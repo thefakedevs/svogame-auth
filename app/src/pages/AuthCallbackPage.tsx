@@ -111,11 +111,8 @@ export default function AuthCallbackPage() {
                 <UserProfileCard user={state.user}/>
                 <div className="card actions-card">
                     <p className="card-text">
-                        Авторизация завершается
+                        Авторизация завершается, вы можете закрыть эту страницу.
                     </p>
-                    <button className="btn primary" type="button" onClick={finishDelivery}>
-                        Войти
-                    </button>
                 </div>
             </div>
         )

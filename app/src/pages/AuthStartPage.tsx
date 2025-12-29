@@ -26,7 +26,7 @@ export default function AuthStartPage() {
     useEffect(() => {
         let cancelled = false
         let returnUrl = query.get('redirectUrl')
-        let pollingData = query.get('pollingData')
+        let pollingData = query.get('polling')
 
         async function initAuth() {
             try {
