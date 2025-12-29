@@ -1,12 +1,13 @@
 use sea_orm::entity::prelude::*;
 use sea_orm::{ActiveModelBehavior, ActiveValue, DatabaseConnection, DeriveRelation, EnumIter};
 use anyhow::Result;
+use uuid::Uuid;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
 #[sea_orm(table_name = "user")]
 pub struct Model {
-    #[sea_orm(primary_key)]
-    pub id: i32,
+    #[sea_orm(primary_key, auto_increment = false)]
+    pub id: Uuid,
     pub discord_id: String,
     pub username: String,
     pub avatar_url: Option<String>,
@@ -45,6 +46,7 @@ impl Entity {
             Ok(updated_user)
         } else {
             let new_user = ActiveModel {
+                id: ActiveValue::Set(Uuid::new_v4()),
                 discord_id: ActiveValue::Set(discord_id),
                 username: ActiveValue::Set(username),
                 avatar_url: ActiveValue::Set(avatar_url),
@@ -53,7 +55,6 @@ impl Entity {
                 is_active: ActiveValue::Set(true),
                 last_login_at: ActiveValue::Set(chrono::Utc::now()),
                 created_at: ActiveValue::Set(chrono::Utc::now()),
-                ..Default::default()
             };
 
             let created_user = new_user.insert(db).await?;

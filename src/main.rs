@@ -19,6 +19,14 @@ use crate::state::AppState;
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    // Загрузка .env файла для локальной разработки
+    #[cfg(debug_assertions)]
+    {
+        if let Err(e) = dotenvy::dotenv() {
+            eprintln!("Warning: .env file not loaded: {}", e);
+        }
+    }
+
     let config = AppConfig::from_env()?;
 
     #[cfg(debug_assertions)]
@@ -43,8 +51,32 @@ async fn main() -> Result<()> {
         .layer(tracing_layer)
         .with_state(state);
 
-    let listener = TcpListener::bind(config.binding_address).await?;
+    let listener = TcpListener::bind(&config.binding_address).await?;
     info!("API server listening on http://{}", listener.local_addr()?);
+
+    // В debug режиме запускаем Vite dev server
+    #[cfg(debug_assertions)]
+    {
+        use std::process::Command;
+
+        let npm_cmd = if cfg!(target_os = "windows") { "npm.cmd" } else { "npm" };
+        let api_target = format!("http://{}", config.binding_address);
+
+        match Command::new(npm_cmd)
+            .args(["run", "dev"])
+            .current_dir("app")
+            .env("VITE_API_TARGET", &api_target)
+            .spawn()
+        {
+            Ok(_child) => {
+                info!("Vite dev server started. Frontend available at http://localhost:5173");
+                info!("API proxy target: {}", api_target);
+            }
+            Err(e) => {
+                error!("Failed to start Vite dev server: {}. Run 'cd app && npm run dev' manually.", e);
+            }
+        }
+    }
 
     axum::serve(listener, app.into_make_service())
         .await?;

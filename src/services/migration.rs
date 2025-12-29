@@ -77,9 +77,8 @@ impl MigrationTrait for CreateUserTable {
                     .if_not_exists()
                     .col(
                         ColumnDef::new(User::Id)
-                            .integer()
+                            .uuid()
                             .not_null()
-                            .auto_increment()
                             .primary_key(),
                     )
                     .col(ColumnDef::new(User::DiscordId).string().not_null().unique_key())
