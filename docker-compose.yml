@@ -4,9 +4,16 @@ services:
   auth:
     build: .
     ports:
-      - "3000:3000"
+      - "3017:3000"
     environment:
       - RUST_BACKTRACE=1
+      - BINDING_ADDRESS=127.0.0.1:3001
+      - DISCORD_CLIENT_ID=${DISCORD_CLIENT_ID}
+      - DISCORD_CLIENT_SECRET=${DISCORD_CLIENT_SECRET}
+      - DISCORD_REDIRECT_URI=${DISCORD_REDIRECT_URI}
+      - DATABASE_URL=${DATABASE_URL:-sqlite:///app/db.sqlite?mode=rwc}
+      - JWT_SECRET=${JWT_SECRET}
+      - POW_COMPLEXITY=${POW_COMPLEXITY:-19}
     volumes:
       - ./db.sqlite:/app/db.sqlite
 
