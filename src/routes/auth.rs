@@ -5,6 +5,7 @@ use axum::extract::State;
 use axum::Json;
 use sea_orm::ModelTrait;
 use serde::{Deserialize, Serialize};
+use tracing::error;
 use crate::services::discord::exchange_code;
 use crate::services::token::sign_token;
 use crate::state::AuthPollResult;
@@ -61,7 +62,10 @@ pub async fn prepare_auth(
         state.config.pow_complexity,
         delivery_method,
         delivery_target,
-    ).await.map_err(|_| HttpError::internal_error("Failed to create auth ray"))?;
+    ).await.map_err(|e| {
+        error!("Failed to create auth ray: {:?}", e);
+        HttpError::internal_error("Failed to create auth ray")
+    })?;
 
     Ok(Json(PrepareAuthResponse {
         pow_prefix: ray.pow_prefix,
@@ -107,7 +111,10 @@ pub async fn authorize(
     // Find the AuthRay
     let ray = AuthRay::find_by_prefix(&state.db, &body.pow_prefix)
         .await
-        .map_err(|_| crate::misc::HttpError::internal_error("Database error"))?;
+        .map_err(|e| {
+            error!("Database error while finding auth ray: {:?}", e);
+            HttpError::internal_error("Database error")
+        })?;
     let ray = match ray {
         Some(ray) => ray,
         None => return Err(crate::misc::HttpError::bad_request("Invalid or expired pow_prefix")),
@@ -123,7 +130,10 @@ pub async fn authorize(
     };
     let delivery_target = ray.delivery_target.clone();
 
-    ray.delete(&state.db).await.map_err(|_| crate::misc::HttpError::internal_error("Failed to delete auth ray"))?;
+    ray.delete(&state.db).await.map_err(|e| {
+        error!("Failed to delete auth ray: {:?}", e);
+        crate::misc::HttpError::internal_error("Failed to delete auth ray")
+    })?;
 
     let notify_error = |msg: &str| {
         if is_polling {
@@ -141,7 +151,8 @@ pub async fn authorize(
 
     let discord_creds = match exchange_code(&state.config.discord, &body.discord_code).await {
         Ok(creds) => creds,
-        Err(_) => {
+        Err(e) => {
+            error!("Failed to exchange Discord code: {:?}", e);
             notify_error("Failed to exchange Discord code");
             return Err(HttpError::forbidden("Failed to exchange Discord code"));
         }
@@ -157,7 +168,8 @@ pub async fn authorize(
 
     let user_info = match crate::services::discord::get_user_info(&discord_creds.access_token).await {
         Ok(info) => info,
-        Err(_) => {
+        Err(e) => {
+            error!("Failed to fetch Discord user info: {:?}", e);
             notify_error("Failed to fetch Discord user info");
             return Err(HttpError::forbidden("Failed to fetch Discord user info"));
         }
@@ -176,7 +188,8 @@ pub async fn authorize(
         user_info.email.clone(),
     ).await {
         Ok(user) => user,
-        Err(_) => {
+        Err(e) => {
+            error!("Failed to register user: {:?}", e);
             notify_error("Failed to register user");
             return Err(HttpError::internal_error("Failed to register user"));
         }
@@ -184,7 +197,8 @@ pub async fn authorize(
 
     let jwt_token = match sign_token(&user, &state.config) {
         Ok(token) => token,
-        Err(_) => {
+        Err(e) => {
+            error!("Failed to sign token: {:?}", e);
             notify_error("Failed to sign token");
             return Err(HttpError::internal_error("Failed to sign token"));
         }

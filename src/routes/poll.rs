@@ -35,7 +35,7 @@ impl PollResponse {
             error: None,
         }
     }
-    
+
     fn success(access_token: String, id: String, username: String, avatar_url: String) -> Self {
         Self {
             status: "success".to_string(),
@@ -46,7 +46,7 @@ impl PollResponse {
             error: None,
         }
     }
-    
+
     fn error(message: String) -> Self {
         Self {
             status: "error".to_string(),
@@ -57,7 +57,7 @@ impl PollResponse {
             error: Some(message),
         }
     }
-    
+
     fn expired() -> Self {
         Self {
             status: "expired".to_string(),
@@ -90,25 +90,25 @@ pub async fn poll_auth_status(
     if uuid::Uuid::parse_str(&poll_id).is_err() {
         return Err(HttpError::bad_request("Invalid poll ID format"));
     }
-    
+
     {
         let state_guard = state.read().await;
         if let Some(cached_result) = state_guard.get_cached_auth_result(&poll_id).await {
             return Ok(Json(PollResponse::from(cached_result)));
         }
     }
-    
+
     let mut receiver = {
         let state_guard = state.read().await;
         state_guard.subscribe_auth_events()
     };
-    
+
     let cache_check_interval = Duration::from_secs(2);
-    
+
     let result = timeout(POLL_TIMEOUT, async {
         loop {
             let recv_result = timeout(cache_check_interval, receiver.recv()).await;
-            
+
             match recv_result {
                 Ok(Ok(event)) => {
                     if event.poll_id == poll_id {
@@ -137,7 +137,7 @@ pub async fn poll_auth_status(
             }
         }
     }).await;
-    
+
     let response = match result {
         Ok(Some(poll_result)) => PollResponse::from(poll_result),
         Ok(None) => PollResponse::pending(),
@@ -149,7 +149,7 @@ pub async fn poll_auth_status(
             PollResponse::pending()
         }
     };
-    
+
     Ok(Json(response))
 }
 
