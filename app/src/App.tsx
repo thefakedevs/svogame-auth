@@ -1,7 +1,7 @@
 import './App.css'
 import { BrowserRouter, Route, Routes, Navigate, useLocation } from 'react-router-dom'
-import AuthStartPage from '../AuthStartPage.tsx'
-import AuthCallbackPage from '../AuthCallbackPage.tsx'
+import AuthStartPage from './pages/AuthStartPage.tsx'
+import AuthCallbackPage from './pages/AuthCallbackPage.tsx'
 
 function App() {
   return (
