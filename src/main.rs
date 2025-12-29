@@ -44,7 +44,7 @@ async fn main() -> Result<()> {
         .allow_headers(Any);
 
     let state = Arc::new(RwLock::new(AppState::new(config.clone(), db)));
-    
+
     {
         let state_clone = state.clone();
         tokio::spawn(async move {
@@ -56,11 +56,13 @@ async fn main() -> Result<()> {
             }
         });
     }
-    
+
     let app = Router::new()
         .route("/api/auth/prepare", post(routes::prepare_auth))
         .route("/api/auth/authorize", post(routes::authorize))
         .route("/api/auth/poll/{poll_id}", get(routes::poll_auth_status))
+        .route("/api/auth/verify", get(routes::verify))
+        .route("/api/compat/gamervii/auth", post(routes::gamervii_auth))
         .layer(cors)
         .layer(tracing_layer)
         .with_state(state);
