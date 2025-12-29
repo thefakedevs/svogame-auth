@@ -6,7 +6,7 @@ mod entities;
 
 use std::sync::Arc;
 use axum::Router;
-use axum::routing::post;
+use axum::routing::{get, post};
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::{HttpMakeClassifier, TraceLayer};
 use tokio::net::TcpListener;
@@ -44,9 +44,23 @@ async fn main() -> Result<()> {
         .allow_headers(Any);
 
     let state = Arc::new(RwLock::new(AppState::new(config.clone(), db)));
+    
+    {
+        let state_clone = state.clone();
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(std::time::Duration::from_secs(60));
+            loop {
+                interval.tick().await;
+                let state_guard = state_clone.read().await;
+                state_guard.cleanup_auth_cache().await;
+            }
+        });
+    }
+    
     let app = Router::new()
         .route("/api/auth/prepare", post(routes::prepare_auth))
         .route("/api/auth/authorize", post(routes::authorize))
+        .route("/api/auth/poll/{poll_id}", get(routes::poll_auth_status))
         .layer(cors)
         .layer(tracing_layer)
         .with_state(state);

@@ -2,7 +2,8 @@ import {defineConfig} from 'vite'
 import react from '@vitejs/plugin-react'
 import {createMpaPlugin, createPages} from 'vite-plugin-virtual-mpa'
 
-const apiTarget = process.env.VITE_API_TARGET || 'http://127.0.0.1:3001'
+const apiTarget = process.env.VITE_API_TARGET || 'http://127.0.0.1:3000'
+console.log('API proxy target:', apiTarget)
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -26,6 +27,7 @@ export default defineConfig({
             '/api': {
                 target: apiTarget,
                 changeOrigin: true,
+                ws: true,
             }
         }
     },
@@ -36,6 +38,7 @@ export default defineConfig({
             '/api': {
                 target: apiTarget,
                 changeOrigin: true,
+                ws: true,
             }
         }
     }

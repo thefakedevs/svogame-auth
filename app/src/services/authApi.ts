@@ -95,3 +95,4 @@ export async function startPowComputation(user: UserProfile): Promise<void> {
         throw new Error(`Сбой при выполнении Proof-of-Work для пользователя ${user.username}`)
     }
 }
+
