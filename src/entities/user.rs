@@ -37,7 +37,7 @@ impl Entity {
             .await?
         {
             let mut user: ActiveModel = existing_user.into();
-            user.username = ActiveValue::Set(username);
+            // user.username = ActiveValue::Set(username);
             user.avatar_url = ActiveValue::Set(avatar_url);
             user.email = ActiveValue::Set(email);
             user.last_login_at = ActiveValue::Set(chrono::Utc::now());
@@ -47,8 +47,8 @@ impl Entity {
         } else {
             let new_user = ActiveModel {
                 id: ActiveValue::Set(Uuid::new_v4()),
-                discord_id: ActiveValue::Set(discord_id),
-                username: ActiveValue::Set(username),
+                discord_id: ActiveValue::Set(discord_id.clone()),
+                username: ActiveValue::Set(format!("{}@discord", discord_id.clone())),
                 avatar_url: ActiveValue::Set(avatar_url),
                 email: ActiveValue::Set(email),
                 auth_epoch: ActiveValue::Set(0),

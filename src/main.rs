@@ -3,6 +3,7 @@ mod state;
 mod misc;
 mod services;
 mod entities;
+mod docs;
 
 use std::sync::Arc;
 use axum::Router;
@@ -16,6 +17,8 @@ use crate::state::config::AppConfig;
 use anyhow::Result;
 use tokio::sync::RwLock;
 use crate::state::AppState;
+use utoipa::OpenApi;
+use utoipa_swagger_ui::SwaggerUi;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -58,11 +61,14 @@ async fn main() -> Result<()> {
     }
 
     let app = Router::new()
+        .merge(SwaggerUi::new("/api/docs").url("/api/openapi.json", docs::ApiDoc::openapi()))
         .route("/api/auth/prepare", post(routes::prepare_auth))
         .route("/api/auth/authorize", post(routes::authorize))
         .route("/api/auth/poll/{poll_id}", get(routes::poll_auth_status))
         .route("/api/auth/verify", get(routes::verify))
         .route("/api/compat/gamervii/auth", post(routes::gamervii_auth))
+        .route("/api/user/me", get(routes::get_me))
+        .route("/api/user/me/nickname", post(routes::update_nickname))
         .layer(cors)
         .layer(tracing_layer)
         .with_state(state);

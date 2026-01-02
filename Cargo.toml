@@ -24,4 +24,7 @@ jwt = "0.16"
 hmac = "0.12"
 uuid = { version = "1.19", features = ["v4"] }
 dotenvy = "0.15"
+regex = "1.12.2"
+utoipa = { version = "5.4.0", features = ["axum_extras", "uuid", "chrono"] }
+utoipa-swagger-ui = { version = "9.0.2", features = ["axum"] }
 

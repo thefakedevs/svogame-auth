@@ -21,6 +21,10 @@ impl HttpError {
         Self::new(StatusCode::BAD_REQUEST, message)
     }
 
+    pub fn unauthorized(message: impl Into<String>) -> Self {
+        Self::new(StatusCode::UNAUTHORIZED, message)
+    }
+
     pub fn forbidden(message: impl Into<String>) -> Self {
         Self::new(StatusCode::FORBIDDEN, message)
     }
@@ -40,5 +44,4 @@ impl IntoResponse for HttpError {
 }
 
 pub type HttpResult<T> = Result<T, HttpError>;
-
 
