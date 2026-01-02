@@ -7,3 +7,4 @@ pub use auth_ray::Model as AuthRayModel;
 pub use user::Entity as User;
 pub use user::Model as UserModel;
 pub use user::ActiveModel as UserActiveModel;
+pub use user::Column as UserColumn;

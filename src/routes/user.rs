@@ -1,7 +1,7 @@
 use axum::extract::State;
 use axum::http::HeaderMap;
 use axum::Json;
-use sea_orm::{ActiveModelTrait, EntityTrait, Set};
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use utoipa::ToSchema;
@@ -129,6 +129,18 @@ pub async fn update_nickname(
     let nickname_regex = regex::Regex::new(r"^[a-zA-Z0-9_]{2,16}$").unwrap();
     if !nickname_regex.is_match(&body.nickname) {
         return Err(HttpError::bad_request("Nickname must be 2-16 characters long and contain only letters, numbers, and underscores"));
+    }
+
+    let existing_user = User::find()
+        .filter(crate::entities::UserColumn::Username.eq(&body.nickname))
+        .one(&state_guard.db)
+        .await
+        .map_err(|e| HttpError::internal_error(format!("Database error: {}", e)))?;
+
+    if let Some(existing) = existing_user {
+        if existing.id != user.id {
+            return Err(HttpError::bad_request("Nickname is already taken"));
+        }
     }
 
     let mut active_user: crate::entities::UserActiveModel = user.into();
