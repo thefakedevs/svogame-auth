@@ -1,7 +1,7 @@
 FROM rust:1.90-alpine3.22 AS rust-builder
 WORKDIR /app
 
-RUN apk add --no-cache build-base musl-dev openssl-dev openssl-libs-static
+RUN apk add --no-cache build-base musl-dev openssl-dev openssl-libs-static curl
 
 RUN rustup target add x86_64-unknown-linux-musl
 COPY Cargo.toml Cargo.lock ./
