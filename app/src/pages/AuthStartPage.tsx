@@ -1,10 +1,12 @@
 import {useEffect, useState} from 'react'
+import { useNavigate } from 'react-router-dom'
 import LoadingState from '../components/LoadingState'
 import ErrorState from '../components/ErrorState'
 import {type DiscordAuthInitResponse, requestDiscordAuthInit} from '../services/authApi'
 import {useAuthStore} from '../store/authStore'
 import {solvePow} from "../services/pow.ts";
 import {useQuery} from "../util/query.ts";
+import { isAuthenticated } from '../util/tokenStorage'
 
 interface InitState {
     status: 'loading' | 'solving_pow' | 'redirecting' | 'error'
@@ -17,13 +19,29 @@ export default function AuthStartPage() {
     const [state, setState] = useState<InitState>({status: 'loading'})
     const store = useAuthStore()
     const query = useQuery()
+    const navigate = useNavigate()
+
+    // Проверяем авторизацию только один раз при монтировании
+    useEffect(() => {
+        if (isAuthenticated()) {
+            navigate('/profile', { replace: true })
+            return
+        }
+        
+        // Очищаем данные только если они есть
+        const currentState = useAuthStore.getState()
+        if (currentState.user || currentState.powData) {
+            store.setUser(null)
+            store.setPoWData(null)
+        }
+    }, []) // Пустой массив зависимостей - выполняется только при монтировании
 
     useEffect(() => {
-        store.setUser(null)
-        store.setPoWData(null)
-    }, [])
+        // Не запускаем авторизацию если пользователь уже авторизован
+        if (isAuthenticated()) {
+            return
+        }
 
-    useEffect(() => {
         let cancelled = false
         let returnUrl = query.get('redirectUrl')
         let pollingData = query.get('polling')
@@ -35,6 +53,8 @@ export default function AuthStartPage() {
                     data = await requestDiscordAuthInit(returnUrl)
                 } else if (pollingData) {
                     data = JSON.parse(atob(pollingData));
+                } else {
+                    data = await requestDiscordAuthInit("/token")
                 }
                 if (!data) {
                     throw new Error('Return URL or polling data is required')
@@ -73,7 +93,7 @@ export default function AuthStartPage() {
         return () => {
             cancelled = true
         }
-    }, [])
+    }, [query]) // Зависимость только от query
 
     if (state.status === 'loading') {
         return (

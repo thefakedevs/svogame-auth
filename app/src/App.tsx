@@ -2,6 +2,9 @@ import './App.css'
 import { BrowserRouter, Route, Routes, Navigate, useLocation } from 'react-router-dom'
 import AuthStartPage from './pages/AuthStartPage.tsx'
 import AuthCallbackPage from './pages/AuthCallbackPage.tsx'
+import UserEditPage from './pages/UserEditPage.tsx'
+import ProfilePage from './pages/ProfilePage.tsx'
+import TokenHandler from './pages/TokenHandler.tsx'
 
 function App() {
   return (
@@ -10,6 +13,9 @@ function App() {
         <Routes>
           <Route path="/" element={<Navigate to="/auth" replace />} />
           <Route path="/auth" element={<AuthEntry />} />
+          <Route path="/token" element={<TokenHandler />} />
+          <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/edit-nickname" element={<UserEditPage />} />
           <Route path="*" element={<div className="not-found">Страница не найдена</div>} />
         </Routes>
       </div>

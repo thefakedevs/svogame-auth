@@ -33,6 +33,9 @@ export default function AuthCallbackPage() {
 
                 if (data.deliveryMethod == 'redirect') {
                     setState({status: 'success', user: data})
+                    setTimeout(() => {
+                        window.location.href = data.deliveryTarget + "?token=" + encodeURIComponent(data.accessToken)
+                    }, 1000)
                 } else if (data.deliveryMethod == 'polling') {
                     setState({status: 'delivering', user: data})
                 } else {
