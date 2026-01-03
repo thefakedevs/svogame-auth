@@ -44,7 +44,7 @@ export function validateTokenFormat(token: string): boolean {
  * Stores JWT token in the auth store
  * @param token JWT token to store
  */
-export function storeToken(token: string): void {
+export function storeToken(token: string): Promise<void> {
   // Import dynamically to avoid circular dependencies
   return import('../store/authStore')
     .then(({ useAuthStore }) => {
@@ -60,7 +60,7 @@ export function storeToken(token: string): void {
 /**
  * Clears JWT token from the auth store
  */
-export function clearToken(): void {
+export function clearToken(): Promise<void> {
   // Import dynamically to avoid circular dependencies
   return import('../store/authStore')
     .then(({ useAuthStore }) => {

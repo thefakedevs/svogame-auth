@@ -1,11 +1,16 @@
 import type { UserProfile } from '../services/authApi'
+import type { UserResponse } from '../services/userApi'
 import './UserProfileCard.css'
 
 interface UserProfileCardProps {
-  user: UserProfile
+  user: UserProfile | UserResponse | undefined
 }
 
 export default function UserProfileCard({ user }: UserProfileCardProps) {
+  if (!user) {
+    return null
+  }
+
   return (
     <div className="user-profile-card">
       <div className="profile-card-glow"></div>
@@ -14,7 +19,7 @@ export default function UserProfileCard({ user }: UserProfileCardProps) {
           <div className="avatar-ring"></div>
           <img
             className="avatar"
-            src={user.avatarUrl}
+            src={user.avatarUrl ?? ''}
             alt={user.username}
             loading="lazy"
           />
@@ -46,4 +51,3 @@ export default function UserProfileCard({ user }: UserProfileCardProps) {
     </div>
   )
 }
-
