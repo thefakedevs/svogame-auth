@@ -34,7 +34,7 @@ export default function TokenHandler() {
                 window.history.replaceState({}, document.title, newUrl)
 
                 // Получаем данные пользователя с новым токеном
-                const userData = await getCurrentUser()
+                const userData = await getCurrentUser(token)
                 if (cancelled) return
 
                 // Обновляем store с данными пользователя только если данные изменились

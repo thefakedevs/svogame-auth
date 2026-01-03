@@ -118,7 +118,7 @@ const ProfilePage: React.FC = () => {
           navigate(url.pathname + url.search, { replace: true })
         } catch (err) {
           // fallback: replace history without token
-          window.history.replaceState(null, '', window.location.pathname + window.location.search.replace(/([?&])token=[^&]*(&|$)/, (m, p1, p2) => p2 ? p1 : ''))
+          window.history.replaceState(null, '', window.location.pathname + window.location.search.replace(/([?&])token=[^&]*(&|$)/, (_m, p1, p2) => p2 ? p1 : ''))
         }
       } catch (err) {
         console.error('Error storing token or fetching user data', err)

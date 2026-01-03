@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getCurrentUser, updateUserNickname, type User } from '../services/userApi'
+import { getCurrentUser, updateNickname, type UserResponse } from '../services/userApi'
 import { useAuthStore } from '../store/authStore'
 import { isAuthenticated, removeAuthToken } from '../util/tokenStorage'
 import LoadingState from '../components/LoadingState'
@@ -10,9 +10,9 @@ import './UserEditPage.css'
 
 type PageState = 
     | { status: 'loading' }
-    | { status: 'loaded', user: User }
+    | { status: 'loaded', user: UserResponse }
     | { status: 'updating' }
-    | { status: 'success', user: User }
+    | { status: 'success', user: UserResponse }
     | { status: 'error', errorMessage: string }
 
 export default function UserEditPage() {
@@ -44,7 +44,13 @@ export default function UserEditPage() {
 
         async function loadUser() {
             try {
-                const userData = await getCurrentUser()
+                // Get token from auth store
+                const token = useAuthStore.getState().token
+                if (!token) {
+                    throw new Error('No authentication token available')
+                }
+
+                const userData = await getCurrentUser(token)
                 if (cancelled) return
 
                 setState({ status: 'loaded', user: userData })
@@ -122,7 +128,12 @@ export default function UserEditPage() {
         setValidationError('')
 
         try {
-            const updatedUser = await updateUserNickname(nickname)
+            const token = useAuthStore.getState().token
+            if (!token) {
+                throw new Error('No authentication token available')
+            }
+
+            const updatedUser = await updateNickname(token, nickname)
             
             // Обновляем пользователя в auth store
             if (authUser) {
