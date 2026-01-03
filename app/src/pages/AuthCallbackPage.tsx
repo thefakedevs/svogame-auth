@@ -1,4 +1,5 @@
 import {useEffect, useState} from 'react'
+import {useNavigate} from 'react-router-dom'
 import LoadingState from '../components/LoadingState'
 import ErrorState from '../components/ErrorState'
 import UserProfileCard from '../components/UserProfileCard'
@@ -14,9 +15,18 @@ interface CallbackState {
 
 export default function AuthCallbackPage() {
     const query = useQuery()
-    // const navigate = useNavigate()
+    const navigate = useNavigate()
     const [state, setState] = useState<CallbackState>({status: 'loadingProfile'})
     const {setUser, setPoWData} = useAuthStore()
+
+    // Auto-deliver immediately when server chose redirect method
+    useEffect(() => {
+        if (state.status === 'success' && state.user && state.user.deliveryMethod === 'redirect') {
+            // Small timeout to allow UI to render briefly before navigation
+            const t = setTimeout(() => finishDelivery(), 50)
+            return () => clearTimeout(t)
+        }
+    }, [state])
 
     useEffect(() => {
         let cancelled = false
@@ -33,9 +43,6 @@ export default function AuthCallbackPage() {
 
                 if (data.deliveryMethod == 'redirect') {
                     setState({status: 'success', user: data})
-                    setTimeout(() => {
-                        window.location.href = data.deliveryTarget + "?token=" + encodeURIComponent(data.accessToken)
-                    }, 1000)
                 } else if (data.deliveryMethod == 'polling') {
                     setState({status: 'delivering', user: data})
                 } else {
@@ -59,7 +66,23 @@ export default function AuthCallbackPage() {
         if (!state.user) return
 
         if (state.user.deliveryMethod === 'redirect') {
-            window.location.href = state.user.deliveryTarget + "?token=" + encodeURIComponent(state.user.accessToken)
+            try {
+                // Try to parse deliveryTarget; allow relative targets
+                const parsed = new URL(state.user.deliveryTarget, window.location.origin)
+                const tokenParam = "?token=" + encodeURIComponent(state.user.accessToken)
+
+                // If target is same-origin, use SPA navigation so the router/effects handle the token
+                if (parsed.origin === window.location.origin) {
+                    navigate(parsed.pathname + tokenParam)
+                    return
+                }
+
+                // Otherwise, perform a full navigation
+                window.location.href = parsed.toString() + tokenParam
+            } catch (err) {
+                // Fallback to naive concatenation if URL parsing fails
+                window.location.href = state.user.deliveryTarget + "?token=" + encodeURIComponent(state.user.accessToken)
+            }
         } else if (state.user.deliveryMethod === 'polling') {
 
         } else {

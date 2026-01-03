@@ -11,11 +11,11 @@ export default function LoadingState({ title, message, children }: LoadingStateP
   return (
     <div className="card loading-state">
       <div className="loading-icon-container">
-        <div className="loading-spinner">
+        {/* <div className="loading-spinner">
           <div className="spinner-ring"></div>
           <div className="spinner-ring"></div>
           <div className="spinner-ring"></div>
-        </div>
+        </div> */}
       </div>
       <div className="loading-content">
         {title && <h1 className="card-title">{title}</h1>}

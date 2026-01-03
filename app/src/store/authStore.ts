@@ -1,14 +1,14 @@
 import {create} from 'zustand'
 import type {UserProfile} from '../services/authApi'
-import { persist } from 'zustand/middleware';
+import { persist } from 'zustand/middleware'
 
 interface AuthState {
     user: UserProfile | null
     powData: { solution: string, prefix: string } | null
-    isAuthenticated: boolean
+    token: string | null
     setUser: (user: UserProfile | null) => void
     setPoWData: (data: { solution: string, prefix: string } | null) => void
-    logout: () => void
+    setToken: (token: string | null) => void
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -16,10 +16,10 @@ export const useAuthStore = create<AuthState>()(
         (set) => ({
             user: null,
             powData: null,
-            isAuthenticated: false,
-            setUser: (user) => set({user, isAuthenticated: !!user}),
+            token: null,
+            setUser: (user) => set({user}),
             setPoWData: (data: { solution: string, prefix: string } | null) => set({powData: data}),
-            logout: () => set({user: null, powData: null, isAuthenticated: false}),
+            setToken: (token) => set({token}),
         }), {name: "auth-storage"}
     )
 )
