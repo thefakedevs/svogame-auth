@@ -150,7 +150,10 @@ const ProfilePage: React.FC = () => {
         return (
           <div className="error">
             <p>Error: {state.errorMessage}</p>
-            <button onClick={() => navigate('/auth')}>
+            <button onClick={() => {
+              window.localStorage.clear()
+              navigate('/auth')}
+            }>
               Return to Authentication
             </button>
           </div>

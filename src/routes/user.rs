@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use utoipa::ToSchema;
 
-use crate::entities::{User, UserModel};
+use crate::entities::{User, UserModel, NICKNAME_REGEX};
 use crate::misc::{HttpError, HttpResult};
 use crate::routes::AxumAppState;
 use crate::services::token::verify_token;
@@ -126,7 +126,7 @@ pub async fn update_nickname(
         return Err(HttpError::bad_request("Nickname cannot be empty"));
     }
 
-    let nickname_regex = regex::Regex::new(r"^[a-zA-Z0-9_]{2,16}$").unwrap();
+    let nickname_regex = regex::Regex::new(NICKNAME_REGEX).unwrap();
     if !nickname_regex.is_match(&body.nickname) {
         return Err(HttpError::bad_request("Nickname must be 2-16 characters long and contain only letters, numbers, and underscores"));
     }

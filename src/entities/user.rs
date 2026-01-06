@@ -1,6 +1,6 @@
+use anyhow::Result;
 use sea_orm::entity::prelude::*;
 use sea_orm::{ActiveModelBehavior, ActiveValue, DatabaseConnection, DeriveRelation, EnumIter};
-use anyhow::Result;
 use uuid::Uuid;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
@@ -37,7 +37,6 @@ impl Entity {
             .await?
         {
             let mut user: ActiveModel = existing_user.into();
-            // user.username = ActiveValue::Set(username);
             user.avatar_url = ActiveValue::Set(avatar_url);
             user.email = ActiveValue::Set(email);
             user.last_login_at = ActiveValue::Set(chrono::Utc::now());
@@ -45,10 +44,16 @@ impl Entity {
             let updated_user = user.update(db).await?;
             Ok(updated_user)
         } else {
+            let username =
+                if is_valid_nickname(&username) && !is_nickname_taken(db, &username).await? {
+                    username
+                } else {
+                    generate_unique_nickname(db).await?
+                };
             let new_user = ActiveModel {
                 id: ActiveValue::Set(Uuid::new_v4()),
                 discord_id: ActiveValue::Set(discord_id.clone()),
-                username: ActiveValue::Set(format!("{}@discord", discord_id.clone())),
+                username: ActiveValue::Set(username),
                 avatar_url: ActiveValue::Set(avatar_url),
                 email: ActiveValue::Set(email),
                 auth_epoch: ActiveValue::Set(0),
@@ -63,3 +68,34 @@ impl Entity {
     }
 }
 
+pub const NICKNAME_REGEX: &str = r"^[a-zA-Z0-9_]{3,16}$";
+
+fn is_valid_nickname(nickname: &str) -> bool {
+    let nickname_regex = regex::Regex::new(NICKNAME_REGEX).unwrap();
+    nickname_regex.is_match(nickname)
+}
+
+async fn is_nickname_taken(db: &DatabaseConnection, nickname: &str) -> Result<bool> {
+    use sea_orm::EntityTrait;
+
+    let count = Entity::find()
+        .filter(Column::Username.eq(nickname))
+        .count(db)
+        .await?;
+
+    Ok(count > 0)
+}
+
+async fn generate_unique_nickname(db: &DatabaseConnection) -> Result<String> {
+    let mut tries = 0;
+    loop {
+        let nickname = crate::util::nickname::random_nickname();
+        if !is_nickname_taken(db, &nickname).await? {
+            return Ok(nickname);
+        }
+        tries += 1;
+        if tries >= 5 {
+            return Err(anyhow::anyhow!("Failed to generate unique nickname after 5 tries"));
+        }
+    }
+}

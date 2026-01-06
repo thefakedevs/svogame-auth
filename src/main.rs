@@ -4,6 +4,7 @@ mod misc;
 mod services;
 mod entities;
 mod docs;
+mod util;
 
 use std::sync::Arc;
 use axum::Router;

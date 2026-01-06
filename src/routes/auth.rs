@@ -40,8 +40,6 @@ pub async fn prepare_auth(
     let state = &state.read().await;
     let db = &state.db;
 
-    // TODO: Return messages through polling if delivery method is polling
-
     let delivery_method = match body.delivery_method.as_str() {
         "redirect" => TokenDeliveryMethod::Redirect,
         "polling" => TokenDeliveryMethod::Polling,
@@ -183,7 +181,7 @@ pub async fn authorize(
     let user = match crate::entities::User::update_or_register_by_discord_id(
         &state.db,
         user_info.id.clone(),
-        user_info.global_name.clone().unwrap_or(user_info.username.clone()),
+        user_info.username.clone(),
         discord_creds.build_avatar_url(&user_info),
         user_info.email.clone(),
     ).await {
