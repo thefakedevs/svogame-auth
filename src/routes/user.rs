@@ -143,6 +143,12 @@ pub async fn update_nickname(
         }
     }
 
+    if let Some(gml_config) = &state_guard.config.gamervii_compat {
+        crate::services::gml::remove_player_from_gml(gml_config, &user.id.to_string())
+            .await
+            .map_err(|e| HttpError::internal_error(format!("Failed to sync with GML: {}", e)))?;
+    }
+
     let mut active_user: crate::entities::UserActiveModel = user.into();
     active_user.username = Set(body.nickname);
 

@@ -83,8 +83,18 @@ export async function getCurrentUser(token: string): Promise<UserResponse> {
     })
 
     if (!response.ok) {
-      const error = new ApiError(response.status, response.statusText)
-      
+      let errorMessage = response.statusText;
+      try {
+        const errorBody = await response.json();
+        if (errorBody && errorBody.error) {
+          errorMessage = errorBody.error;
+        }
+      } catch (e) {
+        console.log(e);
+      }
+
+      const error = new ApiError(response.status, response.statusText, errorMessage)
+
       // Handle authentication errors
       if (error.isAuthError()) {
         handleAuthError(error)
@@ -125,8 +135,18 @@ export async function updateNickname(token: string, nickname: string): Promise<U
     })
 
     if (!response.ok) {
-      const error = new ApiError(response.status, response.statusText)
-      
+      let errorMessage = response.statusText;
+      try {
+        const errorBody = await response.json();
+        if (errorBody && errorBody.error) {
+          errorMessage = errorBody.error;
+        }
+      } catch (e) {
+        // Ignore JSON parsing errors
+      }
+
+      const error = new ApiError(response.status, response.statusText, errorMessage)
+
       // Handle authentication errors
       if (error.isAuthError()) {
         handleAuthError(error)

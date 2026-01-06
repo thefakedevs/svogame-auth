@@ -8,6 +8,13 @@ pub struct AppConfig {
     pub database: DatabaseConfig,
     pub pow_complexity: u8,
     pub jwt_secret: String,
+    pub gamervii_compat: Option<GamerviiCompatConfig>,
+}
+
+#[derive(Debug, Clone)]
+pub struct GamerviiCompatConfig {
+    pub endpoint: String,
+    pub token: String,
 }
 
 #[derive(Debug, Clone)]
@@ -34,6 +41,7 @@ impl AppConfig {
             .parse::<u8>()
             .context("POW_COMPLEXITY must be a valid u8")?;
         let jwt_secret = std::env::var("JWT_SECRET").context("JWT_SECRET not set")?;
+        let gamervii_compat = GamerviiCompatConfig::from_env();
         
         Ok(AppConfig {
             binding_address,
@@ -41,6 +49,24 @@ impl AppConfig {
             database,
             pow_complexity,
             jwt_secret,
+            gamervii_compat,
+        })
+    }
+}
+
+impl GamerviiCompatConfig {
+    fn from_env() -> Option<Self> {
+        let enabled = std::env::var("GAMERVII_COMPAT_ENABLED").unwrap_or_else(|_| "false".to_string()) == "true";
+        if !enabled {
+            return None;
+        }
+
+        let endpoint = std::env::var("GAMERVII_COMPAT_ENDPOINT").ok()?;
+        let token = std::env::var("GAMERVII_COMPAT_TOKEN").ok()?;
+
+        Some(GamerviiCompatConfig {
+            endpoint,
+            token,
         })
     }
 }
