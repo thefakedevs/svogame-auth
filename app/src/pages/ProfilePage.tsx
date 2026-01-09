@@ -27,6 +27,7 @@ const ProfilePage: React.FC = () => {
   const fetchUserData = async (token: string) => {
     try {
       const userData = await getCurrentUser(token)
+      authStore.setUser(userData)
       setState({ 
         status: 'loaded',
         user: userData
@@ -35,6 +36,7 @@ const ProfilePage: React.FC = () => {
       if (error instanceof ApiError && error.isAuthError()) {
         tokenManager.clearToken()
         authStore.setToken(null)
+        authStore.setUser(null)
         setState({ status: 'unauthorized' })
         navigate('/auth')
       } else {
@@ -56,6 +58,7 @@ const ProfilePage: React.FC = () => {
 
     try {
       const updatedUser = await updateNickname(token, newNickname)
+      authStore.setUser(updatedUser)
       setState(prev => ({ 
         ...prev, 
         user: updatedUser,
@@ -67,6 +70,7 @@ const ProfilePage: React.FC = () => {
       if (error instanceof ApiError && error.isAuthError()) {
         tokenManager.clearToken()
         authStore.setToken(null)
+        authStore.setUser(null)
         setState({ status: 'unauthorized' })
         navigate('/auth')
         throw error
@@ -86,6 +90,15 @@ const ProfilePage: React.FC = () => {
         if (!storedToken) {
           setState({ status: 'unauthorized' })
           navigate('/auth')
+          return
+        }
+
+        // If we already have user data in store, use it directly
+        if (authStore.user) {
+          setState({ 
+            status: 'loaded',
+            user: authStore.user
+          })
           return
         }
 
@@ -135,6 +148,7 @@ const ProfilePage: React.FC = () => {
   const handleLogout = () => {
     tokenManager.clearToken()
     authStore.setToken(null)
+    authStore.setUser(null)
     navigate('/auth')
   }
 

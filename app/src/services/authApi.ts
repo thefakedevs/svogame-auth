@@ -18,6 +18,7 @@ export interface AuthorizationCallbackResponse {
     avatarUrl: string,
     deliveryMethod: 'redirect' | 'polling',
     deliveryTarget: string,
+    user: UserProfile,
 }
 
 function simulateDelay<T>(result: T, delayMs = 1200): Promise<T> {
@@ -82,7 +83,17 @@ export async function fetchAuthorize(
         throw new Error(`Ошибка при авторизации: ${errorMessage}`);
     }
 
-    return simulateDelay(data as AuthorizationCallbackResponse)
+    // Create user object from response data
+    const result: AuthorizationCallbackResponse = {
+        ...data,
+        user: {
+            id: data.id,
+            username: data.username,
+            avatarUrl: data.avatarUrl
+        }
+    }
+
+    return simulateDelay(result)
 }
 
 

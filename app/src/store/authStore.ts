@@ -11,6 +11,7 @@ interface AuthState {
     setToken: (token: string | null) => void
 }
 
+// Main store for user/token - persisted to localStorage
 export const useAuthStore = create<AuthState>()(
     persist(
         (set) => ({
@@ -18,9 +19,34 @@ export const useAuthStore = create<AuthState>()(
             powData: null,
             token: null,
             setUser: (user) => set({user}),
-            setPoWData: (data: { solution: string, prefix: string } | null) => set({powData: data}),
+            setPoWData: (data: { solution: string, prefix: string } | null) => {
+                // Save powData to sessionStorage (survives redirects, cleared on tab close)
+                if (data) {
+                    sessionStorage.setItem('pow-data', JSON.stringify(data))
+                } else {
+                    sessionStorage.removeItem('pow-data')
+                }
+                set({powData: data})
+            },
             setToken: (token) => set({token}),
-        }), {name: "auth-storage"}
+        }), {
+            name: "auth-storage",
+            // Exclude powData from localStorage persistence
+            partialize: (state) => ({ user: state.user, token: state.token }),
+            onRehydrate: () => (state) => {
+                // Restore powData from sessionStorage on page load
+                if (state) {
+                    try {
+                        const stored = sessionStorage.getItem('pow-data')
+                        if (stored) {
+                            state.powData = JSON.parse(stored)
+                        }
+                    } catch (e) {
+                        // ignore parse errors
+                    }
+                }
+            }
+        }
     )
 )
 

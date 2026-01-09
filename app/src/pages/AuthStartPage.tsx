@@ -31,8 +31,12 @@ export default function AuthStartPage() {
             return
         }
 
-        store.setUser(null)
-        store.setPoWData(null)
+        // Only clear data if we're starting a new auth flow (no code from Discord)
+        // If code is present, AuthCallbackPage will handle the flow
+        if (!query.get('code')) {
+            store.setUser(null)
+            store.setPoWData(null)
+        }
     }, [query, navigate, store.setUser, store.setPoWData])
 
     useEffect(() => {

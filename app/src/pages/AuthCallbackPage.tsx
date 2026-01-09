@@ -17,7 +17,7 @@ export default function AuthCallbackPage() {
     const query = useQuery()
     const navigate = useNavigate()
     const [state, setState] = useState<CallbackState>({status: 'loadingProfile'})
-    const {setUser, setPoWData} = useAuthStore()
+    const {setUser, setPoWData, setToken} = useAuthStore()
 
     // Auto-deliver immediately when server chose redirect method
     useEffect(() => {
@@ -34,7 +34,19 @@ export default function AuthCallbackPage() {
         async function loadProfile() {
             try {
                 const code = query.get('code') ?? ''
-                const pow = useAuthStore.getState().powData
+                
+                // Try to get powData from store first, fallback to sessionStorage
+                let pow = useAuthStore.getState().powData
+                if (!pow) {
+                    try {
+                        const stored = sessionStorage.getItem('pow-data')
+                        if (stored) {
+                            pow = JSON.parse(stored)
+                        }
+                    } catch (e) {
+                        // ignore parse errors
+                    }
+                }
 
                 const data = await fetchAuthorize(code, pow)
                 if (cancelled) return
@@ -62,23 +74,30 @@ export default function AuthCallbackPage() {
         }
     }, [query, setPoWData, setUser])
 
-    const finishDelivery = function() {
+    const finishDelivery = async function() {
         if (!state.user) return
 
         if (state.user.deliveryMethod === 'redirect') {
             try {
+                // Store token and user data before navigation
+                setUser(state.user.user)
+                setToken(state.user.accessToken)
+                await import('../services/tokenManager').then(({ tokenManager }) => {
+                    return tokenManager.storeToken(state.user!.accessToken)
+                })
+
                 // Try to parse deliveryTarget; allow relative targets
                 const parsed = new URL(state.user.deliveryTarget, window.location.origin)
-                const tokenParam = "?token=" + encodeURIComponent(state.user.accessToken)
 
-                // If target is same-origin, use SPA navigation so the router/effects handle the token
+                // If target is same-origin, use SPA navigation without token in URL
                 if (parsed.origin === window.location.origin) {
-                    navigate(parsed.pathname + tokenParam)
+                    navigate(parsed.pathname + parsed.search, { replace: true })
                     return
                 }
 
-                // Otherwise, perform a full navigation
-                window.location.href = parsed.toString() + tokenParam
+                // Otherwise, perform a full navigation with token
+                const tokenParam = parsed.search ? "&" : "?"
+                window.location.href = parsed.toString() + tokenParam + "token=" + encodeURIComponent(state.user.accessToken)
             } catch (err) {
                 // Fallback to naive concatenation if URL parsing fails
                 window.location.href = state.user.deliveryTarget + "?token=" + encodeURIComponent(state.user.accessToken)
@@ -137,8 +156,18 @@ export default function AuthCallbackPage() {
                 <UserProfileCard user={state.user}/>
                 <div className="card actions-card">
                     <p className="card-text">
-                        Авторизация завершается, вы можете закрыть эту страницу.
+                        Авторизация завершается, для изменения никнейма нажмите кнопку ниже.
                     </p>
+                    <button className="btn primary" type="button" onClick={async () => {
+                        setUser(state.user!.user)
+                        setToken(state.user!.accessToken)
+                        await import('../services/tokenManager').then(({ tokenManager }) => {
+                            return tokenManager.storeToken(state.user!.accessToken)
+                        })
+                        navigate('/profile', {replace: true})
+                    }}>
+                        Перейти в профиль
+                    </button>
                 </div>
             </div>
         )
