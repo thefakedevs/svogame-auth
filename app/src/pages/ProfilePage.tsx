@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery } from '../util/query'
 import { useAuthStore } from '../store/authStore'
 import { getCurrentUser, updateNickname, type UserResponse, ApiError } from '../services/userApi'
+import type { UserProfile } from '../services/authApi'
 import { tokenManager } from '../services/tokenManager'
 import UserProfileCard from '../components/UserProfileCard'
 import NicknameEditor from '../components/NicknameEditor'
@@ -10,7 +11,7 @@ import './ProfilePage.css'
 
 interface ProfilePageState {
   status: 'loading' | 'loaded' | 'error' | 'unauthorized'
-  user?: UserResponse
+  user?: UserResponse | UserProfile
   errorMessage?: string
   isUpdatingNickname?: boolean
 }
@@ -27,7 +28,12 @@ const ProfilePage: React.FC = () => {
   const fetchUserData = async (token: string) => {
     try {
       const userData = await getCurrentUser(token)
-      authStore.setUser(userData)
+      const profile: UserProfile = {
+        id: userData.id,
+        username: userData.username,
+        avatarUrl: userData.avatarUrl ?? ''
+      }
+      authStore.setUser(profile)
       setState({ 
         status: 'loaded',
         user: userData
@@ -58,7 +64,12 @@ const ProfilePage: React.FC = () => {
 
     try {
       const updatedUser = await updateNickname(token, newNickname)
-      authStore.setUser(updatedUser)
+      const profile: UserProfile = {
+        id: updatedUser.id,
+        username: updatedUser.username,
+        avatarUrl: updatedUser.avatarUrl ?? ''
+      }
+      authStore.setUser(profile)
       setState(prev => ({ 
         ...prev, 
         user: updatedUser,

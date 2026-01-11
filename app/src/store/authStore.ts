@@ -33,7 +33,7 @@ export const useAuthStore = create<AuthState>()(
             name: "auth-storage",
             // Exclude powData from localStorage persistence
             partialize: (state) => ({ user: state.user, token: state.token }),
-            onRehydrate: () => (state) => {
+            onRehydrateStorage: () => (state?: AuthState) => {
                 // Restore powData from sessionStorage on page load
                 if (state) {
                     try {
