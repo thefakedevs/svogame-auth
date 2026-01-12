@@ -43,7 +43,7 @@ export default function SkinUploadInline({ userUuid }: { userUuid: string }) {
       const formData = new FormData()
       formData.append('', file)
 
-      const response = await fetch(`http://localhost:80/skin/${userUuid}?model=${model}`, {
+      const response = await fetch(`https://skins.launcher.artembay.ru/skin/${userUuid}?model=${model}`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`
