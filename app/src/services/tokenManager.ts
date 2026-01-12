@@ -7,6 +7,7 @@ export interface TokenManager {
   validateTokenFormat(token: string): boolean
   storeToken(token: string): Promise<void>
   clearToken(): Promise<void>
+  getToken(): Promise<string | null>
 }
 
 /**
@@ -72,6 +73,12 @@ export function clearToken(): Promise<void> {
     })
 }
 
+export async function getToken(): Promise<string | null> {
+  // Import dynamically to avoid circular dependencies
+  const { useAuthStore } = await import('../store/authStore')
+  return useAuthStore.getState().token
+}
+
 /**
  * TokenManager implementation with all utility functions
  */
@@ -79,5 +86,6 @@ export const tokenManager: TokenManager = {
   extractTokenFromUrl,
   validateTokenFormat,
   storeToken,
-  clearToken
+  clearToken,
+  getToken
 }

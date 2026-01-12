@@ -23,7 +23,6 @@ export default function UserProfileCard({ user }: UserProfileCardProps) {
             alt={user.username}
             loading="lazy"
           />
-          <div className="avatar-status online"></div>
         </div>
         <div className="user-info">
           <h2 className="username">

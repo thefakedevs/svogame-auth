@@ -12,7 +12,9 @@
   "dependencies": {
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "react-hot-toast": "^2.6.0",
     "react-router-dom": "^7.6.0",
+    "skinview3d": "^3.4.1",
     "vite-plugin-mpa": "^1.2.0",
     "zustand": "^5.0.0"
   },

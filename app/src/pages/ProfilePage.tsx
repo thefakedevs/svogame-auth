@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import toast, { Toaster } from 'react-hot-toast'
 import { useQuery } from '../util/query'
 import { useAuthStore } from '../store/authStore'
 import { getCurrentUser, updateNickname, type UserResponse, ApiError } from '../services/userApi'
 import type { UserProfile } from '../services/authApi'
 import { tokenManager } from '../services/tokenManager'
-import UserProfileCard from '../components/UserProfileCard'
-import NicknameEditor from '../components/NicknameEditor'
+import SkinUploadInline from '../components/SkinUploadInline'
+import SkinViewer3D from '../components/SkinViewer3D'
 import './ProfilePage.css'
 
 interface ProfilePageState {
@@ -20,6 +21,9 @@ const ProfilePage: React.FC = () => {
   const navigate = useNavigate()
   const query = useQuery()
   const authStore = useAuthStore()
+  const [isEditing, setIsEditing] = useState(false)
+  const [editNickname, setEditNickname] = useState('')
+  const [viewMode, setViewMode] = useState<'avatar' | 'skin'>('avatar')
   
   const [state, setState] = useState<ProfilePageState>({
     status: 'loading'
@@ -62,8 +66,22 @@ const ProfilePage: React.FC = () => {
 
     setState(prev => ({ ...prev, isUpdatingNickname: true }))
 
-    try {
+    const updatePromise = (async () => {
       const updatedUser = await updateNickname(token, newNickname)
+      return updatedUser
+    })()
+
+    toast.promise(
+      updatePromise,
+      {
+        loading: 'Обновление никнейма...',
+        success: 'Никнейм успешно обновлен!',
+        error: (err) => err.message || 'Ошибка при обновлении никнейма'
+      }
+    )
+
+    try {
+      const updatedUser = await updatePromise
       const profile: UserProfile = {
         id: updatedUser.id,
         username: updatedUser.username,
@@ -75,6 +93,7 @@ const ProfilePage: React.FC = () => {
         user: updatedUser,
         isUpdatingNickname: false
       }))
+      setIsEditing(false)
     } catch (error) {
       setState(prev => ({ ...prev, isUpdatingNickname: false }))
       
@@ -166,48 +185,151 @@ const ProfilePage: React.FC = () => {
   const renderContent = () => {
     switch (state.status) {
       case 'loading':
-        return <div className="loading">Loading profile...</div>
+        return <div className="loading">Загрузка профиля...</div>
       
       case 'unauthorized':
-        return <div className="error">Redirecting to authentication...</div>
+        return <div className="error">Перенаправление на аутентификацию...</div>
       
       case 'error':
         return (
           <div className="error">
-            <p>Error: {state.errorMessage}</p>
+            <p>Ошибка: {state.errorMessage}</p>
             <button onClick={() => {
               window.localStorage.clear()
               navigate('/auth')}
             }>
-              Return to Authentication
+              Вернуться к аутентификации
             </button>
           </div>
         )
       
       case 'loaded':
-        return (
-          <div className="profile-content">
-            <h1>Профиль пользователя</h1>
-            
-            {/* User profile display */}
-            <UserProfileCard 
-              user={state.user}
-            />
-            
-            {/* Nickname editor */}
-            {state.user && (
-              <div className="nickname-section">
-                <h2>Редактирование никнейма</h2>
-                <NicknameEditor
-                  currentUsername={state.user.username}
-                  onNicknameUpdate={handleNicknameUpdate}
-                  isLoading={state.isUpdatingNickname}
-                />
-                <div className="logout-section">
-                  <button className="logout-button" onClick={handleLogout}>Выйти</button>
+        if (isEditing) {
+          return (
+            <div className="profile-container">
+              <div className="profile-view-side">
+                <div className="avatar-circle">
+                  <img
+                    src={state.user?.avatarUrl ?? ''}
+                    alt={state.user?.username}
+                  />
+                </div>
+                <h2 className="username-display">{state.user?.username}</h2>
+              </div>
+
+              <div className="profile-edit-side">
+                <h2>Редактировать профиль</h2>
+
+                {/* Nickname Editor */}
+                <div className="edit-field">
+                  <label>Никнейм</label>
+                  <input
+                    type="text"
+                    value={editNickname}
+                    onChange={(e) => setEditNickname(e.target.value)}
+                    placeholder="Введите никнейм (3-16 символов, a-z, 0-9, _)"
+                    maxLength={16}
+                    disabled={state.isUpdatingNickname}
+                  />
+                  <div className="validation-hint">
+                    3-16 символов, только буквы, цифры и _
+                  </div>
+                </div>
+
+                {/* Skin Upload */}
+                <div className="edit-field">
+                  <label>Загрузка скина</label>
+                  <div className="skin-upload-compact">
+                    <SkinUploadInline userUuid={state.user?.id ?? ''} />
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="edit-actions">
+                  <button
+                    className="btn-save"
+                    onClick={() => {
+                      if (editNickname && editNickname !== state.user?.username) {
+                        handleNicknameUpdate(editNickname)
+                      } else {
+                        setIsEditing(false)
+                      }
+                    }}
+                    disabled={state.isUpdatingNickname}
+                  >
+                    {state.isUpdatingNickname ? 'Сохранение...' : 'Сохранить'}
+                  </button>
+                  <button
+                    className="btn-cancel"
+                    onClick={() => {
+                      setIsEditing(false)
+                      setEditNickname(state.user?.username ?? '')
+                    }}
+                    disabled={state.isUpdatingNickname}
+                  >
+                    Отменить
+                  </button>
                 </div>
               </div>
-            )}
+            </div>
+          )
+        }
+
+        return (
+          <div className="profile-container">
+            <div className="profile-view-side">
+              <div className="view-mode-toggle">
+                <button
+                  className={`view-mode-btn ${viewMode === 'avatar' ? 'active' : ''}`}
+                  onClick={() => setViewMode('avatar')}
+                >
+                  Аватар
+                </button>
+                <button
+                  className={`view-mode-btn ${viewMode === 'skin' ? 'active' : ''}`}
+                  onClick={() => setViewMode('skin')}
+                >
+                  3D Скин
+                </button>
+              </div>
+
+              {viewMode === 'avatar' ? (
+                <div className="avatar-circle">
+                  <img
+                    src={state.user?.avatarUrl ?? ''}
+                    alt={state.user?.username}
+                  />
+                </div>
+              ) : (
+                <div className="skin-viewer-container">
+                  <SkinViewer3D
+                    skinUrl={`https://skins.launcher.artembay.ru/skin/${state.user?.id}`}
+                    width={300}
+                    height={350}
+                  />
+                </div>
+              )}
+
+              <h2 className="username-display">{state.user?.username}</h2>
+            </div>
+
+            <div className="profile-info-side">
+              <button
+                className="btn-edit-profile"
+                onClick={() => {
+                  setIsEditing(true)
+                  setEditNickname(state.user?.username ?? '')
+                }}
+              >
+                Редактировать профиль
+              </button>
+              <button
+                className="btn-logout"
+                onClick={handleLogout}
+              >
+                Выйти из аккаунта
+              </button>
+            </div>
           </div>
         )
       
@@ -218,6 +340,30 @@ const ProfilePage: React.FC = () => {
 
   return (
     <div className="profile-page">
+      <Toaster
+        position="top-right"
+        toastOptions={{
+          duration: 3000,
+          style: {
+            background: '#1e1e2e',
+            color: '#fff',
+            border: '1px solid rgba(88, 101, 242, 0.3)',
+            borderRadius: '12px',
+          },
+          success: {
+            iconTheme: {
+              primary: '#3ba55c',
+              secondary: '#fff',
+            },
+          },
+          error: {
+            iconTheme: {
+              primary: '#ed4245',
+              secondary: '#fff',
+            },
+          },
+        }}
+      />
       {renderContent()}
     </div>
   )
