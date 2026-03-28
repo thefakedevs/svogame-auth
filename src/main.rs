@@ -13,7 +13,7 @@ use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::{HttpMakeClassifier, TraceLayer};
 use tokio::net::TcpListener;
 use tower_http::trace;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 use crate::state::config::AppConfig;
 use anyhow::Result;
 use tokio::sync::RwLock;
@@ -23,6 +23,7 @@ use utoipa_swagger_ui::SwaggerUi;
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    let tracing_layer = prepare_tracing();
     // Загрузка .env файла для локальной разработки
     #[cfg(debug_assertions)]
     {
@@ -34,9 +35,8 @@ async fn main() -> Result<()> {
     let config = AppConfig::from_env()?;
 
     #[cfg(debug_assertions)]
-    error!("Running in debug mode. This is NOT recommended for production!");
+    warn!("Running in debug mode. This is NOT recommended for production!");
 
-    let tracing_layer = prepare_tracing();
 
     let db = services::db::connect_db(&config.database).await?;
     services::db::run_migrations(&db).await?;

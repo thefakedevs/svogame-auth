@@ -1,5 +1,7 @@
 use anyhow::Context;
 use anyhow::Result;
+use reqwest::Proxy;
+use tracing::warn;
 
 #[derive(Debug, Clone)]
 pub struct AppConfig {
@@ -24,6 +26,7 @@ pub struct DiscordConfig {
     pub client_id: String,
     pub client_secret: String,
     pub required_scopes: Vec<String>,
+    pub discord_proxy: Option<Proxy>,
 }
 
 #[derive(Debug, Clone)]
@@ -83,6 +86,13 @@ impl DiscordConfig {
             urlencoding::encode(scopes)
         );
         let client_secret = std::env::var("DISCORD_CLIENT_SECRET").context("DISCORD_CLIENT_SECRET not set")?;
+        let discord_proxy = std::env::var("DISCORD_PROXY").ok();
+        let discord_proxy = if let Some(p) = discord_proxy {
+            Some(Proxy::http(p)?)
+        } else {
+            warn!("DISCORD_PROXY variable not set. Make sure service is hosting out of Russia.");
+            None
+        };
 
         Ok(DiscordConfig {
             oauth2_url,
@@ -90,6 +100,7 @@ impl DiscordConfig {
             client_id,
             client_secret,
             required_scopes: scopes.split('+').map(|s| s.to_string()).collect(),
+            discord_proxy,
         })
     }
 }

@@ -36,7 +36,11 @@ impl DiscordTokenResponse {
 }
 
 pub async fn exchange_code(config: &DiscordConfig, code: &str) -> Result<DiscordTokenResponse> {
-    let client = Client::new();
+    let client = Client::builder();
+    let client = if let Some(p) = config.discord_proxy.clone() {
+        client.proxy(p)
+    } else { client };
+    let client = client.build()?;
 
     let params = [
         ("grant_type", "authorization_code"),
