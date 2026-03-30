@@ -164,7 +164,7 @@ pub async fn authorize(
         }
     }
 
-    let user_info = match crate::services::discord::get_user_info(&discord_creds.access_token).await {
+    let user_info = match crate::services::discord::get_user_info(&state.config.discord, &discord_creds.access_token).await {
         Ok(info) => info,
         Err(e) => {
             error!("Failed to fetch Discord user info: {:?}", e);
