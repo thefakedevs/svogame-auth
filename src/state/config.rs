@@ -36,7 +36,8 @@ pub struct DatabaseConfig {
 
 impl AppConfig {
     pub(crate) fn from_env() -> Result<Self> {
-        let binding_address = std::env::var("BINDING_ADDRESS").unwrap_or_else(|_| { "0.0.0.0:3000".to_string() });
+        let binding_address =
+            std::env::var("BINDING_ADDRESS").unwrap_or_else(|_| "0.0.0.0:3000".to_string());
         let discord = DiscordConfig::from_env()?;
         let database = DatabaseConfig::from_env()?;
         let pow_complexity = std::env::var("POW_COMPLEXITY")
@@ -45,7 +46,7 @@ impl AppConfig {
             .context("POW_COMPLEXITY must be a valid u8")?;
         let jwt_secret = std::env::var("JWT_SECRET").context("JWT_SECRET not set")?;
         let gamervii_compat = GamerviiCompatConfig::from_env();
-        
+
         Ok(AppConfig {
             binding_address,
             discord,
@@ -59,7 +60,9 @@ impl AppConfig {
 
 impl GamerviiCompatConfig {
     fn from_env() -> Option<Self> {
-        let enabled = std::env::var("GAMERVII_COMPAT_ENABLED").unwrap_or_else(|_| "false".to_string()) == "true";
+        let enabled = std::env::var("GAMERVII_COMPAT_ENABLED")
+            .unwrap_or_else(|_| "false".to_string())
+            == "true";
         if !enabled {
             return None;
         }
@@ -67,17 +70,15 @@ impl GamerviiCompatConfig {
         let endpoint = std::env::var("GAMERVII_COMPAT_ENDPOINT").ok()?;
         let token = std::env::var("GAMERVII_COMPAT_TOKEN").ok()?;
 
-        Some(GamerviiCompatConfig {
-            endpoint,
-            token,
-        })
+        Some(GamerviiCompatConfig { endpoint, token })
     }
 }
 
 impl DiscordConfig {
     fn from_env() -> Result<Self> {
         let client_id = std::env::var("DISCORD_CLIENT_ID").context("DISCORD_CLIENT_ID not set")?;
-        let redirect_url = std::env::var("DISCORD_REDIRECT_URI").context("DISCORD_REDIRECT_URI not set")?;
+        let redirect_url =
+            std::env::var("DISCORD_REDIRECT_URI").context("DISCORD_REDIRECT_URI not set")?;
         let scopes = "identify+email+openid";
         let oauth2_url = format!(
             "https://discord.com/oauth2/authorize?client_id={}&response_type=code&redirect_uri={}&scope={}",
@@ -85,10 +86,11 @@ impl DiscordConfig {
             urlencoding::encode(&redirect_url),
             urlencoding::encode(scopes)
         );
-        let client_secret = std::env::var("DISCORD_CLIENT_SECRET").context("DISCORD_CLIENT_SECRET not set")?;
+        let client_secret =
+            std::env::var("DISCORD_CLIENT_SECRET").context("DISCORD_CLIENT_SECRET not set")?;
         let discord_proxy = std::env::var("DISCORD_PROXY").ok();
         let discord_proxy = if let Some(p) = discord_proxy {
-            Some(Proxy::http(p)?)
+            Some(Proxy::all(p)?)
         } else {
             warn!("DISCORD_PROXY variable not set. Make sure service is hosting out of Russia.");
             None
@@ -108,8 +110,6 @@ impl DiscordConfig {
 impl DatabaseConfig {
     fn from_env() -> Result<Self> {
         let db_url = std::env::var("DATABASE_URL").context("DATABASE_URL not set")?;
-        Ok(DatabaseConfig {
-            db_url,
-        })
+        Ok(DatabaseConfig { db_url })
     }
 }
