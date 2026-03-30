@@ -62,7 +62,11 @@ pub async fn exchange_code(config: &DiscordConfig, code: &str) -> Result<Discord
 }
 
 pub async fn get_user_info(access_token: &str) -> Result<DiscordUserResponse> {
-    let client = Client::new();
+    let client = Client::builder();
+    let client = if let Some(p) = config.discord_proxy.clone() {
+        client.proxy(p)
+    } else { client };
+    let client = client.build()?;
 
     let res = client
         .get(&format!("{}/users/@me", API_ENDPOINT))
