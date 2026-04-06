@@ -12,6 +12,7 @@ use crate::domains;
 pub fn build_router(state: SharedAppState) -> Router {
     Router::new()
         .merge(SwaggerUi::new("/api/docs").url("/api/openapi.json", ApiDoc::openapi()))
+        .merge(domains::system::router())
         .merge(domains::auth::router())
         .merge(domains::users::router())
         .merge(domains::compat::router())
