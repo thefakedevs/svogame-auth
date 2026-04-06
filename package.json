@@ -1,0 +1,20 @@
+{
+  "name": "svogame-auth",
+  "private": true,
+  "workspaces": [
+    "frontend"
+  ],
+  "scripts": {
+    "dev": "concurrently --kill-others-on-fail \"npm run backend:dev\" \"npm run frontend:dev:wait\"",
+    "backend:dev": "cross-env BINDING_ADDRESS=127.0.0.1:3001 FRONTEND_DEV_HOST=localhost FRONTEND_DEV_PORT=5173 cargo run -p auth",
+    "backend:check": "cargo check -p auth",
+    "frontend:dev:wait": "wait-on tcp:127.0.0.1:3001 && npm run frontend:dev",
+    "frontend:dev": "npm run dev --workspace frontend",
+    "frontend:build": "npm run build --workspace frontend"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "cross-env": "^10.1.0",
+    "wait-on": "^8.0.3"
+  }
+}
