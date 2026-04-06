@@ -7,7 +7,6 @@ flock -n 9 || {
   exit 1
 }
 
-git config --global --add safe.directory .
 git fetch origin production
 git reset --hard origin/production
 
