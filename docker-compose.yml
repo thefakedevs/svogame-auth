@@ -17,6 +17,7 @@ services:
       - GAMERVII_COMPAT_ENABLED=${GAMERVII_COMPAT_ENABLED:-false}
       - GAMERVII_COMPAT_ENDPOINT=${GAMERVII_COMPAT_ENDPOINT}
       - GAMERVII_COMPAT_TOKEN=${GAMERVII_COMPAT_TOKEN}
+      - DISCORD_PROXY=${DISCORD_PROXY}
     volumes:
       - ./db.sqlite:/app/db.sqlite
     restart: unless-stopped
