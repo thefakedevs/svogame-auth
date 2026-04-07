@@ -16,7 +16,7 @@ pub struct PrepareAuthResponse {
     #[serde(rename = "powPrefix")]
     pow_prefix: String,
     #[serde(rename = "powComplexity")]
-    pow_complexity: u8,
+    pow_complexity: i16,
     #[serde(rename = "oauthUrl")]
     oauth2_url: String,
     #[serde(rename = "deliveryMethod")]

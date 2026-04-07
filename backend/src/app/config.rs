@@ -8,7 +8,8 @@ pub struct AppConfig {
     pub binding_address: String,
     pub discord: DiscordConfig,
     pub database: DatabaseConfig,
-    pub pow_complexity: u8,
+    pub s3: S3Config,
+    pub pow_complexity: i16,
     pub jwt_secret: String,
     pub gamervii_compat: Option<GamerviiCompatConfig>,
 }
@@ -34,15 +35,26 @@ pub struct DatabaseConfig {
     pub db_url: String,
 }
 
+#[derive(Debug, Clone)]
+pub struct S3Config {
+    pub endpoint: Option<String>,
+    pub region: String,
+    pub bucket: String,
+    pub access_key_id: String,
+    pub secret_access_key: String,
+    pub force_path_style: bool,
+}
+
 impl AppConfig {
     pub(crate) fn from_env() -> Result<Self> {
         let binding_address =
             std::env::var("BINDING_ADDRESS").unwrap_or_else(|_| "0.0.0.0:3000".to_string());
         let discord = DiscordConfig::from_env()?;
         let database = DatabaseConfig::from_env()?;
+        let s3 = S3Config::from_env()?;
         let pow_complexity = std::env::var("POW_COMPLEXITY")
             .unwrap_or_else(|_| "19".to_string())
-            .parse::<u8>()
+            .parse::<i16>()
             .context("POW_COMPLEXITY must be a valid u8")?;
         let jwt_secret = std::env::var("JWT_SECRET").context("JWT_SECRET not set")?;
         let gamervii_compat = GamerviiCompatConfig::from_env();
@@ -51,6 +63,7 @@ impl AppConfig {
             binding_address,
             discord,
             database,
+            s3,
             pow_complexity,
             jwt_secret,
             gamervii_compat,
@@ -111,5 +124,29 @@ impl DatabaseConfig {
     fn from_env() -> Result<Self> {
         let db_url = std::env::var("DATABASE_URL").context("DATABASE_URL not set")?;
         Ok(DatabaseConfig { db_url })
+    }
+}
+
+impl S3Config {
+    fn from_env() -> Result<Self> {
+        let endpoint = std::env::var("S3_ENDPOINT").ok().filter(|it| !it.trim().is_empty());
+        let region = std::env::var("S3_REGION").context("S3_REGION not set")?;
+        let bucket = std::env::var("S3_BUCKET").context("S3_BUCKET not set")?;
+        let access_key_id =
+            std::env::var("S3_ACCESS_KEY_ID").context("S3_ACCESS_KEY_ID not set")?;
+        let secret_access_key =
+            std::env::var("S3_SECRET_ACCESS_KEY").context("S3_SECRET_ACCESS_KEY not set")?;
+        let force_path_style = std::env::var("S3_FORCE_PATH_STYLE")
+            .unwrap_or_else(|_| "true".to_string())
+            == "true";
+
+        Ok(Self {
+            endpoint,
+            region,
+            bucket,
+            access_key_id,
+            secret_access_key,
+            force_path_style,
+        })
     }
 }

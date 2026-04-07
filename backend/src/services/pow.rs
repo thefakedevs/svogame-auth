@@ -16,7 +16,7 @@ pub fn generate_pow_prefix() -> String {
         .collect()
 }
 
-pub fn verify_pow(solution: &str, prefix: &str, complexity: u8, creation: &DateTime<Utc>) -> bool {
+pub fn verify_pow(solution: &str, prefix: &str, complexity: i16, creation: &DateTime<Utc>) -> bool {
     const POW_MAX_AGE_SECONDS: u64 = 3600;
     let age = Utc::now().signed_duration_since(*creation).num_seconds() as u64;
     if age > POW_MAX_AGE_SECONDS {

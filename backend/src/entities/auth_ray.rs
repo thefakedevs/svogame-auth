@@ -20,7 +20,7 @@ pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i32,
     pub pow_prefix: String,
-    pub pow_complexity: u8,
+    pub pow_complexity: i16,
     pub delivery_method: TokenDeliveryMethod,
     pub delivery_target: String,
     pub created_at: chrono::DateTime<Utc>,
@@ -34,7 +34,7 @@ impl ActiveModelBehavior for ActiveModel {}
 impl Entity {
     pub async fn create_with_complexity(
         db: &DatabaseConnection,
-        pow_complexity: u8,
+        pow_complexity: i16,
         delivery_method: TokenDeliveryMethod,
         delivery_target: String,
     ) -> Result<Model> {

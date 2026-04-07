@@ -19,8 +19,10 @@ pub async fn run() -> Result<()> {
 
     let db = services::db::connect_db(&config.database).await?;
     services::db::run_migrations(&db).await?;
+    let s3 = build_s3_client(&config).await?;
+    verify_s3_access(&config, &s3).await?;
 
-    let state: SharedAppState = Arc::new(RwLock::new(AppState::new(config.clone(), db)));
+    let state: SharedAppState = Arc::new(RwLock::new(AppState::new(config.clone(), db, s3)));
     spawn_auth_cleanup_worker(state.clone());
 
     let app = build_router(state);
@@ -30,6 +32,69 @@ pub async fn run() -> Result<()> {
 
     axum::serve(listener, app.into_make_service()).await?;
     unreachable!()
+}
+
+async fn build_s3_client(config: &AppConfig) -> Result<aws_sdk_s3::Client> {
+    let s3_config = &config.s3;
+    let credentials = aws_credential_types::Credentials::new(
+        s3_config.access_key_id.clone(),
+        s3_config.secret_access_key.clone(),
+        None,
+        None,
+        "app-config",
+    );
+
+    let shared_config = aws_config::defaults(aws_config::BehaviorVersion::latest())
+        .region(aws_config::Region::new(s3_config.region.clone()))
+        .credentials_provider(credentials)
+        .load()
+        .await;
+
+    let mut builder = aws_sdk_s3::config::Builder::from(&shared_config)
+        .force_path_style(s3_config.force_path_style);
+
+    if let Some(endpoint) = &s3_config.endpoint {
+        builder = builder.endpoint_url(endpoint);
+    }
+
+    Ok(aws_sdk_s3::Client::from_conf(builder.build()))
+}
+
+async fn verify_s3_access(config: &AppConfig, s3: &aws_sdk_s3::Client) -> Result<()> {
+    if let Err(head_error) = s3.head_bucket().bucket(&config.s3.bucket).send().await {
+        warn!(
+            "S3 bucket '{}' is not accessible yet, trying to create it: {}",
+            config.s3.bucket, head_error
+        );
+
+        s3.create_bucket()
+            .bucket(&config.s3.bucket)
+            .send()
+            .await
+            .map_err(|create_error| {
+                anyhow::anyhow!(
+                    "Failed to access S3 bucket '{}' and failed to create it: head error: {}; create error: {}",
+                    config.s3.bucket,
+                    head_error,
+                    create_error
+                )
+            })?;
+
+        s3.head_bucket()
+            .bucket(&config.s3.bucket)
+            .send()
+            .await
+            .map_err(|retry_error| {
+                anyhow::anyhow!(
+                    "S3 bucket '{}' was created but is still not accessible: {}",
+                    config.s3.bucket,
+                    retry_error
+                )
+            })?;
+    }
+
+    info!("S3 connection established for bucket '{}'", config.s3.bucket);
+    Ok(())
 }
 
 fn load_dotenv_for_local_dev() {
