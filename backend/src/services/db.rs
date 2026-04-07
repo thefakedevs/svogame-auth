@@ -1,4 +1,7 @@
-use crate::services::migration::{CreateAuthRayTable, CreateUserTable};
+use crate::services::migration::{
+    AddUserDeactivationReasonColumn, AddUserSuperuserColumn, CreateAuditLogTable,
+    CreateAuthRayTable, CreateUserTable,
+};
 use crate::app::config::DatabaseConfig;
 use anyhow::Result;
 use sea_orm::{Database, DatabaseConnection};
@@ -14,6 +17,9 @@ pub async fn run_migrations(db: &DatabaseConnection) -> Result<()> {
     let schema_manager = SchemaManager::new(db);
     CreateAuthRayTable.up(&schema_manager).await?;
     CreateUserTable.up(&schema_manager).await?;
+    AddUserSuperuserColumn.up(&schema_manager).await?;
+    AddUserDeactivationReasonColumn.up(&schema_manager).await?;
+    CreateAuditLogTable.up(&schema_manager).await?;
     Ok(())
 }
 

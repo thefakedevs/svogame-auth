@@ -6,8 +6,10 @@ use axum::extract::State;
 use axum::Json;
 use sea_orm::ModelTrait;
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use tracing::error;
 use crate::services::discord::exchange_code;
+use crate::services::audit::{write_audit_log, ACTION_USER_REGISTERED};
 use crate::services::token::sign_token;
 use uuid::Uuid;
 
@@ -178,7 +180,7 @@ pub async fn authorize(
         return Err(HttpError::forbidden("Discord email not verified"));
     }
 
-    let user = match crate::entities::User::update_or_register_by_discord_id(
+    let user_result = match crate::entities::User::update_or_register_by_discord_id(
         &state.db,
         user_info.id.clone(),
         user_info.username.clone(),
@@ -192,6 +194,31 @@ pub async fn authorize(
             return Err(HttpError::internal_error("Failed to register user"));
         }
     };
+    let user = user_result.user;
+
+    if user_result.created {
+        write_audit_log(
+            &state.db,
+            ACTION_USER_REGISTERED,
+            None,
+            Some(user.id),
+            None,
+            Some(json!({
+                "discordId": user.discord_id,
+                "username": user.username,
+            })),
+        )
+        .await
+        .map_err(|e| {
+            error!("Failed to write registration audit log: {:?}", e);
+            HttpError::internal_error("Failed to write registration audit log")
+        })?;
+    }
+
+    if !user.is_active {
+        notify_error("User is deactivated");
+        return Err(HttpError::forbidden("User is deactivated"));
+    }
 
     let jwt_token = match sign_token(&user, &state.config) {
         Ok(token) => token,

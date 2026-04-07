@@ -1,3 +1,4 @@
+pub mod audit;
 pub mod db;
 pub mod discord;
 pub mod migration;

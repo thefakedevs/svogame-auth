@@ -14,6 +14,8 @@ pub struct Model {
     pub email: Option<String>,
     pub auth_epoch: i32,
     pub is_active: bool,
+    pub is_superuser: bool,
+    pub deactivation_reason: Option<String>,
     pub last_login_at: chrono::DateTime<chrono::Utc>,
     pub created_at: chrono::DateTime<chrono::Utc>,
 }
@@ -23,6 +25,11 @@ pub enum Relation {}
 
 impl ActiveModelBehavior for ActiveModel {}
 
+pub struct UpsertUserResult {
+    pub user: Model,
+    pub created: bool,
+}
+
 impl Entity {
     pub async fn update_or_register_by_discord_id(
         db: &DatabaseConnection,
@@ -30,7 +37,7 @@ impl Entity {
         username: String,
         avatar_url: Option<String>,
         email: Option<String>,
-    ) -> Result<Model> {
+    ) -> Result<UpsertUserResult> {
         if let Some(existing_user) = Self::find()
             .filter(Column::DiscordId.eq(&discord_id))
             .one(db)
@@ -42,7 +49,10 @@ impl Entity {
             user.last_login_at = ActiveValue::Set(chrono::Utc::now());
 
             let updated_user = user.update(db).await?;
-            Ok(updated_user)
+            Ok(UpsertUserResult {
+                user: updated_user,
+                created: false,
+            })
         } else {
             let username =
                 if is_valid_nickname(&username) && !is_nickname_taken(db, &username).await? {
@@ -58,12 +68,17 @@ impl Entity {
                 email: ActiveValue::Set(email),
                 auth_epoch: ActiveValue::Set(0),
                 is_active: ActiveValue::Set(true),
+                is_superuser: ActiveValue::Set(false),
+                deactivation_reason: ActiveValue::Set(None),
                 last_login_at: ActiveValue::Set(chrono::Utc::now()),
                 created_at: ActiveValue::Set(chrono::Utc::now()),
             };
 
             let created_user = new_user.insert(db).await?;
-            Ok(created_user)
+            Ok(UpsertUserResult {
+                user: created_user,
+                created: true,
+            })
         }
     }
 }

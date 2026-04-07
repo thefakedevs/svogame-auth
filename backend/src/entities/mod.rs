@@ -1,6 +1,8 @@
+pub(crate) mod audit_log;
 pub(crate) mod auth_ray;
 pub(crate) mod user;
 
+pub use audit_log::ActiveModel as AuditLogActiveModel;
 pub use auth_ray::Entity as AuthRay;
 
 pub use user::Entity as User;

@@ -21,6 +21,8 @@ pub struct UserResponse {
     pub email: Option<String>,
     #[serde(rename = "isActive")]
     pub is_active: bool,
+    #[serde(rename = "isSuperuser")]
+    pub is_superuser: bool,
     #[serde(rename = "lastLoginAt")]
     pub last_login_at: chrono::DateTime<chrono::Utc>,
     #[serde(rename = "createdAt")]
@@ -36,6 +38,7 @@ impl From<UserModel> for UserResponse {
             avatar_url: user.avatar_url,
             email: user.email,
             is_active: user.is_active,
+            is_superuser: user.is_superuser,
             last_login_at: user.last_login_at,
             created_at: user.created_at,
         }

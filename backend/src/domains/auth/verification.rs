@@ -23,6 +23,8 @@ pub struct VerifyResponse {
     pub email: Option<String>,
     #[serde(rename = "isActive")]
     pub is_active: bool,
+    #[serde(rename = "isSuperuser")]
+    pub is_superuser: bool,
 }
 
 pub async fn verify(
@@ -46,6 +48,10 @@ pub async fn verify(
     if !user.is_active {
         return Err(HttpError::forbidden("User is not active"));
     }
+
+    if user.auth_epoch != jwt_content.auth_epoch {
+        return Err(HttpError::forbidden("Token has been revoked"));
+    }
     
     Ok(Json(VerifyResponse {
         id: user.id.to_string(),
@@ -53,5 +59,6 @@ pub async fn verify(
         avatar_url: user.avatar_url,
         email: user.email,
         is_active: user.is_active,
+        is_superuser: user.is_superuser,
     }))
 }
