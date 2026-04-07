@@ -1,15 +1,15 @@
-import { useState, useRef } from 'react'
+import { useRef, useState } from 'react'
 import toast from 'react-hot-toast'
+
 import SkinViewer3D from './SkinViewer3D'
+import { uploadMySkin, type SkinModel } from '../services/skinApi'
 import { tokenManager } from '../services/tokenManager'
 import './SkinUploadInline.css'
 
-type SkinModel = 'classic' | 'slim'
-
-export default function SkinUploadInline({ userUuid }: { userUuid: string }) {
+export default function SkinUploadInline({ onUploaded }: { onUploaded?: () => void }) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
-  const [model, setModel] = useState<SkinModel>('classic')
+  const [model, setModel] = useState<SkinModel>('default')
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleFileChange = (file: File) => {
@@ -39,38 +39,19 @@ export default function SkinUploadInline({ userUuid }: { userUuid: string }) {
 
     setIsLoading(true)
 
-    const uploadPromise = (async () => {
-      const formData = new FormData()
-      formData.append('', file)
+    const uploadPromise = uploadMySkin(token, file, model)
 
-      const response = await fetch(`https://skins.launcher.artembay.ru/skin/${userUuid}?model=${model}`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
-        body: formData
-      })
-
-      if (!response.ok) {
-        throw new Error(`Ошибка загрузки: ${response.statusText}`)
-      }
-
-      return response
-    })()
-
-    toast.promise(
-      uploadPromise,
-      {
-        loading: 'Загрузка скина...',
-        success: 'Скин успешно загружен!',
-        error: (err) => err.message || 'Ошибка при загрузке'
-      }
-    )
+    toast.promise(uploadPromise, {
+      loading: 'Загрузка скина...',
+      success: 'Скин успешно загружен!',
+      error: (err) => err.message || 'Ошибка при загрузке',
+    })
 
     try {
       await uploadPromise
       setPreviewUrl(null)
       if (fileInputRef.current) fileInputRef.current.value = ''
+      onUploaded?.()
     } finally {
       setIsLoading(false)
     }
@@ -81,8 +62,8 @@ export default function SkinUploadInline({ userUuid }: { userUuid: string }) {
       <div className="upload-preview-3d">
         {previewUrl ? (
           <>
-            <SkinViewer3D 
-              skinUrl={previewUrl} 
+            <SkinViewer3D
+              skinUrl={previewUrl}
               model={model}
               width={300}
               height={400}
@@ -90,8 +71,8 @@ export default function SkinUploadInline({ userUuid }: { userUuid: string }) {
             <div className="model-toggle">
               <button
                 type="button"
-                className={`model-btn ${model === 'classic' ? 'active' : ''}`}
-                onClick={() => setModel('classic')}
+                className={`model-btn ${model === 'default' ? 'active' : ''}`}
+                onClick={() => setModel('default')}
               >
                 Обычные
               </button>

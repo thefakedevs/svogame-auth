@@ -4,12 +4,11 @@ use axum::Json;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
-use uuid::Uuid;
 
+use crate::app::auth::get_user_from_headers;
 use crate::app::http::{HttpError, HttpResult};
-use crate::app::state::{AppState, AppStateExtractor};
+use crate::app::state::AppStateExtractor;
 use crate::entities::{User, UserModel, NICKNAME_REGEX};
-use crate::services::token::verify_token;
 
 #[derive(Serialize, ToSchema)]
 pub struct UserResponse {
@@ -48,37 +47,6 @@ pub struct UpdateNicknameRequest {
     pub nickname: String,
 }
 
-async fn get_user_from_header(headers: HeaderMap, state: &AppState) -> HttpResult<UserModel> {
-    let auth_header = headers
-        .get("Authorization")
-        .ok_or_else(|| HttpError::unauthorized("Missing Authorization header"))?
-        .to_str()
-        .map_err(|_| HttpError::unauthorized("Invalid Authorization header"))?;
-
-    if !auth_header.starts_with("Bearer ") {
-        return Err(HttpError::unauthorized("Invalid Authorization header format"));
-    }
-
-    let token = &auth_header[7..];
-    let jwt_content = verify_token(token, &state.config)
-        .map_err(|_| HttpError::forbidden("Invalid or expired token"))?;
-
-    let user_id = Uuid::parse_str(&jwt_content.user_id)
-        .map_err(|_| HttpError::bad_request("Invalid user ID in token"))?;
-
-    let user = User::find_by_id(user_id)
-        .one(&state.db)
-        .await
-        .map_err(|_| HttpError::internal_error("Database error"))?
-        .ok_or_else(|| HttpError::bad_request("User not found"))?;
-
-    if !user.is_active {
-        return Err(HttpError::forbidden("User is not active"));
-    }
-
-    Ok(user)
-}
-
 #[utoipa::path(
     get,
     path = "/api/user/me",
@@ -96,7 +64,7 @@ pub async fn get_me(
     headers: HeaderMap,
 ) -> HttpResult<Json<UserResponse>> {
     let state = state.read().await;
-    let user = get_user_from_header(headers, &state).await?;
+    let user = get_user_from_headers(&headers, &state).await?;
     Ok(Json(user.into()))
 }
 
@@ -120,7 +88,7 @@ pub async fn update_nickname(
     Json(body): Json<UpdateNicknameRequest>,
 ) -> HttpResult<Json<UserResponse>> {
     let state_guard = state.read().await;
-    let user = get_user_from_header(headers, &state_guard).await?;
+    let user = get_user_from_headers(&headers, &state_guard).await?;
 
     if body.nickname.trim().is_empty() {
         return Err(HttpError::bad_request("Nickname cannot be empty"));

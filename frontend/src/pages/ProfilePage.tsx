@@ -8,6 +8,7 @@ import type { UserProfile } from '../services/authApi'
 import { tokenManager } from '../services/tokenManager'
 import SkinUploadInline from '../components/SkinUploadInline'
 import SkinViewer3D from '../components/SkinViewer3D'
+import { buildSkinUrl } from '../services/skinApi'
 import './ProfilePage.css'
 
 interface ProfilePageState {
@@ -24,6 +25,7 @@ const ProfilePage: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false)
   const [editNickname, setEditNickname] = useState('')
   const [viewMode, setViewMode] = useState<'avatar' | 'skin'>('avatar')
+  const [skinVersion, setSkinVersion] = useState(() => Date.now())
   
   const [state, setState] = useState<ProfilePageState>({
     status: 'loading'
@@ -240,7 +242,7 @@ const ProfilePage: React.FC = () => {
                 <div className="edit-field">
                   <label>Загрузка скина</label>
                   <div className="skin-upload-compact">
-                    <SkinUploadInline userUuid={state.user?.id ?? ''} />
+                    <SkinUploadInline onUploaded={() => setSkinVersion(Date.now())} />
                   </div>
                 </div>
 
@@ -303,7 +305,7 @@ const ProfilePage: React.FC = () => {
               ) : (
                 <div className="skin-viewer-container">
                   <SkinViewer3D
-                    skinUrl={`https://skins.launcher.artembay.ru/skin/${state.user?.id}`}
+                    skinUrl={buildSkinUrl(state.user?.id ?? '', skinVersion)}
                     width={300}
                     height={350}
                   />

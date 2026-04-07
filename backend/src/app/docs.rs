@@ -1,4 +1,6 @@
 use utoipa::OpenApi;
+use crate::domains::skins::handlers as skins_handlers;
+use crate::domains::skins::types as skins_types;
 use crate::domains::users::handlers;
 
 #[derive(OpenApi)]
@@ -6,12 +8,17 @@ use crate::domains::users::handlers;
     paths(
         handlers::get_me,
         handlers::update_nickname,
+        skins_handlers::upload_my_skin,
+        skins_handlers::get_skin,
         // Add other routes here
     ),
     components(
         schemas(
             handlers::UserResponse,
             handlers::UpdateNicknameRequest,
+            skins_types::ModelParam,
+            skins_types::SkinModel,
+            skins_types::UploadSkinResponse,
             // Add other schemas here
         )
     ),
