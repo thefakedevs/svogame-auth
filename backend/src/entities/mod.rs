@@ -1,12 +1,30 @@
 pub(crate) mod audit_log;
 pub(crate) mod auth_ray;
+pub(crate) mod squad;
+pub(crate) mod squad_invite;
 pub(crate) mod user;
+pub(crate) mod user_restriction;
 
 pub use audit_log::ActiveModel as AuditLogActiveModel;
+pub use audit_log::Column as AuditLogColumn;
+pub use audit_log::Entity as AuditLog;
+pub use audit_log::Model as AuditLogModel;
 pub use auth_ray::Entity as AuthRay;
+pub use squad::ActiveModel as SquadActiveModel;
+pub use squad::Column as SquadColumn;
+pub use squad::Entity as Squad;
+pub use squad::Model as SquadModel;
+pub use squad_invite::ActiveModel as SquadInviteActiveModel;
+pub use squad_invite::Column as SquadInviteColumn;
+pub use squad_invite::Entity as SquadInvite;
+pub use squad_invite::Model as SquadInviteModel;
 
 pub use user::Entity as User;
 pub use user::NICKNAME_REGEX;
 pub use user::Model as UserModel;
 pub use user::ActiveModel as UserActiveModel;
 pub use user::Column as UserColumn;
+pub use user_restriction::ActiveModel as UserRestrictionActiveModel;
+pub use user_restriction::Column as UserRestrictionColumn;
+pub use user_restriction::Entity as UserRestriction;
+pub use user_restriction::Model as UserRestrictionModel;

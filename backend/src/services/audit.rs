@@ -12,6 +12,26 @@ pub const ACTION_ADMIN_USER_ACTIVATED: &str = "admin.user.activated";
 pub const ACTION_ADMIN_USER_AUTH_EPOCH_RESET: &str = "admin.user.auth_epoch_reset";
 pub const ACTION_ADMIN_USER_SUPERUSER_GRANTED: &str = "admin.user.superuser_granted";
 pub const ACTION_ADMIN_USER_SUPERUSER_REVOKED: &str = "admin.user.superuser_revoked";
+pub const ACTION_USER_SQUAD_CREATED: &str = "user.squad.created";
+pub const ACTION_USER_SQUAD_DISBANDED: &str = "user.squad.disbanded";
+pub const ACTION_USER_SQUAD_LEFT: &str = "user.squad.left";
+pub const ACTION_USER_SQUAD_KICKED: &str = "user.squad.kicked";
+pub const ACTION_USER_SQUAD_INVITE_CREATED: &str = "user.squad.invite_created";
+pub const ACTION_USER_SQUAD_INVITE_ACCEPTED: &str = "user.squad.invite_accepted";
+pub const ACTION_USER_SQUAD_INVITE_DECLINED: &str = "user.squad.invite_declined";
+pub const ACTION_USER_SQUAD_INVITE_REVOKED: &str = "user.squad.invite_revoked";
+pub const ACTION_USER_SQUAD_UPDATED: &str = "user.squad.updated";
+pub const ACTION_USER_SQUAD_IMAGE_UPDATED: &str = "user.squad.image_updated";
+pub const ACTION_USER_SQUAD_IMAGE_DELETED: &str = "user.squad.image_deleted";
+pub const ACTION_ADMIN_SQUAD_UPDATED: &str = "admin.squad.updated";
+pub const ACTION_ADMIN_SQUAD_RESTRICTED: &str = "admin.squad.restricted";
+pub const ACTION_ADMIN_SQUAD_UNRESTRICTED: &str = "admin.squad.unrestricted";
+pub const ACTION_ADMIN_SQUAD_DELETED: &str = "admin.squad.deleted";
+pub const ACTION_ADMIN_SQUAD_MEMBER_KICKED: &str = "admin.squad.member_kicked";
+pub const ACTION_ADMIN_SQUAD_IMAGE_UPDATED: &str = "admin.squad.image_updated";
+pub const ACTION_ADMIN_SQUAD_IMAGE_DELETED: &str = "admin.squad.image_deleted";
+pub const ACTION_ADMIN_USER_RESTRICTION_GRANTED: &str = "admin.user.restriction_granted";
+pub const ACTION_ADMIN_USER_RESTRICTION_REVOKED: &str = "admin.user.restriction_revoked";
 
 pub async fn write_audit_log<C>(
     db: &C,

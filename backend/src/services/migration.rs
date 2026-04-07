@@ -103,6 +103,7 @@ impl MigrationTrait for CreateUserTable {
                             .not_null()
                             .default(false),
                     )
+                    .col(ColumnDef::new(User::SquadId).uuid().null())
                     .col(ColumnDef::new(User::DeactivationReason).string().null())
                     .col(
                         ColumnDef::new(User::LastLoginAt)
@@ -138,6 +139,7 @@ enum User {
     AuthEpoch,
     IsActive,
     IsSuperuser,
+    SquadId,
     DeactivationReason,
     LastLoginAt,
     CreatedAt,
@@ -230,6 +232,46 @@ impl MigrationTrait for AddUserDeactivationReasonColumn {
     }
 }
 
+pub struct AddUserSquadIdColumn;
+
+impl MigrationName for AddUserSquadIdColumn {
+    fn name(&self) -> &str {
+        "m20260407_000006_add_user_squad_id_column"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for AddUserSquadIdColumn {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        let sql = match manager.get_database_backend() {
+            DatabaseBackend::Postgres => {
+                r#"ALTER TABLE "user" ADD COLUMN "squad_id" uuid NULL"#
+            }
+            DatabaseBackend::Sqlite => {
+                r#"ALTER TABLE "user" ADD COLUMN "squad_id" uuid NULL"#
+            }
+            _ => return Ok(()),
+        };
+
+        match manager
+            .get_connection()
+            .execute(Statement::from_string(
+                manager.get_database_backend(),
+                sql.to_string(),
+            ))
+            .await
+        {
+            Ok(_) => Ok(()),
+            Err(error) if is_duplicate_column_error(&error) => Ok(()),
+            Err(error) => Err(error),
+        }
+    }
+
+    async fn down(&self, _manager: &SchemaManager) -> Result<(), DbErr> {
+        Ok(())
+    }
+}
+
 pub struct CreateAuditLogTable;
 
 impl MigrationName for CreateAuditLogTable {
@@ -285,6 +327,190 @@ enum AuditLog {
     TargetUserId,
     Reason,
     Metadata,
+    CreatedAt,
+}
+
+pub struct CreateSquadTable;
+
+impl MigrationName for CreateSquadTable {
+    fn name(&self) -> &str {
+        "m20260407_000007_create_squad_table"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for CreateSquadTable {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .create_table(
+                Table::create()
+                    .table(Squad::Table)
+                    .if_not_exists()
+                    .col(
+                        ColumnDef::new(Squad::Id)
+                            .uuid()
+                            .not_null()
+                            .primary_key(),
+                    )
+                    .col(ColumnDef::new(Squad::LeaderUserId).uuid().not_null())
+                    .col(ColumnDef::new(Squad::Name).string().not_null())
+                    .col(ColumnDef::new(Squad::ImageKey).string().null())
+                    .col(ColumnDef::new(Squad::ImageContentType).string().null())
+                    .col(
+                        ColumnDef::new(Squad::IsRestricted)
+                            .boolean()
+                            .not_null()
+                            .default(false),
+                    )
+                    .col(ColumnDef::new(Squad::RestrictionReason).string().null())
+                    .col(
+                        ColumnDef::new(Squad::CreatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .col(
+                        ColumnDef::new(Squad::UpdatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .to_owned(),
+            )
+            .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_table(Table::drop().table(Squad::Table).to_owned())
+            .await
+    }
+}
+
+#[derive(DeriveIden)]
+enum Squad {
+    Table,
+    Id,
+    LeaderUserId,
+    Name,
+    ImageKey,
+    ImageContentType,
+    IsRestricted,
+    RestrictionReason,
+    CreatedAt,
+    UpdatedAt,
+}
+
+pub struct CreateSquadInviteTable;
+
+impl MigrationName for CreateSquadInviteTable {
+    fn name(&self) -> &str {
+        "m20260407_000008_create_squad_invite_table"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for CreateSquadInviteTable {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .create_table(
+                Table::create()
+                    .table(SquadInvite::Table)
+                    .if_not_exists()
+                    .col(
+                        ColumnDef::new(SquadInvite::Id)
+                            .uuid()
+                            .not_null()
+                            .primary_key(),
+                    )
+                    .col(ColumnDef::new(SquadInvite::SquadId).uuid().not_null())
+                    .col(ColumnDef::new(SquadInvite::InviterUserId).uuid().not_null())
+                    .col(ColumnDef::new(SquadInvite::InvitedUserId).uuid().not_null())
+                    .col(
+                        ColumnDef::new(SquadInvite::ExpiresAt)
+                            .timestamp_with_time_zone()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(SquadInvite::CreatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .to_owned(),
+            )
+            .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_table(Table::drop().table(SquadInvite::Table).to_owned())
+            .await
+    }
+}
+
+#[derive(DeriveIden)]
+enum SquadInvite {
+    Table,
+    Id,
+    SquadId,
+    InviterUserId,
+    InvitedUserId,
+    ExpiresAt,
+    CreatedAt,
+}
+
+pub struct CreateUserRestrictionTable;
+
+impl MigrationName for CreateUserRestrictionTable {
+    fn name(&self) -> &str {
+        "m20260407_000009_create_user_restriction_table"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for CreateUserRestrictionTable {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .create_table(
+                Table::create()
+                    .table(UserRestriction::Table)
+                    .if_not_exists()
+                    .col(
+                        ColumnDef::new(UserRestriction::Id)
+                            .big_integer()
+                            .not_null()
+                            .auto_increment()
+                            .primary_key(),
+                    )
+                    .col(ColumnDef::new(UserRestriction::UserId).uuid().not_null())
+                    .col(ColumnDef::new(UserRestriction::RestrictionKey).string().not_null())
+                    .col(ColumnDef::new(UserRestriction::Reason).string().null())
+                    .col(
+                        ColumnDef::new(UserRestriction::CreatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .to_owned(),
+            )
+            .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_table(Table::drop().table(UserRestriction::Table).to_owned())
+            .await
+    }
+}
+
+#[derive(DeriveIden)]
+enum UserRestriction {
+    Table,
+    Id,
+    UserId,
+    RestrictionKey,
+    Reason,
     CreatedAt,
 }
 

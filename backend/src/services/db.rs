@@ -1,6 +1,7 @@
 use crate::services::migration::{
-    AddUserDeactivationReasonColumn, AddUserSuperuserColumn, CreateAuditLogTable,
-    CreateAuthRayTable, CreateUserTable,
+    AddUserDeactivationReasonColumn, AddUserSquadIdColumn, AddUserSuperuserColumn,
+    CreateAuditLogTable, CreateAuthRayTable, CreateSquadInviteTable, CreateSquadTable,
+    CreateUserRestrictionTable, CreateUserTable,
 };
 use crate::app::config::DatabaseConfig;
 use anyhow::Result;
@@ -19,7 +20,11 @@ pub async fn run_migrations(db: &DatabaseConnection) -> Result<()> {
     CreateUserTable.up(&schema_manager).await?;
     AddUserSuperuserColumn.up(&schema_manager).await?;
     AddUserDeactivationReasonColumn.up(&schema_manager).await?;
+    AddUserSquadIdColumn.up(&schema_manager).await?;
     CreateAuditLogTable.up(&schema_manager).await?;
+    CreateSquadTable.up(&schema_manager).await?;
+    CreateSquadInviteTable.up(&schema_manager).await?;
+    CreateUserRestrictionTable.up(&schema_manager).await?;
     Ok(())
 }
 

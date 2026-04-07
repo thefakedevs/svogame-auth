@@ -2,7 +2,7 @@ use axum::extract::{Path, Query, State};
 use axum::http::HeaderMap;
 use axum::Json;
 use sea_orm::{
-    ActiveValue, ColumnTrait, Condition, ConnectionTrait, DatabaseTransaction, EntityTrait,
+    ActiveModelTrait, ActiveValue, ColumnTrait, Condition, ConnectionTrait, DatabaseTransaction, EntityTrait,
     PaginatorTrait, QueryFilter, QueryOrder, Set, TransactionTrait,
 };
 use serde::{Deserialize, Serialize};
@@ -13,12 +13,17 @@ use uuid::Uuid;
 use crate::app::auth::require_superuser;
 use crate::app::http::{HttpError, HttpResult};
 use crate::app::state::{AppState, AppStateExtractor};
-use crate::entities::{User, UserActiveModel, UserColumn, UserModel, NICKNAME_REGEX};
+use crate::entities::{
+    User, UserActiveModel, UserColumn, UserModel, UserRestriction, UserRestrictionActiveModel,
+    UserRestrictionColumn, NICKNAME_REGEX,
+};
 use crate::services::audit::{
     ACTION_ADMIN_USER_ACTIVATED, ACTION_ADMIN_USER_AUTH_EPOCH_RESET,
     ACTION_ADMIN_USER_DEACTIVATED, ACTION_ADMIN_USER_SUPERUSER_GRANTED,
-    ACTION_ADMIN_USER_SUPERUSER_REVOKED, ACTION_ADMIN_USER_UPDATED, write_audit_log,
+    ACTION_ADMIN_USER_SUPERUSER_REVOKED, ACTION_ADMIN_USER_UPDATED,
+    ACTION_ADMIN_USER_RESTRICTION_GRANTED, ACTION_ADMIN_USER_RESTRICTION_REVOKED, write_audit_log,
 };
+use crate::services::restrictions::{list_user_restrictions, RestrictionKind};
 
 const DEFAULT_PAGE: u64 = 1;
 const DEFAULT_PER_PAGE: u64 = 20;
@@ -108,6 +113,19 @@ pub struct PatchAdminUserRequest {
 #[derive(Deserialize, ToSchema)]
 pub struct DeactivateAdminUserRequest {
     pub reason: String,
+}
+
+#[derive(Deserialize, ToSchema)]
+pub struct RestrictionReasonRequest {
+    pub reason: Option<String>,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct AdminUserRestrictionResponse {
+    pub key: String,
+    pub reason: Option<String>,
+    #[serde(rename = "createdAt")]
+    pub created_at: chrono::DateTime<chrono::Utc>,
 }
 
 #[utoipa::path(
@@ -640,4 +658,137 @@ async fn validate_username(
     }
 
     Ok(())
+}
+
+pub async fn get_user_restrictions(
+    State(state): AppStateExtractor,
+    headers: HeaderMap,
+    Path(user_id): Path<String>,
+) -> HttpResult<Json<Vec<AdminUserRestrictionResponse>>> {
+    let state = state.read().await;
+    require_superuser(&headers, &state).await?;
+    let user_id = parse_user_id(&user_id)?;
+
+    let restrictions = list_user_restrictions(&state.db, user_id)
+        .await
+        .map_err(|e| HttpError::internal_error(format!("Failed to load restrictions: {e}")))?;
+
+    Ok(Json(
+        restrictions
+            .into_iter()
+            .map(|restriction| AdminUserRestrictionResponse {
+                key: restriction.restriction_key,
+                reason: restriction.reason,
+                created_at: restriction.created_at,
+            })
+            .collect(),
+    ))
+}
+
+pub async fn grant_user_restriction(
+    State(state): AppStateExtractor,
+    headers: HeaderMap,
+    Path((user_id, restriction_key)): Path<(String, String)>,
+    Json(body): Json<RestrictionReasonRequest>,
+) -> HttpResult<Json<Vec<AdminUserRestrictionResponse>>> {
+    let state = state.read().await;
+    let admin = require_superuser(&headers, &state).await?;
+    let user_id = parse_user_id(&user_id)?;
+    let restriction = restriction_key
+        .parse::<RestrictionKind>()
+        .map_err(|e| HttpError::bad_request(e.to_string()))?;
+
+    let existing = UserRestriction::find()
+        .filter(UserRestrictionColumn::UserId.eq(user_id))
+        .filter(UserRestrictionColumn::RestrictionKey.eq(restriction.as_str()))
+        .one(&state.db)
+        .await
+        .map_err(|e| HttpError::internal_error(format!("Failed to check restriction: {e}")))?;
+
+    if existing.is_none() {
+        let active_model = UserRestrictionActiveModel {
+            id: ActiveValue::NotSet,
+            user_id: Set(user_id),
+            restriction_key: Set(restriction.as_str().to_string()),
+            reason: Set(body.reason.clone()),
+            created_at: Set(chrono::Utc::now()),
+        };
+        active_model
+            .insert(&state.db)
+            .await
+            .map_err(|e| HttpError::internal_error(format!("Failed to grant restriction: {e}")))?;
+
+        write_audit_log(
+            &state.db,
+            ACTION_ADMIN_USER_RESTRICTION_GRANTED,
+            Some(admin.id),
+            Some(user_id),
+            body.reason,
+            Some(json!({ "restrictionKey": restriction.as_str() })),
+        )
+        .await
+        .map_err(|e| HttpError::internal_error(format!("Failed to write audit log: {e}")))?;
+    }
+
+    let restrictions = list_user_restrictions(&state.db, user_id)
+        .await
+        .map_err(|e| HttpError::internal_error(format!("Failed to load restrictions: {e}")))?;
+
+    Ok(Json(
+        restrictions
+            .into_iter()
+            .map(|restriction| AdminUserRestrictionResponse {
+                key: restriction.restriction_key,
+                reason: restriction.reason,
+                created_at: restriction.created_at,
+            })
+            .collect(),
+    ))
+}
+
+pub async fn revoke_user_restriction(
+    State(state): AppStateExtractor,
+    headers: HeaderMap,
+    Path((user_id, restriction_key)): Path<(String, String)>,
+    Json(body): Json<RestrictionReasonRequest>,
+) -> HttpResult<Json<Vec<AdminUserRestrictionResponse>>> {
+    let state = state.read().await;
+    let admin = require_superuser(&headers, &state).await?;
+    let user_id = parse_user_id(&user_id)?;
+    let restriction = restriction_key
+        .parse::<RestrictionKind>()
+        .map_err(|e| HttpError::bad_request(e.to_string()))?;
+
+    UserRestriction::delete_many()
+        .filter(UserRestrictionColumn::UserId.eq(user_id))
+        .filter(UserRestrictionColumn::RestrictionKey.eq(restriction.as_str()))
+        .exec(&state.db)
+        .await
+        .map_err(|e| HttpError::internal_error(format!("Failed to revoke restriction: {e}")))?;
+
+    write_audit_log(
+        &state.db,
+        ACTION_ADMIN_USER_RESTRICTION_REVOKED,
+        Some(admin.id),
+        Some(user_id),
+        body.reason,
+        Some(json!({ "restrictionKey": restriction.as_str() })),
+    )
+    .await
+    .map_err(|e| HttpError::internal_error(format!("Failed to write audit log: {e}")))?;
+
+    let restrictions = list_user_restrictions(&state.db, user_id)
+        .await
+        .map_err(|e| HttpError::internal_error(format!("Failed to load restrictions: {e}")))?;
+
+    Ok(Json(
+        restrictions
+            .into_iter()
+            .map(|restriction| AdminUserRestrictionResponse {
+                key: restriction.restriction_key,
+                reason: restriction.reason,
+                created_at: restriction.created_at,
+            })
+            .collect(),
+    ))
 }
