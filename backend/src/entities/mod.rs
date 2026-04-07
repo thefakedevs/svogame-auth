@@ -1,5 +1,5 @@
 pub(crate) mod auth_ray;
-mod user;
+pub(crate) mod user;
 
 pub use auth_ray::Entity as AuthRay;
 

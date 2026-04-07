@@ -62,4 +62,4 @@ services:
 networks:
   default:
     external: true
-    name: my_shared_proxy_net
+    name: svo-server-local
