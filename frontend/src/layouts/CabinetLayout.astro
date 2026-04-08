@@ -1,0 +1,21 @@
+﻿---
+import BaseLayout from './BaseLayout.astro'
+import CabinetHeader from '../components/CabinetHeader'
+import './CabinetLayout.css'
+
+interface Props {
+  title?: string
+  description?: string
+}
+
+const { title = 'Личный кабинет | SVO Game', description } = Astro.props
+const pathname = Astro.url.pathname
+---
+
+<BaseLayout title={title} description={description}>
+  <div class="ui-kit-vhs" aria-hidden="true"></div>
+  <div class="ui-kit-page cabinet-layout">
+    <CabinetHeader client:load pathname={pathname} />
+    <slot />
+  </div>
+</BaseLayout>

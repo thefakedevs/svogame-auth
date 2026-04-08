@@ -11,6 +11,7 @@ export interface UserResponse {
   avatarUrl: string | null
   email: string | null
   isActive: boolean
+  isSuperuser: boolean
   lastLoginAt: string // ISO date-time
   createdAt: string // ISO date-time
 }
@@ -51,18 +52,14 @@ export class ApiError extends Error {
 }
 
 /**
- * Handles authentication errors by clearing tokens and redirecting
+ * Handles authentication errors by clearing tokens from client state.
  * @param error ApiError to handle
  */
 function handleAuthError(error: ApiError): void {
   if (error.isAuthError()) {
-    // Clear token from auth store
     import('../services/tokenManager').then(({ clearToken }) => {
       clearToken()
     })
-    
-    // Redirect to auth page
-    window.location.href = '/auth'
   }
 }
 
@@ -141,7 +138,7 @@ export async function updateNickname(token: string, nickname: string): Promise<U
         if (errorBody && errorBody.error) {
           errorMessage = errorBody.error;
         }
-      } catch (e) {
+      } catch {
         // Ignore JSON parsing errors
       }
 

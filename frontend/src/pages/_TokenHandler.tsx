@@ -1,14 +1,12 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
 import { setAuthToken } from '../util/tokenStorage'
 import { getCurrentUser } from '../services/userApi'
 import { useAuthStore } from '../store/authStore'
 import LoadingState from '../components/LoadingState'
 import ErrorState from '../components/ErrorState'
+import { paths } from '../routes/paths'
 
 export default function TokenHandler() {
-    const navigate = useNavigate()
-    const location = useLocation()
     const { setUser } = useAuthStore()
     const [error, setError] = useState<string | null>(null)
 
@@ -17,12 +15,12 @@ export default function TokenHandler() {
 
         async function handleToken() {
             try {
-                const params = new URLSearchParams(location.search)
+                const params = new URLSearchParams(window.location.search)
                 const token = params.get('token')
 
                 if (!token) {
                     // No token found, redirect to auth
-                    navigate('/auth', { replace: true })
+                    window.location.replace(paths.auth)
                     return
                 }
 
@@ -48,7 +46,7 @@ export default function TokenHandler() {
                 }
 
                 // Перенаправляем на страницу профиля
-                navigate('/profile', { replace: true })
+                window.location.replace(paths.profile)
             } catch (err) {
                 if (cancelled) return
                 const message = err instanceof Error ? err.message : 'Ошибка при обработке токена'
@@ -61,23 +59,27 @@ export default function TokenHandler() {
         return () => {
             cancelled = true
         }
-    }, [location.search, navigate, setUser])
+    }, [setUser])
 
     if (error) {
         return (
-            <ErrorState
-                title="Ошибка авторизации"
-                message={error}
-                primaryActionLabel="Вернуться к авторизации"
-                onPrimaryAction={() => navigate('/auth', { replace: true })}
-            />
+            <div className="ui-kit-page page token-page">
+                <ErrorState
+                    title="Ошибка авторизации"
+                    message={error}
+                    primaryActionLabel="Вернуться к авторизации"
+                    onPrimaryAction={() => window.location.replace(paths.auth)}
+                />
+            </div>
         )
     }
 
     return (
-        <LoadingState
-            title="Завершение авторизации"
-            message="Сохраняем данные авторизации и получаем профиль..."
-        />
+        <div className="ui-kit-page page token-page">
+            <LoadingState
+                title="Завершение авторизации"
+                message="Сохраняем данные авторизации и получаем профиль..."
+            />
+        </div>
     )
 }

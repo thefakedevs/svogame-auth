@@ -71,14 +71,14 @@ export default function SkinUploadInline({ onUploaded }: { onUploaded?: () => vo
             <div className="model-toggle">
               <button
                 type="button"
-                className={`model-btn ${model === 'default' ? 'active' : ''}`}
+                className={`btn btn-sm model-btn ${model === 'default' ? 'active' : ''}`}
                 onClick={() => setModel('default')}
               >
                 Обычные
               </button>
               <button
                 type="button"
-                className={`model-btn ${model === 'slim' ? 'active' : ''}`}
+                className={`btn btn-sm model-btn ${model === 'slim' ? 'active' : ''}`}
                 onClick={() => setModel('slim')}
               >
                 Тонкие
@@ -109,7 +109,7 @@ export default function SkinUploadInline({ onUploaded }: { onUploaded?: () => vo
         <div className="upload-buttons">
           <button
             type="button"
-            className="btn-upload"
+            className="btn btn-success"
             onClick={handleUpload}
             disabled={isLoading}
           >
@@ -117,7 +117,7 @@ export default function SkinUploadInline({ onUploaded }: { onUploaded?: () => vo
           </button>
           <button
             type="button"
-            className="btn-clear"
+            className="btn"
             onClick={() => {
               setPreviewUrl(null)
               if (fileInputRef.current) fileInputRef.current.value = ''

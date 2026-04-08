@@ -1,7 +1,18 @@
 // sha("{prefix}:{solution}") has {complexity} leading zero bits
-export async function solvePow(prefix: string, complexity: number, updateProgress: (progress: { percents: number, eta: number }) => void): Promise<string> {
+export interface PowProgressUpdate {
+    percents: number
+    eta: number
+    /** Хешей в секунду (для отображения kH/s) */
+    hashRatePerSec: number
+}
+
+export async function solvePow(
+    prefix: string,
+    complexity: number,
+    updateProgress: (progress: PowProgressUpdate) => void,
+): Promise<string> {
     let current = 0;
-    let startTime = Date.now();
+    const startTime = Date.now();
     const targetBits = complexity;
     const expectedTotal = 2 ** complexity;
     let percents = 0;
@@ -13,7 +24,7 @@ export async function solvePow(prefix: string, complexity: number, updateProgres
         const eta = Math.ceil(remaining / (rate || 1));
         percents = Math.min(100, (current / expectedTotal) * 100);
 
-        updateProgress({ percents, eta });
+        updateProgress({ percents, eta, hashRatePerSec: rate });
     };
 
     const progressInterval = setInterval(updateProgressInterval, 100);

@@ -6,9 +6,11 @@ interface AuthState {
     user: UserProfile | null
     powData: { solution: string, prefix: string } | null
     token: string | null
+    hydrated: boolean
     setUser: (user: UserProfile | null) => void
     setPoWData: (data: { solution: string, prefix: string } | null) => void
     setToken: (token: string | null) => void
+    setHydrated: (hydrated: boolean) => void
 }
 
 // Main store for user/token - persisted to localStorage
@@ -18,6 +20,7 @@ export const useAuthStore = create<AuthState>()(
             user: null,
             powData: null,
             token: null,
+            hydrated: false,
             setUser: (user) => set({user}),
             setPoWData: (data: { solution: string, prefix: string } | null) => {
                 // Save powData to sessionStorage (survives redirects, cleared on tab close)
@@ -29,6 +32,7 @@ export const useAuthStore = create<AuthState>()(
                 set({powData: data})
             },
             setToken: (token) => set({token}),
+            setHydrated: (hydrated) => set({hydrated}),
         }), {
             name: "auth-storage",
             // Exclude powData from localStorage persistence
@@ -41,10 +45,11 @@ export const useAuthStore = create<AuthState>()(
                         if (stored) {
                             state.powData = JSON.parse(stored)
                         }
-                    } catch (e) {
+                    } catch {
                         // ignore parse errors
                     }
                 }
+                state?.setHydrated(true)
             }
         }
     )

@@ -12,7 +12,7 @@ export default function UserProfileCard({ user }: UserProfileCardProps) {
   }
 
   return (
-    <div className="user-profile-card">
+    <div className="card user-profile-card">
       <div className="profile-card-glow"></div>
       <div className="profile-card-content">
         <div className="avatar-container">

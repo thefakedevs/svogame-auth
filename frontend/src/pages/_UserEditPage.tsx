@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { getCurrentUser, updateNickname, type UserResponse } from '../services/userApi'
 import { useAuthStore } from '../store/authStore'
 import { isAuthenticated, removeAuthToken } from '../util/tokenStorage'
 import LoadingState from '../components/LoadingState'
 import ErrorState from '../components/ErrorState'
-import UserProfileCard from '../components/UserProfileCard'
+import { paths } from '../routes/paths'
 import './UserEditPage.css'
 
 type PageState = 
@@ -20,7 +19,6 @@ export default function UserEditPage() {
     const [nickname, setNickname] = useState('')
     const [validationError, setValidationError] = useState('')
     const [authChecked, setAuthChecked] = useState(false)
-    const navigate = useNavigate()
     const { user: authUser, setUser } = useAuthStore()
 
     // Проверяем авторизацию при загрузке компонента
@@ -28,11 +26,11 @@ export default function UserEditPage() {
         if (authChecked) return // Предотвращаем повторные проверки
         
         if (!isAuthenticated()) {
-            navigate('/auth', { replace: true })
+            window.location.replace(paths.auth)
             return
         }
         setAuthChecked(true)
-    }, [navigate, authChecked])
+    }, [authChecked])
 
     useEffect(() => {
         // Если не авторизован или еще не проверили авторизацию, не загружаем данные
@@ -67,7 +65,7 @@ export default function UserEditPage() {
                 )) {
                     removeAuthToken()
                     setUser(null)
-                    navigate('/auth', { replace: true })
+                    window.location.replace(paths.auth)
                     return
                 }
                 
@@ -81,7 +79,7 @@ export default function UserEditPage() {
         return () => {
             cancelled = true
         }
-    }, [authChecked, navigate, setUser]) // Добавляем необходимые зависимости
+    }, [authChecked, setUser]) // Добавляем необходимые зависимости
 
     const validateNickname = (value: string): string => {
         if (!value.trim()) {
@@ -156,40 +154,44 @@ export default function UserEditPage() {
     }
 
     const handleBackToProfile = () => {
-        navigate('/profile')
+        window.location.assign(paths.profile)
     }
 
     if (state.status === 'loading') {
         return (
-            <LoadingState
-                title="Загрузка профиля"
-                message="Получаем данные вашего профиля..."
-            />
+            <div className="ui-kit-page user-edit-page">
+                <LoadingState
+                    title="Загрузка профиля"
+                    message="Получаем данные вашего профиля..."
+                />
+            </div>
         )
     }
 
     if (state.status === 'error') {
         return (
-            <ErrorState
-                title="Ошибка загрузки"
-                message={state.errorMessage}
-                primaryActionLabel="Повторить"
-                onPrimaryAction={handleRetry}
-            />
+            <div className="ui-kit-page user-edit-page">
+                <ErrorState
+                    title="Ошибка загрузки"
+                    message={state.errorMessage}
+                    primaryActionLabel="Повторить"
+                    onPrimaryAction={handleRetry}
+                />
+            </div>
         )
     }
 
     if (state.status === 'success') {
         return (
-            <div className="user-edit-page">
-                <div className="success-container">
+            <div className="ui-kit-page user-edit-page">
+                <div className="card success-container">
                     <div className="success-icon">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                             <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
                             <polyline points="22,4 12,14.01 9,11.01"/>
                         </svg>
                     </div>
-                    <h1>Никнейм успешно обновлен!</h1>
+                    <h1 className="card-title">Никнейм успешно обновлен!</h1>
                     <p>Ваш новый никнейм: <strong>{state.user.username}</strong></p>
                     
                     <button 
@@ -207,30 +209,27 @@ export default function UserEditPage() {
     const isUpdating = state.status === 'updating'
 
     return (
-        <div className="user-edit-page">
-            <div className="edit-container">
-                <h1>Изменение никнейма</h1>
+        <div className="ui-kit-page user-edit-page">
+            <div className="edit-container card">
+                <h1 className="card-title">Изменение никнейма</h1>
                 
                 {user && (
-                    <div className="current-profile">
-                        <UserProfileCard user={{
-                            id: user.id,
-                            username: user.username,
-                            avatarUrl: user.avatarUrl || ''
-                        }} />
+                    <div className="ui-alert ui-alert-info current-profile">
+                        <span className="ui-alert-icon" aria-hidden>ℹ</span>
+                        <span>Текущий никнейм: <strong>{user.username}</strong></span>
                     </div>
                 )}
 
                 <form onSubmit={handleSubmit} className="nickname-form">
-                    <div className="form-group">
-                        <label htmlFor="nickname">Новый никнейм</label>
+                    <div className={`ui-field form-group ${validationError ? 'ui-field-error' : ''}`}>
+                        <label className="ui-label" htmlFor="nickname">Новый никнейм</label>
                         <input
                             id="nickname"
+                            className="ui-input"
                             type="text"
                             value={nickname}
                             onChange={(e) => handleNicknameChange(e.target.value)}
                             disabled={isUpdating}
-                            className={validationError ? 'error' : ''}
                             placeholder="Введите новый никнейм"
                             maxLength={16}
                         />
@@ -239,7 +238,7 @@ export default function UserEditPage() {
                                 {validationError}
                             </div>
                         )}
-                        <div className="form-help">
+                        <div className="ui-hint form-help">
                             Никнейм должен содержать от 2 до 16 символов и может включать только буквы, цифры и подчеркивания.
                         </div>
                     </div>
@@ -247,7 +246,7 @@ export default function UserEditPage() {
                     <div className="form-actions">
                         <button
                             type="button"
-                            className="btn secondary"
+                            className="btn"
                             onClick={handleBackToProfile}
                             disabled={isUpdating}
                         >
