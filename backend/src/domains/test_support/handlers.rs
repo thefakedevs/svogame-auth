@@ -2,6 +2,7 @@ use axum::extract::State;
 use axum::Json;
 use sea_orm::{ActiveModelTrait, ActiveValue, ColumnTrait, EntityTrait, QueryFilter, Set, TransactionTrait};
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::app::http::{HttpError, HttpResult};
@@ -12,7 +13,7 @@ use crate::entities::{
 use crate::services::restrictions::RestrictionKind;
 use crate::services::token::sign_token;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct IssueTokenRequest {
     #[serde(rename = "userId")]
     pub user_id: Option<String>,
@@ -31,7 +32,7 @@ pub struct IssueTokenRequest {
     pub restrictions: Option<Vec<String>>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, ToSchema)]
 pub struct IssueTokenResponse {
     #[serde(rename = "accessToken")]
     pub access_token: String,
@@ -45,6 +46,20 @@ pub struct IssueTokenResponse {
     pub restrictions: Vec<String>,
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/test/issue-token",
+    request_body(
+        content = IssueTokenRequest,
+        description = "Debug-only test helper that creates or mutates a user and returns a signed JWT. This route exists only in debug builds and should never be used as production authentication."
+    ),
+    responses(
+        (status = 200, description = "Token issued for test flows.", body = IssueTokenResponse),
+        (status = 400, description = "Invalid UUID or unknown restriction key in the request."),
+        (status = 500, description = "Failed to persist debug user or sign test token.")
+    ),
+    tag = "debug"
+)]
 pub async fn issue_token(
     State(state): AppStateExtractor,
     Json(body): Json<IssueTokenRequest>,

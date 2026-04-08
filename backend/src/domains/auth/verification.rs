@@ -2,6 +2,7 @@ use axum::extract::{Query, State};
 use axum::Json;
 use sea_orm::EntityTrait;
 use serde::{Deserialize, Serialize};
+use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 
 use crate::entities::User;
@@ -9,12 +10,12 @@ use crate::app::http::{HttpError, HttpResult};
 use crate::app::state::AppStateExtractor;
 use crate::services::token::verify_token;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, IntoParams, ToSchema)]
 pub struct VerifyQuery {
     pub token: String,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, ToSchema)]
 pub struct VerifyResponse {
     pub id: String,
     pub username: String,
@@ -27,6 +28,18 @@ pub struct VerifyResponse {
     pub is_superuser: bool,
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/auth/verify",
+    params(VerifyQuery),
+    responses(
+        (status = 200, description = "Verify a JWT and return current user snapshot when token is valid and user is active.", body = VerifyResponse),
+        (status = 400, description = "Token payload contains invalid user ID or user record is missing."),
+        (status = 403, description = "Token invalid, expired, revoked, or user inactive."),
+        (status = 500, description = "Database error while loading user.")
+    ),
+    tag = "auth"
+)]
 pub async fn verify(
     State(state): AppStateExtractor,
     Query(query): Query<VerifyQuery>,

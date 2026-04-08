@@ -1,5 +1,6 @@
 use axum::Json;
 use serde::Serialize;
+use utoipa::ToSchema;
 
 use crate::services::restrictions::RestrictionKind;
 use crate::services::squads::{
@@ -7,24 +8,24 @@ use crate::services::squads::{
     SQUAD_MAX_MEMBERS, SQUAD_NAME_MAX_CHARS, SQUAD_NAME_MIN_CHARS, SQUAD_NAME_REGEX,
 };
 
-#[derive(Serialize)]
+#[derive(Serialize, ToSchema)]
 pub struct RestrictionMetaResponse {
     pub key: &'static str,
     pub locale: RestrictionLocale,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, ToSchema)]
 pub struct RestrictionLocale {
     pub en: RestrictionLocaleEntry,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, ToSchema)]
 pub struct RestrictionLocaleEntry {
     pub title: &'static str,
     pub description: &'static str,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, ToSchema)]
 pub struct SquadConfigResponse {
     #[serde(rename = "maxMembers")]
     pub max_members: u64,
@@ -44,6 +45,14 @@ pub struct SquadConfigResponse {
     pub image_max_height: u32,
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/meta/restrictions",
+    responses(
+        (status = 200, description = "Restriction metadata dictionary used by clients to render localized titles and descriptions.", body = [RestrictionMetaResponse])
+    ),
+    tag = "meta"
+)]
 pub async fn get_restrictions_meta() -> Json<Vec<RestrictionMetaResponse>> {
     Json(
         RestrictionKind::ALL
@@ -61,6 +70,14 @@ pub async fn get_restrictions_meta() -> Json<Vec<RestrictionMetaResponse>> {
     )
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/meta/squads/config",
+    responses(
+        (status = 200, description = "Public squad configuration such as member cap, invite TTL, name validation and image limits.", body = SquadConfigResponse)
+    ),
+    tag = "meta"
+)]
 pub async fn get_squads_config() -> Json<SquadConfigResponse> {
     Json(SquadConfigResponse {
         max_members: SQUAD_MAX_MEMBERS,

@@ -8,6 +8,7 @@ use sea_orm::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 
 use crate::app::auth::require_superuser;
@@ -24,7 +25,7 @@ use crate::services::audit::{
 };
 use crate::services::squads::{process_squad_image, squad_image_key, validate_squad_name, SQUAD_MAX_MEMBERS};
 
-#[derive(Deserialize)]
+#[derive(Deserialize, IntoParams, ToSchema)]
 pub struct ListSquadsQuery {
     pub q: Option<String>,
     pub page: Option<u64>,
@@ -32,7 +33,7 @@ pub struct ListSquadsQuery {
     pub per_page: Option<u64>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct PatchAdminSquadRequest {
     pub name: Option<String>,
     #[serde(rename = "isRestricted")]
@@ -41,12 +42,12 @@ pub struct PatchAdminSquadRequest {
     pub restriction_reason: Option<String>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct ReasonRequest {
     pub reason: Option<String>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, ToSchema)]
 pub struct AdminSquadResponse {
     pub id: String,
     pub name: String,
@@ -68,7 +69,7 @@ pub struct AdminSquadResponse {
     pub updated_at: chrono::DateTime<chrono::Utc>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, ToSchema)]
 pub struct AdminSquadListResponse {
     pub items: Vec<AdminSquadResponse>,
     pub total: u64,
@@ -77,11 +78,23 @@ pub struct AdminSquadListResponse {
     pub per_page: u64,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, ToSchema)]
 pub struct ActionResponse {
     pub status: &'static str,
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/admin/squads",
+    params(ListSquadsQuery),
+    responses(
+        (status = 200, description = "Admin list of squads with optional search by squad name, squad id, or leader id.", body = AdminSquadListResponse),
+        (status = 401, description = "Missing bearer token."),
+        (status = 403, description = "Superuser permissions required.")
+    ),
+    security(("bearer_auth" = [])),
+    tag = "admin"
+)]
 pub async fn list_squads(
     State(state): AppStateExtractor,
     headers: axum::http::HeaderMap,
@@ -127,6 +140,22 @@ pub async fn list_squads(
     }))
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/admin/squads/{squad_id}",
+    params(
+        ("squad_id" = String, Path, description = "Squad UUID.")
+    ),
+    responses(
+        (status = 200, description = "Admin squad details.", body = AdminSquadResponse),
+        (status = 400, description = "Invalid squad ID."),
+        (status = 401, description = "Missing bearer token."),
+        (status = 403, description = "Superuser permissions required."),
+        (status = 404, description = "Squad not found.")
+    ),
+    security(("bearer_auth" = [])),
+    tag = "admin"
+)]
 pub async fn get_squad(
     State(state): AppStateExtractor,
     headers: axum::http::HeaderMap,
@@ -138,6 +167,23 @@ pub async fn get_squad(
     Ok(Json(to_squad_response(&state, squad).await?))
 }
 
+#[utoipa::path(
+    patch,
+    path = "/api/admin/squads/{squad_id}",
+    params(
+        ("squad_id" = String, Path, description = "Squad UUID.")
+    ),
+    request_body = PatchAdminSquadRequest,
+    responses(
+        (status = 200, description = "Admin-updated squad fields.", body = AdminSquadResponse),
+        (status = 400, description = "Invalid squad ID or invalid squad patch values."),
+        (status = 401, description = "Missing bearer token."),
+        (status = 403, description = "Superuser permissions required."),
+        (status = 404, description = "Squad not found.")
+    ),
+    security(("bearer_auth" = [])),
+    tag = "admin"
+)]
 pub async fn patch_squad(
     State(state): AppStateExtractor,
     headers: axum::http::HeaderMap,
@@ -179,6 +225,23 @@ pub async fn patch_squad(
     Ok(Json(to_squad_response(&state, updated_squad).await?))
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/admin/squads/{squad_id}/restrict",
+    params(
+        ("squad_id" = String, Path, description = "Squad UUID.")
+    ),
+    request_body = ReasonRequest,
+    responses(
+        (status = 200, description = "Restrict squad from normal member management actions.", body = AdminSquadResponse),
+        (status = 400, description = "Invalid squad ID."),
+        (status = 401, description = "Missing bearer token."),
+        (status = 403, description = "Superuser permissions required."),
+        (status = 404, description = "Squad not found.")
+    ),
+    security(("bearer_auth" = [])),
+    tag = "admin"
+)]
 pub async fn restrict_squad(
     State(state): AppStateExtractor,
     headers: axum::http::HeaderMap,
@@ -190,6 +253,23 @@ pub async fn restrict_squad(
     update_squad_restricted_flag(&state, admin.id, squad_id, true, body.reason, ACTION_ADMIN_SQUAD_RESTRICTED).await
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/admin/squads/{squad_id}/unrestrict",
+    params(
+        ("squad_id" = String, Path, description = "Squad UUID.")
+    ),
+    request_body = ReasonRequest,
+    responses(
+        (status = 200, description = "Remove squad restriction.", body = AdminSquadResponse),
+        (status = 400, description = "Invalid squad ID."),
+        (status = 401, description = "Missing bearer token."),
+        (status = 403, description = "Superuser permissions required."),
+        (status = 404, description = "Squad not found.")
+    ),
+    security(("bearer_auth" = [])),
+    tag = "admin"
+)]
 pub async fn unrestrict_squad(
     State(state): AppStateExtractor,
     headers: axum::http::HeaderMap,
@@ -201,6 +281,22 @@ pub async fn unrestrict_squad(
     update_squad_restricted_flag(&state, admin.id, squad_id, false, body.reason, ACTION_ADMIN_SQUAD_UNRESTRICTED).await
 }
 
+#[utoipa::path(
+    delete,
+    path = "/api/admin/squads/{squad_id}",
+    params(
+        ("squad_id" = String, Path, description = "Squad UUID.")
+    ),
+    responses(
+        (status = 200, description = "Force-delete squad and detach all users from it.", body = ActionResponse),
+        (status = 400, description = "Invalid squad ID."),
+        (status = 401, description = "Missing bearer token."),
+        (status = 403, description = "Superuser permissions required."),
+        (status = 404, description = "Squad not found.")
+    ),
+    security(("bearer_auth" = [])),
+    tag = "admin"
+)]
 pub async fn delete_squad(
     State(state): AppStateExtractor,
     headers: axum::http::HeaderMap,
@@ -258,6 +354,23 @@ pub async fn delete_squad(
     Ok(Json(ActionResponse { status: "ok" }))
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/admin/squads/{squad_id}/members/{user_id}/kick",
+    params(
+        ("squad_id" = String, Path, description = "Squad UUID."),
+        ("user_id" = String, Path, description = "Target user UUID.")
+    ),
+    responses(
+        (status = 200, description = "Admin removed a member from squad.", body = ActionResponse),
+        (status = 400, description = "Invalid ids, leader target, or target user not in squad."),
+        (status = 401, description = "Missing bearer token."),
+        (status = 403, description = "Superuser permissions required."),
+        (status = 404, description = "Squad or user not found.")
+    ),
+    security(("bearer_auth" = [])),
+    tag = "admin"
+)]
 pub async fn kick_member(
     State(state): AppStateExtractor,
     headers: axum::http::HeaderMap,
@@ -302,6 +415,26 @@ pub async fn kick_member(
     Ok(Json(ActionResponse { status: "ok" }))
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/admin/squads/{squad_id}/image",
+    params(
+        ("squad_id" = String, Path, description = "Squad UUID.")
+    ),
+    request_body(
+        content_type = "multipart/form-data",
+        description = "First image part is taken, validated as an image, normalized, and uploaded as the squad avatar."
+    ),
+    responses(
+        (status = 200, description = "Admin uploaded or replaced the squad image.", body = AdminSquadResponse),
+        (status = 400, description = "Invalid squad ID, invalid multipart body, missing image, or uploaded file is not an image."),
+        (status = 401, description = "Missing bearer token."),
+        (status = 403, description = "Superuser permissions required."),
+        (status = 404, description = "Squad not found.")
+    ),
+    security(("bearer_auth" = [])),
+    tag = "admin"
+)]
 pub async fn upload_squad_image(
     State(state): AppStateExtractor,
     headers: axum::http::HeaderMap,
@@ -349,6 +482,22 @@ pub async fn upload_squad_image(
     Ok(Json(to_squad_response(&state, updated_squad).await?))
 }
 
+#[utoipa::path(
+    delete,
+    path = "/api/admin/squads/{squad_id}/image",
+    params(
+        ("squad_id" = String, Path, description = "Squad UUID.")
+    ),
+    responses(
+        (status = 200, description = "Admin removed the squad image. Repeated delete is effectively idempotent.", body = AdminSquadResponse),
+        (status = 400, description = "Invalid squad ID."),
+        (status = 401, description = "Missing bearer token."),
+        (status = 403, description = "Superuser permissions required."),
+        (status = 404, description = "Squad not found.")
+    ),
+    security(("bearer_auth" = [])),
+    tag = "admin"
+)]
 pub async fn delete_squad_image(
     State(state): AppStateExtractor,
     headers: axum::http::HeaderMap,

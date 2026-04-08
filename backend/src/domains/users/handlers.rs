@@ -46,7 +46,7 @@ impl From<UserModel> for UserResponse {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, ToSchema)]
 pub struct UserRestrictionResponse {
     pub key: String,
     pub reason: Option<String>,
@@ -69,7 +69,8 @@ pub struct UpdateNicknameRequest {
     ),
     security(
         ("bearer_auth" = [])
-    )
+    ),
+    tag = "users"
 )]
 pub async fn get_me(
     State(state): AppStateExtractor,
@@ -92,7 +93,8 @@ pub async fn get_me(
     ),
     security(
         ("bearer_auth" = [])
-    )
+    ),
+    tag = "users"
 )]
 pub async fn update_nickname(
     State(state): AppStateExtractor,
@@ -138,6 +140,19 @@ pub async fn update_nickname(
     Ok(Json(updated_user.into()))
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/user/me/restrictions",
+    responses(
+        (status = 200, description = "List active restrictions currently applied to the authenticated user.", body = [UserRestrictionResponse]),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden")
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "users"
+)]
 pub async fn get_my_restrictions(
     State(state): AppStateExtractor,
     headers: HeaderMap,

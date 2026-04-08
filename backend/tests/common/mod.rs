@@ -4,7 +4,10 @@ use std::sync::Arc;
 use auth::app::config::{AppConfig, DatabaseConfig, DiscordConfig, S3Config};
 use auth::app::router::build_router;
 use auth::app::state::{AppState, SharedAppState};
-use auth::entities::{AuditLog, AuditLogColumn, Squad, User};
+use auth::entities::{
+    AuditLog, AuditLogColumn, InventoryOperation, InventoryOperationColumn, Squad, User,
+    WalletTransaction, WalletTransactionColumn,
+};
 use auth::services::db::{connect_db, run_migrations};
 use aws_credential_types::Credentials;
 use reqwest::Client;
@@ -145,6 +148,16 @@ impl TestApp {
         body: serde_json::Value,
     ) -> reqwest::Response {
         self.send_with_retry(|| self.client.patch(self.url(path)).bearer_auth(token).json(&body))
+            .await
+    }
+
+    pub async fn put_json(
+        &self,
+        path: &str,
+        token: &str,
+        body: serde_json::Value,
+    ) -> reqwest::Response {
+        self.send_with_retry(|| self.client.put(self.url(path)).bearer_auth(token).json(&body))
             .await
     }
 
@@ -289,6 +302,38 @@ impl TestApp {
             .await
             .expect("load squad")
             .is_some()
+    }
+
+    pub async fn create_asset(
+        &self,
+        admin: &IssuedUser,
+        body: serde_json::Value,
+    ) -> serde_json::Value {
+        let response = self
+            .post_json("/api/admin/assets", &admin.access_token, body)
+            .await;
+        assert!(
+            response.status().is_success(),
+            "create asset failed: {}",
+            response.text().await.unwrap_or_default()
+        );
+        response.json().await.expect("asset json")
+    }
+
+    pub async fn inventory_operation_count(&self, operation_type: &str) -> u64 {
+        InventoryOperation::find()
+            .filter(InventoryOperationColumn::OperationType.eq(operation_type))
+            .count(&self.db)
+            .await
+            .expect("count inventory operations")
+    }
+
+    pub async fn wallet_transaction_count(&self, operation_type: &str) -> u64 {
+        WalletTransaction::find()
+            .filter(WalletTransactionColumn::OperationType.eq(operation_type))
+            .count(&self.db)
+            .await
+            .expect("count wallet transactions")
     }
 
     async fn wait_until_ready(&self) {

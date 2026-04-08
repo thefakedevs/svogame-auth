@@ -660,6 +660,21 @@ async fn validate_username(
     Ok(())
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/admin/users/{user_id}/restrictions",
+    params(
+        ("user_id" = String, Path, description = "User UUID")
+    ),
+    responses(
+        (status = 200, description = "List active restrictions for a user.", body = [AdminUserRestrictionResponse]),
+        (status = 400, description = "Invalid user ID."),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden")
+    ),
+    security(("bearer_auth" = [])),
+    tag = "admin"
+)]
 pub async fn get_user_restrictions(
     State(state): AppStateExtractor,
     headers: HeaderMap,
@@ -685,6 +700,23 @@ pub async fn get_user_restrictions(
     ))
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/admin/users/{user_id}/restrictions/{restriction_key}",
+    params(
+        ("user_id" = String, Path, description = "User UUID"),
+        ("restriction_key" = String, Path, description = "Restriction key")
+    ),
+    request_body = RestrictionReasonRequest,
+    responses(
+        (status = 200, description = "Grant restriction to a user. Repeated grant is effectively idempotent.", body = [AdminUserRestrictionResponse]),
+        (status = 400, description = "Invalid user ID or restriction key."),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden")
+    ),
+    security(("bearer_auth" = [])),
+    tag = "admin"
+)]
 pub async fn grant_user_restriction(
     State(state): AppStateExtractor,
     headers: HeaderMap,
@@ -746,6 +778,23 @@ pub async fn grant_user_restriction(
     ))
 }
 
+#[utoipa::path(
+    delete,
+    path = "/api/admin/users/{user_id}/restrictions/{restriction_key}",
+    params(
+        ("user_id" = String, Path, description = "User UUID"),
+        ("restriction_key" = String, Path, description = "Restriction key")
+    ),
+    request_body = RestrictionReasonRequest,
+    responses(
+        (status = 200, description = "Revoke restriction from a user.", body = [AdminUserRestrictionResponse]),
+        (status = 400, description = "Invalid user ID or restriction key."),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden")
+    ),
+    security(("bearer_auth" = [])),
+    tag = "admin"
+)]
 pub async fn revoke_user_restriction(
     State(state): AppStateExtractor,
     headers: HeaderMap,

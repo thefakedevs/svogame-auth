@@ -14,6 +14,7 @@ pub fn build_router(state: SharedAppState) -> Router {
         .merge(SwaggerUi::new("/api/docs").url("/api/openapi.json", ApiDoc::openapi()))
         .merge(domains::system::router())
         .merge(domains::meta::router())
+        .merge(domains::ownership::router())
         .merge(domains::admin::router())
         .merge(domains::auth::router())
         .merge(domains::squads::router())

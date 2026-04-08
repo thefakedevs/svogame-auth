@@ -32,6 +32,19 @@ pub const ACTION_ADMIN_SQUAD_IMAGE_UPDATED: &str = "admin.squad.image_updated";
 pub const ACTION_ADMIN_SQUAD_IMAGE_DELETED: &str = "admin.squad.image_deleted";
 pub const ACTION_ADMIN_USER_RESTRICTION_GRANTED: &str = "admin.user.restriction_granted";
 pub const ACTION_ADMIN_USER_RESTRICTION_REVOKED: &str = "admin.user.restriction_revoked";
+pub const ACTION_ADMIN_ASSET_CREATED: &str = "admin.asset.created";
+pub const ACTION_ADMIN_ASSET_UPDATED: &str = "admin.asset.updated";
+pub const ACTION_ADMIN_INVENTORY_ENTITLEMENT_GRANTED: &str = "admin.inventory.entitlement_granted";
+pub const ACTION_ADMIN_INVENTORY_ENTITLEMENT_REVOKED: &str = "admin.inventory.entitlement_revoked";
+pub const ACTION_ADMIN_INVENTORY_STACKABLE_ADDED: &str = "admin.inventory.stackable_added";
+pub const ACTION_ADMIN_INVENTORY_STACKABLE_REMOVED: &str = "admin.inventory.stackable_removed";
+pub const ACTION_ADMIN_INVENTORY_STACKABLE_SET: &str = "admin.inventory.stackable_set";
+pub const ACTION_ADMIN_INVENTORY_EXPIRABLE_PROLONGED: &str = "admin.inventory.expirable.prolonged";
+pub const ACTION_ADMIN_INVENTORY_EXPIRABLE_EXPIRATION_SET: &str = "admin.inventory.expirable.expiration_set";
+pub const ACTION_ADMIN_INVENTORY_EXPIRABLE_REVOKED: &str = "admin.inventory.expirable.revoked";
+pub const ACTION_ADMIN_WALLET_CREDITED: &str = "admin.wallet.credited";
+pub const ACTION_ADMIN_WALLET_DEBITED: &str = "admin.wallet.debited";
+pub const ACTION_ADMIN_WALLET_ADJUSTED: &str = "admin.wallet.adjusted";
 
 pub async fn write_audit_log<C>(
     db: &C,
