@@ -65,6 +65,16 @@
   gap: 1rem;
 }
 
+.auth-start-card {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.auth-start-card__actions {
+  width: 100%;
+}
+
 .profile-hero-top,
 .profile-actions,
 .profile-chip-row,
@@ -144,6 +154,10 @@
   gap: 0.75rem;
 }
 
+.profile-form {
+  margin-bottom: 0.75rem;
+}
+
 .profile-stats,
 .profile-summary-grid {
   display: grid;
@@ -167,11 +181,13 @@
 }
 
 .profile-panel .ui-card-header {
+  justify-content: space-between;
   align-items: flex-start;
 }
 
 .profile-panel .ui-card-header .card-title {
   flex: 1 1 auto;
+  text-align: left;
 }
 
 .profile-split .profile-panel .ui-card-header .card-title {
@@ -382,6 +398,14 @@
   flex: 1 1 10rem;
 }
 
+.profile-member-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
 .profile-member {
   justify-content: flex-start;
 }
@@ -395,6 +419,11 @@
   place-items: center;
   overflow: hidden;
   flex-shrink: 0;
+}
+
+.profile-member-avatar--sm {
+  width: 32px;
+  height: 32px;
 }
 
 .profile-member-avatar img {
@@ -417,6 +446,42 @@
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
+}
+
+.profile-search-results {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.profile-search-item,
+.profile-invite-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--ui-border);
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--ui-text);
+  text-align: left;
+}
+
+.profile-search-item__main {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.profile-search-item.is-active {
+  border-color: rgba(247, 164, 29, 0.4);
+}
+
+.profile-search-item > span:first-child,
+.profile-invite-card strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .profile-page .btn:focus,
@@ -671,7 +736,9 @@
   .profile-actions,
   .profile-toolbar,
   .profile-section-head,
-  .profile-inline-card {
+  .profile-inline-card,
+  .profile-search-item,
+  .profile-invite-card {
     align-items: stretch;
   }
 

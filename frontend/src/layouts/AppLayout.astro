@@ -1,0 +1,20 @@
+---
+import BaseLayout from './BaseLayout.astro'
+import AppHeader from '../components/layout/AppHeader'
+
+interface Props {
+  title?: string
+  description?: string
+  pageTitle?: string
+}
+
+const { title = 'SVOCraft', description, pageTitle } = Astro.props
+---
+
+<BaseLayout title={title} description={description}>
+  <div class="ui-kit-vhs" aria-hidden="true"></div>
+  <div class="ui-kit-page app-shell">
+    <AppHeader client:load pageTitle={pageTitle} />
+    <slot />
+  </div>
+</BaseLayout>

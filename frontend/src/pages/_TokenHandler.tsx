@@ -1,85 +1,80 @@
+import { buildAuthUrl } from '../routes/auth'
 import { useEffect, useState } from 'react'
-import { setAuthToken } from '../util/tokenStorage'
-import { getCurrentUser } from '../services/userApi'
-import { useAuthStore } from '../store/authStore'
-import LoadingState from '../components/LoadingState'
 import ErrorState from '../components/ErrorState'
+import LoadingState from '../components/LoadingState'
+import { toDisplayError } from '../api/http'
+import { getCurrentUser } from '../api/users'
 import { paths } from '../routes/paths'
+import { useAuthStore } from '../store/authStore'
+import { setAuthToken } from '../util/tokenStorage'
 
 export default function TokenHandler() {
-    const { setUser } = useAuthStore()
-    const [error, setError] = useState<string | null>(null)
+  const { setUser } = useAuthStore()
+  const [error, setError] = useState<string | null>(null)
 
-    useEffect(() => {
-        let cancelled = false
+  useEffect(() => {
+    let cancelled = false
 
-        async function handleToken() {
-            try {
-                const params = new URLSearchParams(window.location.search)
-                const token = params.get('token')
+    async function handleToken() {
+      try {
+        const params = new URLSearchParams(window.location.search)
+        const token = params.get('token')
 
-                if (!token) {
-                    // No token found, redirect to auth
-                    window.location.replace(paths.auth)
-                    return
-                }
-
-                // Сохраняем токен
-                setAuthToken(token)
-
-                // Убираем токен из URL, сохраняя чистый путь
-                const newUrl = window.location.pathname
-                window.history.replaceState({}, document.title, newUrl)
-
-                // Получаем данные пользователя с новым токеном
-                const userData = await getCurrentUser(token)
-                if (cancelled) return
-
-                // Обновляем store с данными пользователя только если данные изменились
-                const currentUser = useAuthStore.getState().user
-                if (!currentUser || currentUser.id !== userData.id) {
-                    setUser({
-                        id: userData.id,
-                        username: userData.username,
-                        avatarUrl: userData.avatarUrl || ''
-                    })
-                }
-
-                // Перенаправляем на страницу профиля
-                window.location.replace(paths.profile)
-            } catch (err) {
-                if (cancelled) return
-                const message = err instanceof Error ? err.message : 'Ошибка при обработке токена'
-                setError(message)
-            }
+        if (!token) {
+          window.location.replace(buildAuthUrl())
+          return
         }
 
-        handleToken()
+        setAuthToken(token)
 
-        return () => {
-            cancelled = true
+        const newUrl = window.location.pathname
+        window.history.replaceState({}, document.title, newUrl)
+
+        const userData = await getCurrentUser(token)
+        if (cancelled) return
+
+        const currentUser = useAuthStore.getState().user
+        if (!currentUser || currentUser.id !== userData.id) {
+          setUser({
+            id: userData.id,
+            username: userData.username,
+            avatarUrl: userData.avatarUrl || '',
+          })
         }
-    }, [setUser])
 
-    if (error) {
-        return (
-            <div className="ui-kit-page page token-page">
-                <ErrorState
-                    title="Ошибка авторизации"
-                    message={error}
-                    primaryActionLabel="Вернуться к авторизации"
-                    onPrimaryAction={() => window.location.replace(paths.auth)}
-                />
-            </div>
-        )
+        window.location.replace(paths.profile)
+      } catch (cause) {
+        if (cancelled) return
+        setError(toDisplayError(cause, 'Ошибка при обработке токена авторизации.'))
+      }
     }
 
+    void handleToken()
+
+    return () => {
+      cancelled = true
+    }
+  }, [setUser])
+
+  if (error) {
     return (
-        <div className="ui-kit-page page token-page">
-            <LoadingState
-                title="Завершение авторизации"
-                message="Сохраняем данные авторизации и получаем профиль..."
-            />
-        </div>
+      <div className="ui-kit-page page token-page">
+        <ErrorState
+          title="Ошибка авторизации"
+          message={error}
+          primaryActionLabel="Вернуться ко входу"
+          onPrimaryAction={() => window.location.replace(buildAuthUrl())}
+        />
+      </div>
     )
+  }
+
+  return (
+    <div className="ui-kit-page page token-page">
+      <LoadingState
+        title="Завершение авторизации"
+        message="Сохраняем сессию и загружаем профиль..."
+      />
+    </div>
+  )
 }

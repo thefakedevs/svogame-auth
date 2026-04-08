@@ -1,14 +1,16 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import AuthStartCard from '../components/auth/AuthStartCard'
 import AuthFlowStages from '../components/auth/AuthFlowStages'
-import { type DiscordAuthInitResponse, requestDiscordAuthInit } from '../services/authApi'
-import { useAuthStore } from '../store/authStore'
-import { tokenManager } from '../services/tokenManager'
-import { solvePow, type PowProgressUpdate } from '../services/pow.ts'
-import { useQuery } from '../util/query.ts'
+import { type DiscordAuthInitResponse, requestDiscordAuthInit } from '../api/auth'
+import { toDisplayError } from '../api/http'
 import { paths } from '../routes/paths'
+import { solvePow, type PowProgressUpdate } from '../services/pow.ts'
+import { tokenManager } from '../services/tokenManager'
+import { useAuthStore } from '../store/authStore'
+import { useQuery } from '../util/query.ts'
 
 interface InitState {
-  status: 'loading' | 'solving_pow' | 'redirecting' | 'error'
+  status: 'idle' | 'loading' | 'solving_pow' | 'redirecting' | 'error'
   oauthUrl?: string
   errorMessage?: string
   powProgress?: PowProgressUpdate
@@ -16,11 +18,14 @@ interface InitState {
 }
 
 export default function AuthStartPage() {
-  const [state, setState] = useState<InitState>({ status: 'loading' })
+  const [state, setState] = useState<InitState>({ status: 'idle' })
   const authHydrated = useAuthStore((store) => store.hydrated)
   const setUser = useAuthStore((store) => store.setUser)
   const setPoWData = useAuthStore((store) => store.setPoWData)
   const query = useQuery()
+  const returnUrl = query.get('redirectUrl')
+  const pollingData = query.get('polling')
+  const shouldAutoStart = Boolean(returnUrl || pollingData)
 
   useEffect(() => {
     if (!authHydrated) {
@@ -28,7 +33,7 @@ export default function AuthStartPage() {
     }
 
     const existingToken = useAuthStore.getState().token
-    const hasAuthParams = query.get('redirectUrl') || query.get('polling')
+    const hasAuthParams = returnUrl || pollingData
 
     if (existingToken && tokenManager.validateTokenFormat(existingToken) && !hasAuthParams) {
       window.location.assign(paths.profile)
@@ -39,79 +44,86 @@ export default function AuthStartPage() {
       setUser(null)
       setPoWData(null)
     }
-  }, [authHydrated, query, setUser, setPoWData])
+  }, [authHydrated, pollingData, returnUrl, query, setUser, setPoWData])
+
+  const startAuth = useCallback(async () => {
+    let data: DiscordAuthInitResponse | null = null
+
+    try {
+      setState({ status: 'loading' })
+
+      if (returnUrl) {
+        data = await requestDiscordAuthInit(returnUrl)
+      } else if (pollingData) {
+        data = JSON.parse(atob(pollingData))
+      } else {
+        data = await requestDiscordAuthInit(paths.profile)
+      }
+
+      setState({ status: 'solving_pow', powComplexity: data.powComplexity })
+
+      const updateProgress = (progress: PowProgressUpdate) => {
+        setState((currentState) => ({
+          ...currentState,
+          powProgress: progress,
+        }))
+      }
+
+      const powResult = await solvePow(data.powPrefix, data.powComplexity, updateProgress)
+
+      useAuthStore.getState().setPoWData({ solution: powResult, prefix: data.powPrefix })
+      setState({ status: 'redirecting', oauthUrl: data.oauthUrl })
+    } catch (error) {
+      setState({
+        status: 'error',
+        errorMessage: toDisplayError(error, 'Не удалось инициализировать авторизацию.'),
+      })
+    }
+  }, [pollingData, returnUrl])
 
   useEffect(() => {
-    if (!authHydrated) {
+    if (!authHydrated || !shouldAutoStart) {
       return
     }
 
-    let cancelled = false
-    const returnUrl = query.get('redirectUrl')
-    const pollingData = query.get('polling')
+    const timerId = window.setTimeout(() => {
+      void startAuth()
+    }, 0)
 
-    async function initAuth() {
-      try {
-        let data = null as DiscordAuthInitResponse | null
-        if (returnUrl) {
-          data = await requestDiscordAuthInit(returnUrl)
-        } else if (pollingData) {
-          data = JSON.parse(atob(pollingData))
-        }
-        if (!data) {
-          data = await requestDiscordAuthInit(paths.profile)
-        }
-        if (cancelled) return
-
-        setState({ status: 'solving_pow', powComplexity: data.powComplexity })
-        const updateProgress = (progress: PowProgressUpdate) => {
-          if (cancelled) return
-          setState((prevState) => ({
-            ...prevState,
-            powProgress: progress,
-          }))
-        }
-        const powResult = await solvePow(data.powPrefix, data.powComplexity, updateProgress)
-
-        useAuthStore.getState().setPoWData({ solution: powResult, prefix: data.powPrefix })
-        setState({ status: 'redirecting', oauthUrl: data.oauthUrl })
-      } catch (err) {
-        if (cancelled) return
-        console.error(err)
-        const message = err instanceof Error ? err.message : 'Не удалось инициализировать авторизацию'
-        setState({ status: 'error', errorMessage: message })
-      }
-    }
-
-    initAuth().catch((err) => {
-      if (cancelled) return
-      const message = err instanceof Error ? err.message : 'Не удалось инициализировать авторизацию'
-      setState({ status: 'error', errorMessage: message })
-    })
-
-    return () => {
-      cancelled = true
-    }
-  }, [authHydrated, query])
+    return () => window.clearTimeout(timerId)
+  }, [authHydrated, shouldAutoStart, startAuth])
 
   useEffect(() => {
     if (state.status !== 'redirecting' || !state.oauthUrl) return
-    const url = state.oauthUrl
-    const id = window.setTimeout(() => {
-      window.location.assign(url)
+
+    const timerId = window.setTimeout(() => {
+      window.location.assign(state.oauthUrl!)
     }, 500)
-    return () => window.clearTimeout(id)
-  }, [state.status, state.oauthUrl])
+
+    return () => window.clearTimeout(timerId)
+  }, [state.oauthUrl, state.status])
 
   return (
-    <div className="page auth-start-page auth-pow-fullbleed">
-      <AuthFlowStages
-        stage={state}
-        onRetryError={() => {
-          setState({ status: 'loading' })
-          window.location.reload()
-        }}
+    state.status === 'idle' || (!shouldAutoStart && state.status === 'error') ? (
+      <AuthStartCard
+        onStart={() => void startAuth()}
+        errorMessage={state.status === 'error' ? state.errorMessage : undefined}
+        isLoading={state.status === 'loading'}
       />
-    </div>
+    ) : (
+      <div className="page auth-start-page auth-pow-fullbleed">
+        <AuthFlowStages
+          stage={state}
+          onRetryError={() => {
+            if (shouldAutoStart) {
+              setState({ status: 'loading' })
+              void startAuth()
+              return
+            }
+            setState({ status: 'idle' })
+          }}
+        />
+      </div>
+    )
   )
 }

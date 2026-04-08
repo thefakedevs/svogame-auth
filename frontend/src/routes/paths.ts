@@ -1,6 +1,5 @@
 /**
- * Canonical URL paths. Use these for navigation so future refactors
- * (e.g. nesting profile under /cabinet) stay localized.
+ * Canonical URL paths for the frontend.
  */
 export const paths = {
   home: '/',
@@ -8,8 +7,6 @@ export const paths = {
   profile: '/profile',
   profileEdit: '/profile/edit',
   token: '/token',
-  /** Root of the signed-in area; extend with child routes as features land. */
-  cabinet: '/cabinet',
   uiKit: '/ui-kit',
 } as const
 

@@ -1,5 +1,5 @@
 import {create} from 'zustand'
-import type {UserProfile} from '../services/authApi'
+import type {UserProfile} from '../api/auth'
 import { persist } from 'zustand/middleware'
 
 interface AuthState {

@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
 import AuthFlowStages, { type AuthFlowStageState } from '../components/auth/AuthFlowStages'
-import { type AuthorizationCallbackResponse, fetchAuthorize } from '../services/authApi'
-import { useAuthStore } from '../store/authStore'
-import { useQuery } from '../util/query.ts'
+import { type AuthorizationCallbackResponse, fetchAuthorize } from '../api/auth'
+import { toDisplayError } from '../api/http'
 import { paths } from '../routes/paths'
 import { tokenManager } from '../services/tokenManager'
+import { useAuthStore } from '../store/authStore'
+import { useQuery } from '../util/query.ts'
 
 interface CallbackState {
   status: 'loadingProfile' | 'success' | 'error' | 'delivering'
@@ -16,7 +17,7 @@ function toFlowStage(state: CallbackState): AuthFlowStageState {
   if (state.status === 'error') {
     return {
       status: 'error',
-      errorMessage: state.errorMessage ?? 'Не удалось завершить авторизацию',
+      errorMessage: state.errorMessage ?? 'Не удалось завершить авторизацию.',
     }
   }
 
@@ -38,7 +39,7 @@ export default function AuthCallbackPage() {
     await tokenManager.storeToken(auth.accessToken)
   }, [setToken, setUser])
 
-  const finishDelivery = useCallback(async function() {
+  const finishDelivery = useCallback(async () => {
     if (!state.user) return
 
     if (state.user.deliveryMethod === 'polling') {
@@ -67,10 +68,11 @@ export default function AuthCallbackPage() {
 
   useEffect(() => {
     if ((state.status === 'success' || state.status === 'delivering') && state.user) {
-      const t = window.setTimeout(() => {
-        finishDelivery()
+      const timerId = window.setTimeout(() => {
+        void finishDelivery()
       }, 50)
-      return () => window.clearTimeout(t)
+
+      return () => window.clearTimeout(timerId)
     }
   }, [finishDelivery, state.status, state.user])
 
@@ -109,14 +111,16 @@ export default function AuthCallbackPage() {
         }
 
         throw new Error(`Unknown auth delivery method: ${data.deliveryMethod}`)
-      } catch (err) {
+      } catch (error) {
         if (cancelled) return
-        const message = err instanceof Error ? err.message : 'Не удалось загрузить профиль'
-        setState({ status: 'error', errorMessage: message })
+        setState({
+          status: 'error',
+          errorMessage: toDisplayError(error, 'Не удалось завершить авторизацию.'),
+        })
       }
     }
 
-    loadProfile()
+    void loadProfile()
 
     return () => {
       cancelled = true

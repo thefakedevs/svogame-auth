@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
-import { getCurrentUser, updateNickname, type UserResponse } from '../services/userApi'
+import { ApiError, toDisplayError } from '../api/http'
+import { getCurrentUser, updateNickname, type UserResponse } from '../api/users'
+import { currentAppPath, redirectToAuth } from '../routes/auth'
 import { useAuthStore } from '../store/authStore'
 import { isAuthenticated, removeAuthToken } from '../util/tokenStorage'
 import LoadingState from '../components/LoadingState'
@@ -26,7 +28,7 @@ export default function UserEditPage() {
         if (authChecked) return // Предотвращаем повторные проверки
         
         if (!isAuthenticated()) {
-            window.location.replace(paths.auth)
+            redirectToAuth(currentAppPath())
             return
         }
         setAuthChecked(true)
@@ -56,20 +58,14 @@ export default function UserEditPage() {
             } catch (err) {
                 if (cancelled) return
                 
-                // Если ошибка связана с авторизацией, очищаем токен и перенаправляем
-                if (err instanceof Error && (
-                    err.message.includes('токен') || 
-                    err.message.includes('авторизации') ||
-                    err.message.includes('401') ||
-                    err.message.includes('403')
-                )) {
+                if (err instanceof ApiError && err.isAuthError()) {
                     removeAuthToken()
                     setUser(null)
-                    window.location.replace(paths.auth)
+                    redirectToAuth(currentAppPath())
                     return
                 }
                 
-                const message = err instanceof Error ? err.message : 'Ошибка при загрузке данных пользователя'
+                const message = toDisplayError(err, 'Ошибка при загрузке данных пользователя')
                 setState({ status: 'error', errorMessage: message })
             }
         }
@@ -143,7 +139,7 @@ export default function UserEditPage() {
             
             setState({ status: 'success', user: updatedUser })
         } catch (err) {
-            const message = err instanceof Error ? err.message : 'Ошибка при обновлении никнейма'
+            const message = toDisplayError(err, 'Ошибка при обновлении никнейма')
             setState({ status: 'error', errorMessage: message })
         }
     }
@@ -154,15 +150,15 @@ export default function UserEditPage() {
     }
 
     const handleBackToProfile = () => {
-        window.location.assign(paths.profile)
+        window.location.assign(`${paths.profile}?tab=settings`)
     }
 
     if (state.status === 'loading') {
         return (
             <div className="ui-kit-page user-edit-page">
                 <LoadingState
-                    title="Загрузка профиля"
-                    message="Получаем данные вашего профиля..."
+                    title="Загрузка настроек"
+                    message="Получаем данные профиля для редактирования..."
                 />
             </div>
         )
@@ -172,7 +168,7 @@ export default function UserEditPage() {
         return (
             <div className="ui-kit-page user-edit-page">
                 <ErrorState
-                    title="Ошибка загрузки"
+                    title="Настройки недоступны"
                     message={state.errorMessage}
                     primaryActionLabel="Повторить"
                     onPrimaryAction={handleRetry}
@@ -191,14 +187,14 @@ export default function UserEditPage() {
                             <polyline points="22,4 12,14.01 9,11.01"/>
                         </svg>
                     </div>
-                    <h1 className="card-title">Никнейм успешно обновлен!</h1>
-                    <p>Ваш новый никнейм: <strong>{state.user.username}</strong></p>
+                    <h1 className="card-title">Настройки обновлены</h1>
+                    <p>Новый никнейм сохранен: <strong>{state.user.username}</strong></p>
                     
                     <button 
                         className="btn primary"
                         onClick={handleBackToProfile}
                     >
-                        Вернуться к профилю
+                        Вернуться к настройкам
                     </button>
                 </div>
             </div>
@@ -211,7 +207,8 @@ export default function UserEditPage() {
     return (
         <div className="ui-kit-page user-edit-page">
             <div className="edit-container card">
-                <h1 className="card-title">Изменение никнейма</h1>
+                <h1 className="card-title">Настройки профиля</h1>
+                <p className="card-text">Сейчас здесь доступно изменение никнейма. Остальные настройки можно будет добавлять в этот же раздел.</p>
                 
                 {user && (
                     <div className="ui-alert ui-alert-info current-profile">

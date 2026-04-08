@@ -11,11 +11,11 @@ export type AuthFlowStageState = {
 }
 
 function formatExpectedTime(progress: PowProgressUpdate | undefined): string {
-  if (!progress) return 'подсчёт…'
+  if (!progress) return 'подсчет...'
   const { eta } = progress
   if (!Number.isFinite(eta) || eta < 0) return '—'
-  if (eta === 0) return '~0 с'
-  return `~${eta} с`
+  if (eta === 0) return '~0 c'
+  return `~${eta} c`
 }
 
 function formatHashRate(hps: number): string {
@@ -91,12 +91,12 @@ function renderHero(status: AuthFlowStageState['status']) {
   }
 }
 
-function stageAriaLabel(s: AuthFlowStageState['status']): string {
-  switch (s) {
+function stageAriaLabel(status: AuthFlowStageState['status']): string {
+  switch (status) {
     case 'loading':
       return 'Подготовка авторизации'
     case 'solving_pow':
-      return 'Проверка на бота, подождите'
+      return 'Проверка на бота, пожалуйста подождите'
     case 'redirecting':
       return 'Переход в Discord'
     case 'error':
@@ -111,10 +111,6 @@ export interface AuthFlowStagesProps {
   onRetryError: () => void
 }
 
-/**
- * Один экран: при смене `stage.status` стек получает новый `key` — CSS-анимация слотов (ступенька по времени).
- * Обновления только PoW не меняют key — анимация не дёргается.
- */
 export default function AuthFlowStages({ stage, onRetryError }: AuthFlowStagesProps) {
   const { status } = stage
   const busy = status === 'loading' || status === 'solving_pow'
@@ -130,12 +126,12 @@ export default function AuthFlowStages({ stage, onRetryError }: AuthFlowStagesPr
 
   const lead =
     status === 'loading'
-      ? 'Готовим авторизацию: запрашиваем параметры входа и защиту сессии.'
+      ? 'Готовим вход: получаем параметры авторизации и защиту для сессии.'
       : status === 'solving_pow'
-        ? 'Короткая проверка вашего устройства. Она помогает защищать сервер от ботов и DDOS атак.'
+        ? 'Короткая локальная проверка устройства. Она помогает защищать сервис от ботов и перегрузки.'
         : status === 'redirecting'
-          ? 'Сейчас откроется страница входа Discord. Если окно не открылось, нажмите кнопку ниже.'
-          : (stage.errorMessage ?? 'Не удалось инициализировать авторизацию')
+          ? 'Сейчас откроется Discord. Если переход не случился автоматически, нажмите кнопку ниже.'
+          : (stage.errorMessage ?? 'Не удалось инициализировать авторизацию.')
 
   const percents =
     status === 'solving_pow' && stage.powProgress
@@ -184,20 +180,20 @@ export default function AuthFlowStages({ stage, onRetryError }: AuthFlowStagesPr
                   Скорость: {formatHashRate(hashRate)}
                 </p>
                 <p className="ui-pow-check-eta">Ожидаемое время: {formatExpectedTime(stage.powProgress)}</p>
-                {showStallHint && <p className="ui-pow-check-hint">Дольше обычного — почти готово</p>}
+                {showStallHint && <p className="ui-pow-check-hint">Дольше обычного, но проверка почти завершена</p>}
               </>
             )}
           </div>
 
           <div className="vt-slot-actions">
             {status === 'redirecting' && stage.oauthUrl && (
-              <button className="btn primary" type="button" onClick={() => (window.location.href = stage.oauthUrl!)}>
+              <button className="btn primary" type="button" onClick={() => (window.location.href = stage.oauthUrl)}>
                 Открыть Discord
               </button>
             )}
             {status === 'error' && (
               <button className="btn primary" type="button" onClick={onRetryError}>
-                Попробовать ещё раз
+                Попробовать еще раз
               </button>
             )}
           </div>

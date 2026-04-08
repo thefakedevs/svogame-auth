@@ -28,4 +28,3 @@ export default function LoadingState({ title, message, children }: LoadingStateP
     </div>
   )
 }
-

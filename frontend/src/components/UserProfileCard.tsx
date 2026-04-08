@@ -1,5 +1,5 @@
-import type { UserProfile } from '../services/authApi'
-import type { UserResponse } from '../services/userApi'
+import type { UserProfile } from '../api/auth'
+import type { UserResponse } from '../api/users'
 import './UserProfileCard.css'
 
 interface UserProfileCardProps {

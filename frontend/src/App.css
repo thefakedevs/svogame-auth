@@ -12,14 +12,8 @@
   max-width: min(1000px, 100%);
 }
 
-#root:has(.public-layout),
-.astro-app-root:has(.public-layout),
-.astro-app-root:has(.public-layout) {
-  max-width: min(720px, 100%);
-}
-
-#root:has(.cabinet-layout),
-.astro-app-root:has(.cabinet-layout) {
+#root:has(.app-shell),
+.astro-app-root:has(.app-shell) {
   max-width: min(1180px, 100%);
 }
 
