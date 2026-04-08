@@ -12,6 +12,8 @@ use auth::services::db::{connect_db, run_migrations};
 use aws_credential_types::Credentials;
 use reqwest::Client;
 use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter};
+use axum::response::IntoResponse;
+use axum::http::StatusCode;
 use tokio::net::TcpListener;
 use tokio::sync::RwLock;
 use uuid::Uuid;
@@ -22,6 +24,7 @@ pub struct TestApp {
     pub db: DatabaseConnection,
     _db_path: PathBuf,
     _server_task: tokio::task::JoinHandle<()>,
+    _mock_s3_server_task: tokio::task::JoinHandle<()>,
 }
 
 #[derive(Clone)]
@@ -32,7 +35,10 @@ pub struct IssuedUser {
 
 impl TestApp {
     pub async fn spawn() -> Self {
+        let (s3_endpoint, mock_s3_server_task) = spawn_mock_s3_server().await;
+
         let db_path = test_db_path();
+        let s3_bucket = format!("test-bucket-{}", Uuid::new_v4().as_simple());
         let database = DatabaseConfig {
             db_url: format!("sqlite://{}?mode=rwc", normalize_sqlite_path(&db_path)),
         };
@@ -51,9 +57,9 @@ impl TestApp {
             },
             database,
             s3: S3Config {
-                endpoint: Some("http://127.0.0.1:9000".to_string()),
+                endpoint: Some(s3_endpoint.clone()),
                 region: "us-east-1".to_string(),
-                bucket: "test-bucket".to_string(),
+                bucket: s3_bucket,
                 access_key_id: "test".to_string(),
                 secret_access_key: "test".to_string(),
                 force_path_style: true,
@@ -66,7 +72,7 @@ impl TestApp {
         let state: SharedAppState = Arc::new(RwLock::new(AppState::new(
             config,
             db.clone(),
-            test_s3_client().await,
+            test_s3_client(&s3_endpoint).await,
         )));
         let app = build_router(state);
         let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind test port");
@@ -82,6 +88,7 @@ impl TestApp {
             db,
             _db_path: db_path,
             _server_task: server_task,
+            _mock_s3_server_task: mock_s3_server_task,
         };
         test_app.wait_until_ready().await;
         test_app
@@ -354,6 +361,48 @@ impl TestApp {
             .await
     }
 
+    pub async fn post_multipart(
+        &self,
+        path: &str,
+        token: &str,
+        file_name: &str,
+        content_type: &str,
+        bytes: Vec<u8>,
+    ) -> reqwest::Response {
+        let url = self.url(path);
+        let token = token.to_string();
+        let file_name = file_name.to_string();
+        let content_type = content_type.to_string();
+        self.send_with_retry(move || {
+            let boundary = "----codex-form-boundary";
+            let mut body = Vec::new();
+            body.extend_from_slice(format!("--{boundary}\r\n").as_bytes());
+            body.extend_from_slice(
+                format!(
+                    "Content-Disposition: form-data; name=\"file\"; filename=\"{}\"\r\n",
+                    file_name
+                )
+                .as_bytes(),
+            );
+            body.extend_from_slice(format!("Content-Type: {}\r\n\r\n", content_type).as_bytes());
+            body.extend_from_slice(&bytes);
+            body.extend_from_slice(format!("\r\n--{boundary}--\r\n").as_bytes());
+            self.client
+                .post(url.clone())
+                .bearer_auth(token.clone())
+                .header(
+                    reqwest::header::CONTENT_TYPE,
+                    format!("multipart/form-data; boundary={boundary}"),
+                )
+                .body(body.clone())
+        })
+        .await
+    }
+
+    pub async fn get_bytes_without_auth(&self, path: &str) -> reqwest::Response {
+        self.send_with_retry(|| self.client.get(self.url(path))).await
+    }
+
     async fn send_with_retry(
         &self,
         make_request: impl Fn() -> reqwest::RequestBuilder,
@@ -377,6 +426,7 @@ impl TestApp {
 impl Drop for TestApp {
     fn drop(&mut self) {
         self._server_task.abort();
+        self._mock_s3_server_task.abort();
     }
 }
 
@@ -390,7 +440,7 @@ fn normalize_sqlite_path(path: &Path) -> String {
     path.to_string_lossy().replace('\\', "/")
 }
 
-async fn test_s3_client() -> aws_sdk_s3::Client {
+async fn test_s3_client(endpoint: &str) -> aws_sdk_s3::Client {
     let credentials = Credentials::new("test", "test", None, None, "tests");
     let shared_config = aws_config::defaults(aws_config::BehaviorVersion::latest())
         .credentials_provider(credentials)
@@ -400,8 +450,79 @@ async fn test_s3_client() -> aws_sdk_s3::Client {
 
     let config = aws_sdk_s3::config::Builder::from(&shared_config)
         .force_path_style(true)
-        .endpoint_url("http://127.0.0.1:9000")
+        .endpoint_url(endpoint)
         .build();
 
     aws_sdk_s3::Client::from_conf(config)
+}
+
+async fn spawn_mock_s3_server() -> (String, tokio::task::JoinHandle<()>) {
+    let storage = Arc::new(RwLock::new(std::collections::HashMap::new()));
+    let listener = TcpListener::bind("127.0.0.1:0")
+        .await
+        .expect("bind mock s3 port");
+    let address = listener.local_addr().expect("mock s3 local addr");
+    let app = axum::Router::new()
+        .route(
+            "/{*path}",
+            axum::routing::get(mock_s3_get)
+                .put(mock_s3_put)
+                .delete(mock_s3_delete),
+        )
+        .with_state(storage);
+
+    let server_task = tokio::spawn(async move {
+        if let Err(error) = axum::serve(listener, app.into_make_service()).await {
+            panic!("serve mock s3: {error}");
+        }
+    });
+
+    for _ in 0..50 {
+        if tokio::net::TcpStream::connect(address).await.is_ok() {
+            return (format!("http://{}", address), server_task);
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+    }
+
+    panic!("mock s3 server did not become ready in time");
+}
+
+async fn mock_s3_put(
+    axum::extract::State(storage): axum::extract::State<
+        Arc<RwLock<std::collections::HashMap<String, Vec<u8>>>>,
+    >,
+    axum::extract::Path(path): axum::extract::Path<String>,
+    body: axum::body::Bytes,
+) -> impl axum::response::IntoResponse {
+    storage.write().await.insert(path, body.to_vec());
+    StatusCode::OK
+}
+
+async fn mock_s3_get(
+    axum::extract::State(storage): axum::extract::State<
+        Arc<RwLock<std::collections::HashMap<String, Vec<u8>>>>,
+    >,
+    axum::extract::Path(path): axum::extract::Path<String>,
+) -> impl axum::response::IntoResponse {
+    let storage = storage.read().await;
+    if let Some(bytes) = storage.get(&path) {
+        (
+            StatusCode::OK,
+            [(reqwest::header::CONTENT_TYPE, "application/octet-stream")],
+            bytes.clone(),
+        )
+            .into_response()
+    } else {
+        StatusCode::NOT_FOUND.into_response()
+    }
+}
+
+async fn mock_s3_delete(
+    axum::extract::State(storage): axum::extract::State<
+        Arc<RwLock<std::collections::HashMap<String, Vec<u8>>>>,
+    >,
+    axum::extract::Path(path): axum::extract::Path<String>,
+) -> impl axum::response::IntoResponse {
+    storage.write().await.remove(&path);
+    StatusCode::NO_CONTENT
 }

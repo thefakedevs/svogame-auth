@@ -1,7 +1,17 @@
 mod common;
 
 use common::TestApp;
+use image::{ImageBuffer, Rgba};
 use serial_test::serial;
+
+fn make_skin_png(fill: [u8; 4]) -> Vec<u8> {
+    let image = ImageBuffer::from_pixel(64, 64, Rgba(fill));
+    let mut bytes = Vec::new();
+    image::DynamicImage::ImageRgba8(image)
+        .write_to(&mut std::io::Cursor::new(&mut bytes), image::ImageFormat::Png)
+        .expect("write png");
+    bytes
+}
 
 #[tokio::test]
 #[serial]
@@ -340,6 +350,67 @@ async fn admin_can_search_users_by_username_and_uuid() {
 
     assert_eq!(uuid_search_body["total"], 1);
     assert_eq!(uuid_search_body["items"][0]["id"], searched_user.user_id);
+}
+
+#[tokio::test]
+#[serial]
+async fn authenticated_user_can_search_users_by_username_for_autocomplete() {
+    let app = TestApp::spawn().await;
+    let requester = app.issue_user_token("SearchRequester", false, &[]).await;
+    let alpha = app.issue_user_token("AlphaSearchOne", false, &[]).await;
+    let beta = app.issue_user_token("AlphaSearchTwo", false, &[]).await;
+    let _gamma = app.issue_user_token("AlphaSearchThree", false, &[]).await;
+    let _other = app.issue_user_token("DifferentPlayer", false, &[]).await;
+
+    let response = app
+        .get_json("/api/users/search?q=AlphaSearch&limit=3", &requester.access_token)
+        .await;
+    assert!(response.status().is_success());
+
+    let body: serde_json::Value = response.json().await.expect("user search json");
+    let items = body.as_array().expect("user search array");
+
+    assert_eq!(items.len(), 3);
+    assert!(items.iter().any(|item| item["id"] == alpha.user_id));
+    assert!(items.iter().any(|item| item["id"] == beta.user_id));
+    assert!(items.iter().all(|item| item.get("discordId").is_none()));
+    assert!(items.iter().all(|item| item["username"].as_str().unwrap().contains("AlphaSearch")));
+}
+
+#[tokio::test]
+#[serial]
+async fn user_search_requires_minimum_query_length_and_authentication() {
+    let app = TestApp::spawn().await;
+    let requester = app.issue_user_token("MinSearchRequester", false, &[]).await;
+
+    let too_short = app
+        .get_json("/api/users/search?q=ab", &requester.access_token)
+        .await;
+    assert_eq!(too_short.status().as_u16(), 400);
+
+    let unauthorized = app.get_without_auth("/api/users/search?q=Alpha").await;
+    assert_eq!(unauthorized.status().as_u16(), 401);
+}
+
+#[tokio::test]
+#[serial]
+async fn user_search_uses_default_limit_of_ten_results() {
+    let app = TestApp::spawn().await;
+    let requester = app.issue_user_token("DefaultLimitRequester", false, &[]).await;
+
+    for index in 0..12 {
+        let username = format!("GroupSearch{:02}", index);
+        let _ = app.issue_user_token(&username, false, &[]).await;
+    }
+
+    let response = app
+        .get_json("/api/users/search?q=GroupSearch", &requester.access_token)
+        .await;
+    assert!(response.status().is_success());
+
+    let body: serde_json::Value = response.json().await.expect("default limit json");
+    let items = body.as_array().expect("default limit array");
+    assert_eq!(items.len(), 10);
 }
 
 #[tokio::test]
@@ -1327,4 +1398,108 @@ async fn wallet_operations_require_currency_assets_and_debit_checks_balance() {
         )
         .await;
     assert_eq!(overdraft.status(), reqwest::StatusCode::UNPROCESSABLE_ENTITY);
+}
+
+#[tokio::test]
+#[serial]
+async fn missing_user_skin_without_default_returns_not_found() {
+    let app = TestApp::spawn().await;
+    let missing_user_id = uuid::Uuid::new_v4().to_string();
+
+    let response = app
+        .get_bytes_without_auth(&format!("/api/skins/{missing_user_id}"))
+        .await;
+
+    assert_eq!(response.status(), reqwest::StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+#[serial]
+async fn missing_user_skin_falls_back_to_admin_default_skin() {
+    let app = TestApp::spawn().await;
+    let admin = app.issue_user_token("DefaultSkinAdmin", true, &[]).await;
+    let fallback_png = make_skin_png([255, 0, 0, 255]);
+
+    let upload = app
+        .post_multipart(
+            "/api/admin/skins/default?model=default",
+            &admin.access_token,
+            "default.png",
+            "image/png",
+            fallback_png.clone(),
+        )
+        .await;
+    assert!(upload.status().is_success(), "{}", upload.text().await.unwrap_or_default());
+
+    let metadata = app
+        .get_json("/api/admin/skins/default", &admin.access_token)
+        .await;
+    assert!(metadata.status().is_success());
+    let metadata_body: serde_json::Value = metadata.json().await.expect("default skin metadata");
+    assert_eq!(metadata_body["imageUrl"], "/api/skins/default");
+    assert_eq!(app.audit_log_count("admin.default_skin.updated").await, 1);
+
+    let missing_user_id = uuid::Uuid::new_v4().to_string();
+    let response = app
+        .get_bytes_without_auth(&format!("/api/skins/{missing_user_id}"))
+        .await;
+    assert!(response.status().is_success());
+    assert_eq!(
+        response
+            .headers()
+            .get(reqwest::header::CONTENT_TYPE)
+            .and_then(|value| value.to_str().ok()),
+        Some("image/png")
+    );
+    let response_bytes = response.bytes().await.expect("fallback bytes");
+
+    let direct_default = app.get_bytes_without_auth("/api/skins/default").await;
+    assert!(direct_default.status().is_success());
+    let direct_default_bytes = direct_default.bytes().await.expect("default bytes");
+
+    assert_eq!(response_bytes.as_ref(), direct_default_bytes.as_ref());
+}
+
+#[tokio::test]
+#[serial]
+async fn personal_skin_takes_priority_over_default_skin() {
+    let app = TestApp::spawn().await;
+    let admin = app.issue_user_token("SkinPriorityAdmin", true, &[]).await;
+    let user = app.issue_user_token("SkinOwner", false, &[]).await;
+    let default_png = make_skin_png([0, 255, 0, 255]);
+    let personal_png = make_skin_png([0, 0, 255, 255]);
+
+    let upload_default = app
+        .post_multipart(
+            "/api/admin/skins/default?model=default",
+            &admin.access_token,
+            "default.png",
+            "image/png",
+            default_png,
+        )
+        .await;
+    assert!(upload_default.status().is_success());
+
+    let upload_personal = app
+        .post_multipart(
+            "/api/skins/me?model=slim",
+            &user.access_token,
+            "personal.png",
+            "image/png",
+            personal_png.clone(),
+        )
+        .await;
+    assert!(upload_personal.status().is_success(), "{}", upload_personal.text().await.unwrap_or_default());
+
+    let response = app
+        .get_bytes_without_auth(&format!("/api/skins/{}", user.user_id))
+        .await;
+    assert!(response.status().is_success());
+    let response_bytes = response.bytes().await.expect("personal skin bytes");
+
+    let default_response = app.get_bytes_without_auth("/api/skins/default").await;
+    assert!(default_response.status().is_success());
+    let default_bytes = default_response.bytes().await.expect("default skin bytes");
+
+    assert_ne!(response_bytes.as_ref(), default_bytes.as_ref());
 }
