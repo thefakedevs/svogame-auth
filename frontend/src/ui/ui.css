@@ -154,12 +154,16 @@
 
 .ui-kit-page button:focus,
 .ui-kit-page button:focus-visible {
-  outline: 2px solid var(--ui-secondary);
-  outline-offset: 2px;
+  outline: none;
 }
 
 .ui-kit-page .btn.primary:focus-visible {
-  outline-color: var(--ui-primary);
+  border-color: var(--ui-primary-hover);
+}
+
+.ui-kit-page button:focus-visible,
+.ui-kit-page .btn:focus-visible {
+  border-color: rgba(247, 164, 29, 0.45);
 }
 
 /* Бейджи — острые */
@@ -1231,4 +1235,316 @@
   background: rgba(0, 0, 0, 0.4);
   border: 1px solid var(--ui-border);
   color: #f7a41d;
+}
+
+/* Проверка на бота — прогресс-бар как в общем блоке «Прогресс» UI kit; под полоской — сложность/скорость, ниже — ETA */
+.ui-kit-page.ui-pow-check {
+  --ui-pow-font-sans: 'IBM Plex Sans', 'Inter', system-ui, sans-serif;
+  --ui-pow-font-mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Code', monospace;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: min(78vh, 720px);
+  padding: clamp(1.5rem, 5vw, 3rem) clamp(1rem, 4vw, 2rem);
+  box-sizing: border-box;
+}
+
+.ui-kit-page.ui-pow-check .ui-pow-check-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  width: 100%;
+  max-width: min(32rem, 100%);
+}
+
+.ui-kit-page.ui-pow-check .ui-pow-check-icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.25rem;
+  color: rgba(247, 164, 29, 0.98);
+  isolation: isolate;
+}
+
+.ui-kit-page.ui-pow-check .ui-pow-check-icon svg {
+  position: relative;
+  z-index: 1;
+  width: clamp(52px, 12vw, 64px);
+  height: clamp(52px, 12vw, 64px);
+  filter:
+    drop-shadow(0 0 8px rgba(247, 164, 29, 0.85))
+    drop-shadow(0 0 22px rgba(247, 164, 29, 0.4))
+    drop-shadow(0 0 40px rgba(247, 164, 29, 0.2));
+}
+
+.ui-kit-page.ui-pow-check .ui-pow-check-title {
+  margin: 0;
+  font-family: var(--ui-pow-font-sans);
+  font-weight: 600;
+  font-size: clamp(1.35rem, 3.4vw, 1.9rem);
+  line-height: 1.2;
+  letter-spacing: -0.03em;
+  color: var(--ui-text);
+  text-align: center;
+}
+
+.ui-kit-page.ui-pow-check .ui-pow-check-lead {
+  margin: 0;
+  margin-top: 0.15rem;
+  font-family: var(--ui-pow-font-sans);
+  font-size: 0.88rem;
+  font-weight: 500;
+  line-height: 1.55;
+  letter-spacing: -0.01em;
+  color: var(--ui-text-muted);
+  text-align: center;
+  max-width: 30rem;
+}
+
+.ui-kit-page.ui-pow-check .ui-pow-check-tech {
+  margin: 0;
+  font-family: var(--ui-pow-font-mono);
+  font-size: 0.75rem;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.5);
+  text-align: center;
+}
+
+.ui-kit-page.ui-pow-check .ui-pow-check-tech-sep {
+  margin: 0 0.4rem;
+  opacity: 0.65;
+}
+
+.ui-kit-page.ui-pow-check .ui-pow-check-bar {
+  width: 100%;
+  max-width: 100%;
+  align-self: stretch;
+  margin-top: 0.35rem;
+}
+
+/* чуть толще базового 8px из UI kit; остальное как «Прогресс» */
+.ui-kit-page.ui-pow-check .ui-pow-check-bar progress {
+  height: 10px;
+}
+
+.ui-kit-page.ui-pow-check .ui-pow-check-eta {
+  margin: 0;
+  margin-top: 0.15rem;
+  font-family: var(--ui-pow-font-mono);
+  font-size: 0.8rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: var(--ui-text-muted);
+  text-align: center;
+}
+
+.ui-kit-page.ui-pow-check .ui-pow-check-hint {
+  margin: 0;
+  font-family: var(--ui-pow-font-mono);
+  font-size: 0.75rem;
+  font-weight: 400;
+  letter-spacing: 0.03em;
+  color: var(--ui-text-muted);
+  text-align: center;
+  max-width: 36rem;
+  line-height: 1.45;
+}
+
+/* Подготовка авторизации и редирект Discord — тот же каркас, что проверка на бота */
+.ui-kit-page.ui-auth-flow {
+  --ui-pow-font-sans: 'IBM Plex Sans', 'Inter', system-ui, sans-serif;
+  --ui-pow-font-mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Code', monospace;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: min(78vh, 720px);
+  padding: clamp(1.5rem, 5vw, 3rem) clamp(1rem, 4vw, 2rem);
+  box-sizing: border-box;
+}
+
+.ui-kit-page.ui-auth-flow .ui-auth-flow-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  width: 100%;
+  max-width: min(32rem, 100%);
+}
+
+.ui-kit-page.ui-auth-flow .ui-auth-flow-hero {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 4.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.ui-kit-page.ui-auth-flow .ui-auth-flow-title {
+  margin: 0;
+  font-family: var(--ui-pow-font-sans);
+  font-weight: 600;
+  font-size: clamp(1.35rem, 3.4vw, 1.9rem);
+  line-height: 1.2;
+  letter-spacing: -0.03em;
+  color: var(--ui-text);
+  text-align: center;
+}
+
+.ui-kit-page.ui-auth-flow .ui-auth-flow-lead {
+  margin: 0;
+  margin-top: 0.15rem;
+  font-family: var(--ui-pow-font-sans);
+  font-size: 0.88rem;
+  font-weight: 500;
+  line-height: 1.55;
+  letter-spacing: -0.01em;
+  color: var(--ui-text-muted);
+  text-align: center;
+  max-width: 30rem;
+}
+
+.ui-kit-page.ui-auth-flow .ui-auth-flow-lead--error,
+.ui-kit-page.ui-auth-flow.ui-pow-check .ui-pow-check-lead.ui-auth-flow-lead--error {
+  color: rgba(255, 210, 210, 0.9);
+}
+
+.ui-kit-page.ui-auth-flow .ui-auth-flow-actions {
+  margin-top: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.ui-kit-page.ui-auth-flow .ui-auth-flow-icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.25rem;
+  isolation: isolate;
+}
+
+.ui-kit-page.ui-auth-flow .ui-auth-flow-icon svg {
+  position: relative;
+  z-index: 1;
+  width: clamp(52px, 12vw, 64px);
+  height: clamp(52px, 12vw, 64px);
+}
+
+.ui-kit-page.ui-auth-flow .ui-auth-flow-icon--discord {
+  color: rgba(247, 164, 29, 0.98);
+}
+
+.ui-kit-page.ui-auth-flow .ui-auth-flow-icon--discord svg {
+  position: relative;
+  z-index: 1;
+  width: clamp(52px, 12vw, 64px);
+  height: clamp(52px, 12vw, 64px);
+  filter:
+    drop-shadow(0 0 8px rgba(247, 164, 29, 0.4))
+    drop-shadow(0 0 22px rgba(247, 164, 29, 0.28))
+    drop-shadow(0 0 40px rgba(247, 164, 29, 0.2));
+}
+
+.ui-kit-page.ui-auth-flow .ui-auth-flow-icon--error {
+  color: #ed4245;
+}
+
+.ui-kit-page.ui-auth-flow .ui-auth-flow-icon--error::before {
+  content: '';
+  position: absolute;
+  width: clamp(76px, 20vw, 104px);
+  height: clamp(76px, 20vw, 104px);
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 50% 45%,
+    rgba(237, 66, 69, 0.42) 0%,
+    rgba(237, 66, 69, 0.12) 45%,
+    transparent 68%
+  );
+  filter: blur(16px);
+  z-index: 0;
+  pointer-events: none;
+}
+
+.ui-kit-page.ui-auth-flow .ui-auth-flow-icon--error svg {
+  filter:
+    drop-shadow(0 0 8px rgba(237, 66, 69, 0.55))
+    drop-shadow(0 0 22px rgba(237, 66, 69, 0.28));
+}
+
+/* Слот основного блока (прогресс PoW): колонка внутри общего стека */
+.ui-kit-page.ui-auth-flow.ui-pow-check .vt-slot-main {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.65rem;
+  width: 100%;
+}
+
+.ui-kit-page.ui-auth-flow.ui-pow-check .vt-slot-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 0;
+}
+
+.ui-kit-page.ui-auth-flow.ui-pow-check .vt-slot-actions:empty {
+  display: none;
+}
+
+/* Смена шага авторизации: новый mount стека по key=status — ступенчатый «приезд» слотов */
+@keyframes vt-auth-slot-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.ui-kit-page.ui-auth-flow.ui-pow-check .vt-auth-stack > * {
+  animation: vt-auth-slot-in 0.52s cubic-bezier(0.22, 1, 0.32, 1) both;
+}
+
+.ui-kit-page.ui-auth-flow.ui-pow-check .vt-auth-stack > *:nth-child(1) {
+  animation-delay: 0ms;
+}
+
+.ui-kit-page.ui-auth-flow.ui-pow-check .vt-auth-stack > *:nth-child(2) {
+  animation-delay: 55ms;
+}
+
+.ui-kit-page.ui-auth-flow.ui-pow-check .vt-auth-stack > *:nth-child(3) {
+  animation-delay: 110ms;
+}
+
+.ui-kit-page.ui-auth-flow.ui-pow-check .vt-auth-stack > *:nth-child(4) {
+  animation-delay: 165ms;
+}
+
+.ui-kit-page.ui-auth-flow.ui-pow-check .vt-auth-stack > *:nth-child(5) {
+  animation-delay: 220ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-kit-page.ui-auth-flow.ui-pow-check .vt-auth-stack > * {
+    animation-duration: 0.12s;
+    animation-delay: 0ms !important;
+  }
 }

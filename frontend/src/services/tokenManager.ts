@@ -1,3 +1,5 @@
+import { useAuthStore } from '../store/authStore'
+
 /**
  * TokenManager utility service for handling JWT token extraction and validation
  */
@@ -46,36 +48,19 @@ export function validateTokenFormat(token: string): boolean {
  * @param token JWT token to store
  */
 export function storeToken(token: string): Promise<void> {
-  // Import dynamically to avoid circular dependencies
-  return import('../store/authStore')
-    .then(({ useAuthStore }) => {
-      useAuthStore.getState().setToken(token)
-    })
-    .catch(err => {
-      // Surface import/set errors to caller
-      console.error('tokenManager.storeToken failed', err)
-      throw err
-    })
+  useAuthStore.getState().setToken(token)
+  return Promise.resolve()
 }
 
 /**
  * Clears JWT token from the auth store
  */
 export function clearToken(): Promise<void> {
-  // Import dynamically to avoid circular dependencies
-  return import('../store/authStore')
-    .then(({ useAuthStore }) => {
-      useAuthStore.getState().setToken(null)
-    })
-    .catch(err => {
-      console.error('tokenManager.clearToken failed', err)
-      throw err
-    })
+  useAuthStore.getState().setToken(null)
+  return Promise.resolve()
 }
 
 export async function getToken(): Promise<string | null> {
-  // Import dynamically to avoid circular dependencies
-  const { useAuthStore } = await import('../store/authStore')
   return useAuthStore.getState().token
 }
 

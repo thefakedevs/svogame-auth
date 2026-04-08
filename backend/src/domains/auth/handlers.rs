@@ -6,12 +6,15 @@ use axum::extract::State;
 use axum::Json;
 use sea_orm::ModelTrait;
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use tracing::error;
+use utoipa::ToSchema;
 use crate::services::discord::exchange_code;
+use crate::services::audit::{write_audit_log, ACTION_USER_REGISTERED};
 use crate::services::token::sign_token;
 use uuid::Uuid;
 
-#[derive(Serialize)]
+#[derive(Serialize, ToSchema)]
 pub struct PrepareAuthResponse {
     #[serde(rename = "powPrefix")]
     pow_prefix: String,
@@ -25,7 +28,7 @@ pub struct PrepareAuthResponse {
     delivery_target: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct PrepareAuthRequest {
     #[serde(rename = "redirectUrl")]
     pub redirect_url: Option<String>,
@@ -33,6 +36,20 @@ pub struct PrepareAuthRequest {
     pub delivery_method: String,
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/auth/prepare",
+    request_body(
+        content = PrepareAuthRequest,
+        description = "Prepare an authentication session. `deliveryMethod` controls whether the final token is returned immediately through redirect flow or later through polling."
+    ),
+    responses(
+        (status = 200, description = "Authentication challenge prepared. Response includes PoW parameters and token delivery metadata.", body = PrepareAuthResponse),
+        (status = 400, description = "Invalid delivery method or missing redirect URL for redirect delivery mode."),
+        (status = 500, description = "Server failed to create auth challenge.")
+    ),
+    tag = "auth"
+)]
 pub async fn prepare_auth(
     State(state): AppStateExtractor,
     Json(body): Json<PrepareAuthRequest>,
@@ -77,7 +94,7 @@ pub async fn prepare_auth(
     }))
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, ToSchema)]
 pub struct AuthorizeResponse {
     #[serde(rename = "accessToken")]
     access_token: String,
@@ -91,7 +108,7 @@ pub struct AuthorizeResponse {
     delivery_target: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct AuthorizeRequest {
     #[serde(rename = "powPrefix")]
     pub pow_prefix: String,
@@ -101,6 +118,21 @@ pub struct AuthorizeRequest {
     pub discord_code: String,
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/auth/authorize",
+    request_body(
+        content = AuthorizeRequest,
+        description = "Complete Discord-based authentication by presenting PoW solution and Discord OAuth code. In polling mode, the same completion also notifies the waiting poll endpoint."
+    ),
+    responses(
+        (status = 200, description = "Authentication completed successfully.", body = AuthorizeResponse),
+        (status = 400, description = "Invalid or expired challenge prefix."),
+        (status = 403, description = "PoW invalid, Discord code invalid, missing required scopes, email not verified, user deactivated, or token exchange rejected."),
+        (status = 500, description = "Internal failure while registering user, writing audit log, or signing token.")
+    ),
+    tag = "auth"
+)]
 pub async fn authorize(
     State(state): AppStateExtractor,
     Json(body): Json<AuthorizeRequest>,
@@ -178,7 +210,7 @@ pub async fn authorize(
         return Err(HttpError::forbidden("Discord email not verified"));
     }
 
-    let user = match crate::entities::User::update_or_register_by_discord_id(
+    let user_result = match crate::entities::User::update_or_register_by_discord_id(
         &state.db,
         user_info.id.clone(),
         user_info.username.clone(),
@@ -192,6 +224,31 @@ pub async fn authorize(
             return Err(HttpError::internal_error("Failed to register user"));
         }
     };
+    let user = user_result.user;
+
+    if user_result.created {
+        write_audit_log(
+            &state.db,
+            ACTION_USER_REGISTERED,
+            None,
+            Some(user.id),
+            None,
+            Some(json!({
+                "discordId": user.discord_id,
+                "username": user.username,
+            })),
+        )
+        .await
+        .map_err(|e| {
+            error!("Failed to write registration audit log: {:?}", e);
+            HttpError::internal_error("Failed to write registration audit log")
+        })?;
+    }
+
+    if !user.is_active {
+        notify_error("User is deactivated");
+        return Err(HttpError::forbidden("User is deactivated"));
+    }
 
     let jwt_token = match sign_token(&user, &state.config) {
         Ok(token) => token,

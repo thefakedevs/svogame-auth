@@ -3,13 +3,14 @@ use axum::extract::Path;
 use axum::Json;
 use serde::Serialize;
 use tokio::time::timeout;
+use utoipa::ToSchema;
 use crate::app::http::{HttpError, HttpResult};
 use crate::app::state::AppStateExtractor;
 use crate::domains::auth::runtime::AuthPollResult;
 
 const POLL_TIMEOUT: Duration = Duration::from_secs(30);
 
-#[derive(Serialize)]
+#[derive(Serialize, ToSchema)]
 pub struct PollResponse {
     status: String,
     #[serde(rename = "accessToken", skip_serializing_if = "Option::is_none")]
@@ -83,6 +84,18 @@ impl From<AuthPollResult> for PollResponse {
     }
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/auth/poll/{poll_id}",
+    params(
+        ("poll_id" = String, Path, description = "Polling delivery identifier returned by `/api/auth/prepare` when `deliveryMethod = polling`.")
+    ),
+    responses(
+        (status = 200, description = "Long-poll auth status. Returns `pending`, `success`, `error`, or cached completion state. Success includes issued token and user snapshot.", body = PollResponse),
+        (status = 400, description = "Invalid poll ID format.")
+    ),
+    tag = "auth"
+)]
 pub async fn poll_auth_status(
     state: AppStateExtractor,
     Path(poll_id): Path<String>,
