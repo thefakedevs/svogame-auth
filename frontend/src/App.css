@@ -6,6 +6,14 @@
   padding: 20px;
 }
 
+#root:has(.ui-kit-page) {
+  max-width: min(1000px, 100%);
+}
+
+body:has(.ui-kit-page) {
+  align-items: flex-start;
+}
+
 .app-root {
   width: 100%;
   display: flex;

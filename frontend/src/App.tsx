@@ -3,6 +3,7 @@ import { BrowserRouter, Route, Routes, Navigate, useLocation } from 'react-route
 import AuthStartPage from './pages/AuthStartPage.tsx'
 import AuthCallbackPage from './pages/AuthCallbackPage.tsx'
 import ProfilePage from './pages/ProfilePage.tsx'
+import UiKitPage from './pages/UiKitPage.tsx'
 
 function App() {
   return (
@@ -12,6 +13,7 @@ function App() {
           <Route path="/" element={<Navigate to="/auth" replace />} />
           <Route path="/auth" element={<AuthEntry />} />
           <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/ui-kit" element={<UiKitPage />} />
           <Route path="*" element={<div className="not-found">Страница не найдена</div>} />
         </Routes>
       </div>
