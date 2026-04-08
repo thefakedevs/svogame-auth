@@ -1,6 +1,6 @@
 use sea_orm::prelude::Expr;
 use sea_orm::sea_query::{ColumnDef, Table};
-use sea_orm::{DbErr, DeriveIden};
+use sea_orm::{ConnectionTrait, DatabaseBackend, DbErr, DeriveIden, Statement};
 use sea_orm_migration::{MigrationName, MigrationTrait, SchemaManager};
 
 pub struct CreateAuthRayTable;
@@ -98,6 +98,14 @@ impl MigrationTrait for CreateUserTable {
                             .default(true),
                     )
                     .col(
+                        ColumnDef::new(User::IsSuperuser)
+                            .boolean()
+                            .not_null()
+                            .default(false),
+                    )
+                    .col(ColumnDef::new(User::SquadId).uuid().null())
+                    .col(ColumnDef::new(User::DeactivationReason).string().null())
+                    .col(
                         ColumnDef::new(User::LastLoginAt)
                             .timestamp_with_time_zone()
                             .not_null(),
@@ -130,7 +138,862 @@ enum User {
     Email,
     AuthEpoch,
     IsActive,
+    IsSuperuser,
+    SquadId,
+    DeactivationReason,
     LastLoginAt,
+    CreatedAt,
+}
+
+pub struct AddUserSuperuserColumn;
+
+impl MigrationName for AddUserSuperuserColumn {
+    fn name(&self) -> &str {
+        "m20260407_000003_add_user_is_superuser_column"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for AddUserSuperuserColumn {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        let sql = match manager.get_database_backend() {
+            DatabaseBackend::Postgres => {
+                r#"ALTER TABLE "user" ADD COLUMN "is_superuser" boolean NOT NULL DEFAULT false"#
+            }
+            DatabaseBackend::Sqlite => {
+                r#"ALTER TABLE "user" ADD COLUMN "is_superuser" boolean NOT NULL DEFAULT false"#
+            }
+            _ => return Ok(()),
+        };
+
+        match manager
+            .get_connection()
+            .execute(Statement::from_string(
+                manager.get_database_backend(),
+                sql.to_string(),
+            ))
+            .await
+        {
+            Ok(_) => Ok(()),
+            Err(error) if is_duplicate_column_error(&error) => Ok(()),
+            Err(error) => Err(error),
+        }
+    }
+
+    async fn down(&self, _manager: &SchemaManager) -> Result<(), DbErr> {
+        Ok(())
+    }
+}
+
+fn is_duplicate_column_error(error: &DbErr) -> bool {
+    let error_text = error.to_string().to_lowercase();
+    error_text.contains("duplicate column")
+        || error_text.contains("duplicate column name")
+        || error_text.contains("already exists")
+}
+
+pub struct AddUserDeactivationReasonColumn;
+
+impl MigrationName for AddUserDeactivationReasonColumn {
+    fn name(&self) -> &str {
+        "m20260407_000004_add_user_deactivation_reason_column"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for AddUserDeactivationReasonColumn {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        let sql = match manager.get_database_backend() {
+            DatabaseBackend::Postgres => {
+                r#"ALTER TABLE "user" ADD COLUMN "deactivation_reason" varchar NULL"#
+            }
+            DatabaseBackend::Sqlite => {
+                r#"ALTER TABLE "user" ADD COLUMN "deactivation_reason" varchar NULL"#
+            }
+            _ => return Ok(()),
+        };
+
+        match manager
+            .get_connection()
+            .execute(Statement::from_string(
+                manager.get_database_backend(),
+                sql.to_string(),
+            ))
+            .await
+        {
+            Ok(_) => Ok(()),
+            Err(error) if is_duplicate_column_error(&error) => Ok(()),
+            Err(error) => Err(error),
+        }
+    }
+
+    async fn down(&self, _manager: &SchemaManager) -> Result<(), DbErr> {
+        Ok(())
+    }
+}
+
+pub struct AddUserSquadIdColumn;
+
+impl MigrationName for AddUserSquadIdColumn {
+    fn name(&self) -> &str {
+        "m20260407_000006_add_user_squad_id_column"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for AddUserSquadIdColumn {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        let sql = match manager.get_database_backend() {
+            DatabaseBackend::Postgres => {
+                r#"ALTER TABLE "user" ADD COLUMN "squad_id" uuid NULL"#
+            }
+            DatabaseBackend::Sqlite => {
+                r#"ALTER TABLE "user" ADD COLUMN "squad_id" uuid NULL"#
+            }
+            _ => return Ok(()),
+        };
+
+        match manager
+            .get_connection()
+            .execute(Statement::from_string(
+                manager.get_database_backend(),
+                sql.to_string(),
+            ))
+            .await
+        {
+            Ok(_) => Ok(()),
+            Err(error) if is_duplicate_column_error(&error) => Ok(()),
+            Err(error) => Err(error),
+        }
+    }
+
+    async fn down(&self, _manager: &SchemaManager) -> Result<(), DbErr> {
+        Ok(())
+    }
+}
+
+pub struct CreateAuditLogTable;
+
+impl MigrationName for CreateAuditLogTable {
+    fn name(&self) -> &str {
+        "m20260407_000005_create_audit_log_table"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for CreateAuditLogTable {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .create_table(
+                Table::create()
+                    .table(AuditLog::Table)
+                    .if_not_exists()
+                    .col(
+                        ColumnDef::new(AuditLog::Id)
+                            .big_integer()
+                            .not_null()
+                            .auto_increment()
+                            .primary_key(),
+                    )
+                    .col(ColumnDef::new(AuditLog::Action).string().not_null())
+                    .col(ColumnDef::new(AuditLog::ActorUserId).uuid().null())
+                    .col(ColumnDef::new(AuditLog::TargetUserId).uuid().null())
+                    .col(ColumnDef::new(AuditLog::Reason).string().null())
+                    .col(ColumnDef::new(AuditLog::Metadata).text().null())
+                    .col(
+                        ColumnDef::new(AuditLog::CreatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .to_owned(),
+            )
+            .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_table(Table::drop().table(AuditLog::Table).to_owned())
+            .await
+    }
+}
+
+#[derive(DeriveIden)]
+enum AuditLog {
+    Table,
+    Id,
+    Action,
+    ActorUserId,
+    TargetUserId,
+    Reason,
+    Metadata,
+    CreatedAt,
+}
+
+pub struct CreateSquadTable;
+
+impl MigrationName for CreateSquadTable {
+    fn name(&self) -> &str {
+        "m20260407_000007_create_squad_table"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for CreateSquadTable {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .create_table(
+                Table::create()
+                    .table(Squad::Table)
+                    .if_not_exists()
+                    .col(
+                        ColumnDef::new(Squad::Id)
+                            .uuid()
+                            .not_null()
+                            .primary_key(),
+                    )
+                    .col(ColumnDef::new(Squad::LeaderUserId).uuid().not_null())
+                    .col(ColumnDef::new(Squad::Name).string().not_null())
+                    .col(ColumnDef::new(Squad::ImageKey).string().null())
+                    .col(ColumnDef::new(Squad::ImageContentType).string().null())
+                    .col(
+                        ColumnDef::new(Squad::IsRestricted)
+                            .boolean()
+                            .not_null()
+                            .default(false),
+                    )
+                    .col(ColumnDef::new(Squad::RestrictionReason).string().null())
+                    .col(
+                        ColumnDef::new(Squad::CreatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .col(
+                        ColumnDef::new(Squad::UpdatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .to_owned(),
+            )
+            .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_table(Table::drop().table(Squad::Table).to_owned())
+            .await
+    }
+}
+
+#[derive(DeriveIden)]
+enum Squad {
+    Table,
+    Id,
+    LeaderUserId,
+    Name,
+    ImageKey,
+    ImageContentType,
+    IsRestricted,
+    RestrictionReason,
+    CreatedAt,
+    UpdatedAt,
+}
+
+pub struct CreateSquadInviteTable;
+
+impl MigrationName for CreateSquadInviteTable {
+    fn name(&self) -> &str {
+        "m20260407_000008_create_squad_invite_table"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for CreateSquadInviteTable {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .create_table(
+                Table::create()
+                    .table(SquadInvite::Table)
+                    .if_not_exists()
+                    .col(
+                        ColumnDef::new(SquadInvite::Id)
+                            .uuid()
+                            .not_null()
+                            .primary_key(),
+                    )
+                    .col(ColumnDef::new(SquadInvite::SquadId).uuid().not_null())
+                    .col(ColumnDef::new(SquadInvite::InviterUserId).uuid().not_null())
+                    .col(ColumnDef::new(SquadInvite::InvitedUserId).uuid().not_null())
+                    .col(
+                        ColumnDef::new(SquadInvite::ExpiresAt)
+                            .timestamp_with_time_zone()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(SquadInvite::CreatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .to_owned(),
+            )
+            .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_table(Table::drop().table(SquadInvite::Table).to_owned())
+            .await
+    }
+}
+
+#[derive(DeriveIden)]
+enum SquadInvite {
+    Table,
+    Id,
+    SquadId,
+    InviterUserId,
+    InvitedUserId,
+    ExpiresAt,
+    CreatedAt,
+}
+
+pub struct CreateUserRestrictionTable;
+
+impl MigrationName for CreateUserRestrictionTable {
+    fn name(&self) -> &str {
+        "m20260407_000009_create_user_restriction_table"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for CreateUserRestrictionTable {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .create_table(
+                Table::create()
+                    .table(UserRestriction::Table)
+                    .if_not_exists()
+                    .col(
+                        ColumnDef::new(UserRestriction::Id)
+                            .big_integer()
+                            .not_null()
+                            .auto_increment()
+                            .primary_key(),
+                    )
+                    .col(ColumnDef::new(UserRestriction::UserId).uuid().not_null())
+                    .col(ColumnDef::new(UserRestriction::RestrictionKey).string().not_null())
+                    .col(ColumnDef::new(UserRestriction::Reason).string().null())
+                    .col(
+                        ColumnDef::new(UserRestriction::CreatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .to_owned(),
+            )
+            .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_table(Table::drop().table(UserRestriction::Table).to_owned())
+            .await
+    }
+}
+
+#[derive(DeriveIden)]
+enum UserRestriction {
+    Table,
+    Id,
+    UserId,
+    RestrictionKey,
+    Reason,
+    CreatedAt,
+}
+
+pub struct CreateAssetDefinitionTable;
+
+impl MigrationName for CreateAssetDefinitionTable {
+    fn name(&self) -> &str {
+        "m20260408_000010_create_asset_definition_table"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for CreateAssetDefinitionTable {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .create_table(
+                Table::create()
+                    .table(AssetDefinition::Table)
+                    .if_not_exists()
+                    .col(ColumnDef::new(AssetDefinition::Id).uuid().not_null().primary_key())
+                    .col(ColumnDef::new(AssetDefinition::Key).string().not_null().unique_key())
+                    .col(ColumnDef::new(AssetDefinition::DisplayName).string().not_null())
+                    .col(ColumnDef::new(AssetDefinition::Description).string().null())
+                    .col(ColumnDef::new(AssetDefinition::AssetKind).string().not_null())
+                    .col(ColumnDef::new(AssetDefinition::OwnershipModel).string().not_null())
+                    .col(
+                        ColumnDef::new(AssetDefinition::IsCurrency)
+                            .boolean()
+                            .not_null()
+                            .default(false),
+                    )
+                    .col(
+                        ColumnDef::new(AssetDefinition::IsUserPurchasable)
+                            .boolean()
+                            .not_null()
+                            .default(false),
+                    )
+                    .col(
+                        ColumnDef::new(AssetDefinition::IsPublic)
+                            .boolean()
+                            .not_null()
+                            .default(false),
+                    )
+                    .col(
+                        ColumnDef::new(AssetDefinition::IsActive)
+                            .boolean()
+                            .not_null()
+                            .default(true),
+                    )
+                    .col(ColumnDef::new(AssetDefinition::Metadata).text().not_null())
+                    .col(
+                        ColumnDef::new(AssetDefinition::CreatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .col(
+                        ColumnDef::new(AssetDefinition::UpdatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .to_owned(),
+            )
+            .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_table(Table::drop().table(AssetDefinition::Table).to_owned())
+            .await
+    }
+}
+
+#[derive(DeriveIden)]
+enum AssetDefinition {
+    Table,
+    Id,
+    Key,
+    DisplayName,
+    Description,
+    AssetKind,
+    OwnershipModel,
+    IsCurrency,
+    IsUserPurchasable,
+    IsPublic,
+    IsActive,
+    Metadata,
+    CreatedAt,
+    UpdatedAt,
+}
+
+pub struct CreateUserStackableAssetTable;
+
+impl MigrationName for CreateUserStackableAssetTable {
+    fn name(&self) -> &str {
+        "m20260408_000011_create_user_stackable_asset_table"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for CreateUserStackableAssetTable {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .create_table(
+                Table::create()
+                    .table(UserStackableAsset::Table)
+                    .if_not_exists()
+                    .col(ColumnDef::new(UserStackableAsset::UserId).uuid().not_null())
+                    .col(ColumnDef::new(UserStackableAsset::AssetDefinitionId).uuid().not_null())
+                    .col(ColumnDef::new(UserStackableAsset::Amount).big_integer().not_null())
+                    .col(
+                        ColumnDef::new(UserStackableAsset::UpdatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .primary_key(
+                        sea_orm::sea_query::Index::create()
+                            .col(UserStackableAsset::UserId)
+                            .col(UserStackableAsset::AssetDefinitionId),
+                    )
+                    .to_owned(),
+            )
+            .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_table(Table::drop().table(UserStackableAsset::Table).to_owned())
+            .await
+    }
+}
+
+#[derive(DeriveIden)]
+enum UserStackableAsset {
+    Table,
+    UserId,
+    AssetDefinitionId,
+    Amount,
+    UpdatedAt,
+}
+
+pub struct CreateUserEntitlementTable;
+
+impl MigrationName for CreateUserEntitlementTable {
+    fn name(&self) -> &str {
+        "m20260408_000012_create_user_entitlement_table"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for CreateUserEntitlementTable {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .create_table(
+                Table::create()
+                    .table(UserEntitlement::Table)
+                    .if_not_exists()
+                    .col(ColumnDef::new(UserEntitlement::UserId).uuid().not_null())
+                    .col(ColumnDef::new(UserEntitlement::AssetDefinitionId).uuid().not_null())
+                    .col(
+                        ColumnDef::new(UserEntitlement::GrantedAt)
+                            .timestamp_with_time_zone()
+                            .not_null(),
+                    )
+                    .col(ColumnDef::new(UserEntitlement::GrantedByActor).text().not_null())
+                    .col(
+                        ColumnDef::new(UserEntitlement::UpdatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .primary_key(
+                        sea_orm::sea_query::Index::create()
+                            .col(UserEntitlement::UserId)
+                            .col(UserEntitlement::AssetDefinitionId),
+                    )
+                    .to_owned(),
+            )
+            .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_table(Table::drop().table(UserEntitlement::Table).to_owned())
+            .await
+    }
+}
+
+#[derive(DeriveIden)]
+enum UserEntitlement {
+    Table,
+    UserId,
+    AssetDefinitionId,
+    GrantedAt,
+    GrantedByActor,
+    UpdatedAt,
+}
+
+pub struct CreateUserExpirableAssetTable;
+
+impl MigrationName for CreateUserExpirableAssetTable {
+    fn name(&self) -> &str {
+        "m20260408_000013_create_user_expirable_asset_table"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for CreateUserExpirableAssetTable {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .create_table(
+                Table::create()
+                    .table(UserExpirableAsset::Table)
+                    .if_not_exists()
+                    .col(ColumnDef::new(UserExpirableAsset::UserId).uuid().not_null())
+                    .col(ColumnDef::new(UserExpirableAsset::AssetDefinitionId).uuid().not_null())
+                    .col(
+                        ColumnDef::new(UserExpirableAsset::ExpiresAt)
+                            .timestamp_with_time_zone()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(UserExpirableAsset::GrantedAt)
+                            .timestamp_with_time_zone()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(UserExpirableAsset::LastExtendedAt)
+                            .timestamp_with_time_zone()
+                            .null(),
+                    )
+                    .col(ColumnDef::new(UserExpirableAsset::GrantedByActor).text().not_null())
+                    .col(
+                        ColumnDef::new(UserExpirableAsset::UpdatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .primary_key(
+                        sea_orm::sea_query::Index::create()
+                            .col(UserExpirableAsset::UserId)
+                            .col(UserExpirableAsset::AssetDefinitionId),
+                    )
+                    .to_owned(),
+            )
+            .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_table(Table::drop().table(UserExpirableAsset::Table).to_owned())
+            .await
+    }
+}
+
+#[derive(DeriveIden)]
+enum UserExpirableAsset {
+    Table,
+    UserId,
+    AssetDefinitionId,
+    ExpiresAt,
+    GrantedAt,
+    LastExtendedAt,
+    GrantedByActor,
+    UpdatedAt,
+}
+
+pub struct CreateInventoryOperationTable;
+
+impl MigrationName for CreateInventoryOperationTable {
+    fn name(&self) -> &str {
+        "m20260408_000014_create_inventory_operation_table"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for CreateInventoryOperationTable {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .create_table(
+                Table::create()
+                    .table(InventoryOperation::Table)
+                    .if_not_exists()
+                    .col(
+                        ColumnDef::new(InventoryOperation::Id)
+                            .big_integer()
+                            .not_null()
+                            .auto_increment()
+                            .primary_key(),
+                    )
+                    .col(ColumnDef::new(InventoryOperation::UserId).uuid().not_null())
+                    .col(
+                        ColumnDef::new(InventoryOperation::AssetDefinitionId)
+                            .uuid()
+                            .not_null(),
+                    )
+                    .col(ColumnDef::new(InventoryOperation::OwnershipModel).string().not_null())
+                    .col(ColumnDef::new(InventoryOperation::OperationType).string().not_null())
+                    .col(ColumnDef::new(InventoryOperation::ActorKind).string().not_null())
+                    .col(ColumnDef::new(InventoryOperation::ActorUserId).uuid().null())
+                    .col(ColumnDef::new(InventoryOperation::ActorServiceName).string().null())
+                    .col(ColumnDef::new(InventoryOperation::DeltaAmount).big_integer().null())
+                    .col(ColumnDef::new(InventoryOperation::NewAmount).big_integer().null())
+                    .col(
+                        ColumnDef::new(InventoryOperation::PreviousExpiresAt)
+                            .timestamp_with_time_zone()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(InventoryOperation::NewExpiresAt)
+                            .timestamp_with_time_zone()
+                            .null(),
+                    )
+                    .col(ColumnDef::new(InventoryOperation::ReasonCode).string().null())
+                    .col(ColumnDef::new(InventoryOperation::ReasonText).string().null())
+                    .col(ColumnDef::new(InventoryOperation::Metadata).text().not_null())
+                    .col(
+                        ColumnDef::new(InventoryOperation::CreatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .to_owned(),
+            )
+            .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_table(Table::drop().table(InventoryOperation::Table).to_owned())
+            .await
+    }
+}
+
+#[derive(DeriveIden)]
+enum InventoryOperation {
+    Table,
+    Id,
+    UserId,
+    AssetDefinitionId,
+    OwnershipModel,
+    OperationType,
+    ActorKind,
+    ActorUserId,
+    ActorServiceName,
+    DeltaAmount,
+    NewAmount,
+    PreviousExpiresAt,
+    NewExpiresAt,
+    ReasonCode,
+    ReasonText,
+    Metadata,
+    CreatedAt,
+}
+
+pub struct CreateWalletBalanceTable;
+
+impl MigrationName for CreateWalletBalanceTable {
+    fn name(&self) -> &str {
+        "m20260408_000015_create_wallet_balance_table"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for CreateWalletBalanceTable {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .create_table(
+                Table::create()
+                    .table(WalletBalance::Table)
+                    .if_not_exists()
+                    .col(ColumnDef::new(WalletBalance::UserId).uuid().not_null())
+                    .col(
+                        ColumnDef::new(WalletBalance::CurrencyAssetDefinitionId)
+                            .uuid()
+                            .not_null(),
+                    )
+                    .col(ColumnDef::new(WalletBalance::Balance).big_integer().not_null())
+                    .col(
+                        ColumnDef::new(WalletBalance::UpdatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .primary_key(
+                        sea_orm::sea_query::Index::create()
+                            .col(WalletBalance::UserId)
+                            .col(WalletBalance::CurrencyAssetDefinitionId),
+                    )
+                    .to_owned(),
+            )
+            .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_table(Table::drop().table(WalletBalance::Table).to_owned())
+            .await
+    }
+}
+
+#[derive(DeriveIden)]
+enum WalletBalance {
+    Table,
+    UserId,
+    CurrencyAssetDefinitionId,
+    Balance,
+    UpdatedAt,
+}
+
+pub struct CreateWalletTransactionTable;
+
+impl MigrationName for CreateWalletTransactionTable {
+    fn name(&self) -> &str {
+        "m20260408_000016_create_wallet_transaction_table"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for CreateWalletTransactionTable {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .create_table(
+                Table::create()
+                    .table(WalletTransaction::Table)
+                    .if_not_exists()
+                    .col(
+                        ColumnDef::new(WalletTransaction::Id)
+                            .big_integer()
+                            .not_null()
+                            .auto_increment()
+                            .primary_key(),
+                    )
+                    .col(ColumnDef::new(WalletTransaction::UserId).uuid().not_null())
+                    .col(
+                        ColumnDef::new(WalletTransaction::CurrencyAssetDefinitionId)
+                            .uuid()
+                            .not_null(),
+                    )
+                    .col(ColumnDef::new(WalletTransaction::OperationType).string().not_null())
+                    .col(ColumnDef::new(WalletTransaction::ActorKind).string().not_null())
+                    .col(ColumnDef::new(WalletTransaction::ActorUserId).uuid().null())
+                    .col(ColumnDef::new(WalletTransaction::ActorServiceName).string().null())
+                    .col(ColumnDef::new(WalletTransaction::Delta).big_integer().not_null())
+                    .col(ColumnDef::new(WalletTransaction::BalanceAfter).big_integer().not_null())
+                    .col(ColumnDef::new(WalletTransaction::ReasonCode).string().null())
+                    .col(ColumnDef::new(WalletTransaction::ReasonText).string().null())
+                    .col(ColumnDef::new(WalletTransaction::Metadata).text().not_null())
+                    .col(
+                        ColumnDef::new(WalletTransaction::CreatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .to_owned(),
+            )
+            .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_table(Table::drop().table(WalletTransaction::Table).to_owned())
+            .await
+    }
+}
+
+#[derive(DeriveIden)]
+enum WalletTransaction {
+    Table,
+    Id,
+    UserId,
+    CurrencyAssetDefinitionId,
+    OperationType,
+    ActorKind,
+    ActorUserId,
+    ActorServiceName,
+    Delta,
+    BalanceAfter,
+    ReasonCode,
+    ReasonText,
+    Metadata,
     CreatedAt,
 }
 

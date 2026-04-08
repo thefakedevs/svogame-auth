@@ -35,5 +35,19 @@ pub async fn get_user_from_headers(headers: &HeaderMap, state: &AppState) -> Htt
         return Err(HttpError::forbidden("User is not active"));
     }
 
+    if user.auth_epoch != jwt_content.auth_epoch {
+        return Err(HttpError::forbidden("Token has been revoked"));
+    }
+
+    Ok(user)
+}
+
+pub async fn require_superuser(headers: &HeaderMap, state: &AppState) -> HttpResult<UserModel> {
+    let user = get_user_from_headers(headers, state).await?;
+
+    if !user.is_superuser {
+        return Err(HttpError::forbidden("Superuser permissions required"));
+    }
+
     Ok(user)
 }
