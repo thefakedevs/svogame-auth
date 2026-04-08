@@ -1,5 +1,6 @@
 pub(crate) mod asset_definition;
 pub(crate) mod audit_log;
+pub(crate) mod default_skin;
 pub(crate) mod auth_ray;
 pub(crate) mod inventory_operation;
 pub(crate) mod squad;
@@ -20,6 +21,10 @@ pub use audit_log::ActiveModel as AuditLogActiveModel;
 pub use audit_log::Column as AuditLogColumn;
 pub use audit_log::Entity as AuditLog;
 pub use audit_log::Model as AuditLogModel;
+pub use default_skin::ActiveModel as DefaultSkinActiveModel;
+pub use default_skin::Column as DefaultSkinColumn;
+pub use default_skin::Entity as DefaultSkin;
+pub use default_skin::Model as DefaultSkinModel;
 pub use auth_ray::Entity as AuthRay;
 pub use inventory_operation::ActiveModel as InventoryOperationActiveModel;
 pub use inventory_operation::Column as InventoryOperationColumn;

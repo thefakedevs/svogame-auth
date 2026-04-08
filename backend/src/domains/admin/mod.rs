@@ -1,4 +1,5 @@
 pub mod handlers;
+pub mod skins;
 pub mod squads;
 
 use axum::routing::{get, post};
@@ -36,5 +37,9 @@ pub fn router() -> Router<crate::app::state::SharedAppState> {
         .route(
             "/api/admin/squads/{squad_id}/image",
             post(squads::upload_squad_image).delete(squads::delete_squad_image),
+        )
+        .route(
+            "/api/admin/skins/default",
+            get(skins::get_default_skin).post(skins::upload_default_skin),
         )
 }

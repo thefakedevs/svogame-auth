@@ -997,3 +997,56 @@ enum WalletTransaction {
     CreatedAt,
 }
 
+pub struct CreateDefaultSkinTable;
+
+impl MigrationName for CreateDefaultSkinTable {
+    fn name(&self) -> &str {
+        "m20260408_000017_create_default_skin_table"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for CreateDefaultSkinTable {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .create_table(
+                Table::create()
+                    .table(DefaultSkin::Table)
+                    .if_not_exists()
+                    .col(
+                        ColumnDef::new(DefaultSkin::Id)
+                            .integer()
+                            .not_null()
+                            .primary_key(),
+                    )
+                    .col(ColumnDef::new(DefaultSkin::S3Key).string().not_null())
+                    .col(ColumnDef::new(DefaultSkin::ContentType).string().not_null())
+                    .col(ColumnDef::new(DefaultSkin::UpdatedByUserId).uuid().null())
+                    .col(
+                        ColumnDef::new(DefaultSkin::UpdatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .to_owned(),
+            )
+            .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_table(Table::drop().table(DefaultSkin::Table).to_owned())
+            .await
+    }
+}
+
+#[derive(DeriveIden)]
+enum DefaultSkin {
+    Table,
+    Id,
+    S3Key,
+    ContentType,
+    UpdatedByUserId,
+    UpdatedAt,
+}
+

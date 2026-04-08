@@ -45,6 +45,7 @@ pub const ACTION_ADMIN_INVENTORY_EXPIRABLE_REVOKED: &str = "admin.inventory.expi
 pub const ACTION_ADMIN_WALLET_CREDITED: &str = "admin.wallet.credited";
 pub const ACTION_ADMIN_WALLET_DEBITED: &str = "admin.wallet.debited";
 pub const ACTION_ADMIN_WALLET_ADJUSTED: &str = "admin.wallet.adjusted";
+pub const ACTION_ADMIN_DEFAULT_SKIN_UPDATED: &str = "admin.default_skin.updated";
 
 pub async fn write_audit_log<C>(
     db: &C,
