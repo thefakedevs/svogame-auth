@@ -10,7 +10,7 @@ use serde_json::{Value, json};
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 
-use crate::app::auth::require_superuser;
+use crate::app::auth::require_human_superuser;
 use crate::app::http::{HttpError, HttpResult};
 use crate::app::state::{AppState, AppStateExtractor};
 use crate::entities::{
@@ -146,7 +146,7 @@ pub async fn health(
     headers: HeaderMap,
 ) -> HttpResult<Json<AdminHealthResponse>> {
     let state = state.read().await;
-    require_superuser(&headers, &state).await?;
+    require_human_superuser(&headers, &state).await?;
     Ok(Json(AdminHealthResponse { status: "ok" }))
 }
 
@@ -168,7 +168,7 @@ pub async fn me(
     headers: HeaderMap,
 ) -> HttpResult<Json<AdminMeResponse>> {
     let state = state.read().await;
-    let user = require_superuser(&headers, &state).await?;
+    let user = require_human_superuser(&headers, &state).await?;
 
     Ok(Json(AdminMeResponse {
         id: user.id.to_string(),
@@ -197,7 +197,7 @@ pub async fn list_users(
     Query(query): Query<ListUsersQuery>,
 ) -> HttpResult<Json<AdminUsersListResponse>> {
     let state = state.read().await;
-    require_superuser(&headers, &state).await?;
+    require_human_superuser(&headers, &state).await?;
 
     let page = query.page.unwrap_or(DEFAULT_PAGE).max(1);
     let per_page = query.per_page.unwrap_or(DEFAULT_PER_PAGE).clamp(1, MAX_PER_PAGE);
@@ -254,7 +254,7 @@ pub async fn get_user(
     Path(user_id): Path<String>,
 ) -> HttpResult<Json<AdminUserResponse>> {
     let state = state.read().await;
-    require_superuser(&headers, &state).await?;
+    require_human_superuser(&headers, &state).await?;
     let user = get_user_by_id(&state.db, &user_id).await?;
     Ok(Json(user.into()))
 }
@@ -285,7 +285,7 @@ pub async fn patch_user(
     Json(body): Json<PatchAdminUserRequest>,
 ) -> HttpResult<Json<AdminUserResponse>> {
     let state = state.read().await;
-    let admin = require_superuser(&headers, &state).await?;
+    let admin = require_human_superuser(&headers, &state).await?;
     let user_id = parse_user_id(&user_id)?;
 
     let tx = state
@@ -379,7 +379,7 @@ pub async fn deactivate_user(
     }
 
     let state = state.read().await;
-    let admin = require_superuser(&headers, &state).await?;
+    let admin = require_human_superuser(&headers, &state).await?;
     let updated_user = update_user_with_audit(
         &state,
         admin.id,
@@ -420,7 +420,7 @@ pub async fn activate_user(
     Path(user_id): Path<String>,
 ) -> HttpResult<Json<AdminUserResponse>> {
     let state = state.read().await;
-    let admin = require_superuser(&headers, &state).await?;
+    let admin = require_human_superuser(&headers, &state).await?;
     let updated_user = update_user_with_audit(
         &state,
         admin.id,
@@ -461,7 +461,7 @@ pub async fn reset_auth_epoch(
     Path(user_id): Path<String>,
 ) -> HttpResult<Json<AdminUserResponse>> {
     let state = state.read().await;
-    let admin = require_superuser(&headers, &state).await?;
+    let admin = require_human_superuser(&headers, &state).await?;
     let updated_user = update_user_with_audit(
         &state,
         admin.id,
@@ -505,7 +505,7 @@ pub async fn grant_superuser(
     Path(user_id): Path<String>,
 ) -> HttpResult<Json<AdminUserResponse>> {
     let state = state.read().await;
-    let admin = require_superuser(&headers, &state).await?;
+    let admin = require_human_superuser(&headers, &state).await?;
     let updated_user = update_user_with_audit(
         &state,
         admin.id,
@@ -545,7 +545,7 @@ pub async fn revoke_superuser(
     Path(user_id): Path<String>,
 ) -> HttpResult<Json<AdminUserResponse>> {
     let state = state.read().await;
-    let admin = require_superuser(&headers, &state).await?;
+    let admin = require_human_superuser(&headers, &state).await?;
     let updated_user = update_user_with_audit(
         &state,
         admin.id,
@@ -681,7 +681,7 @@ pub async fn get_user_restrictions(
     Path(user_id): Path<String>,
 ) -> HttpResult<Json<Vec<AdminUserRestrictionResponse>>> {
     let state = state.read().await;
-    require_superuser(&headers, &state).await?;
+    require_human_superuser(&headers, &state).await?;
     let user_id = parse_user_id(&user_id)?;
 
     let restrictions = list_user_restrictions(&state.db, user_id)
@@ -724,7 +724,7 @@ pub async fn grant_user_restriction(
     Json(body): Json<RestrictionReasonRequest>,
 ) -> HttpResult<Json<Vec<AdminUserRestrictionResponse>>> {
     let state = state.read().await;
-    let admin = require_superuser(&headers, &state).await?;
+    let admin = require_human_superuser(&headers, &state).await?;
     let user_id = parse_user_id(&user_id)?;
     let restriction = restriction_key
         .parse::<RestrictionKind>()
@@ -802,7 +802,7 @@ pub async fn revoke_user_restriction(
     Json(body): Json<RestrictionReasonRequest>,
 ) -> HttpResult<Json<Vec<AdminUserRestrictionResponse>>> {
     let state = state.read().await;
-    let admin = require_superuser(&headers, &state).await?;
+    let admin = require_human_superuser(&headers, &state).await?;
     let user_id = parse_user_id(&user_id)?;
     let restriction = restriction_key
         .parse::<RestrictionKind>()
