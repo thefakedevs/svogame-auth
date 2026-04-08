@@ -3,13 +3,14 @@ use axum::Json;
 use sea_orm::EntityTrait;
 use serde::{Deserialize, Serialize};
 use tracing::{error, info};
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::app::state::AppStateExtractor;
 use crate::entities::User;
 use crate::services::token::verify_token;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct GamerViiAuthRequest {
     #[serde(rename = "Login")]
     pub login: String,
@@ -17,7 +18,7 @@ pub struct GamerViiAuthRequest {
     pub password: String,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, ToSchema)]
 pub struct GamerViiAuthResponse {
     #[serde(rename = "Login")]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -52,6 +53,18 @@ impl GamerViiAuthResponse {
     }
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/compat/gamervii/auth",
+    request_body(
+        content = GamerViiAuthRequest,
+        description = "Compatibility login endpoint for GamerVii clients. `Login` must contain the user UUID and `Password` must contain the JWT issued by this auth service."
+    ),
+    responses(
+        (status = 200, description = "Compatibility auth response. Failures are encoded in response body message for client compatibility.", body = GamerViiAuthResponse)
+    ),
+    tag = "compat"
+)]
 pub async fn gamervii_auth(
     State(state): AppStateExtractor,
     Json(body): Json<GamerViiAuthRequest>,

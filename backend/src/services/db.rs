@@ -1,4 +1,11 @@
-use crate::services::migration::{CreateAuthRayTable, CreateUserTable};
+use crate::services::migration::{
+    AddUserDeactivationReasonColumn, AddUserSquadIdColumn, AddUserSuperuserColumn,
+    CreateAssetDefinitionTable, CreateAuditLogTable, CreateAuthRayTable,
+    CreateInventoryOperationTable, CreateSquadInviteTable, CreateSquadTable,
+    CreateUserEntitlementTable, CreateUserExpirableAssetTable, CreateUserRestrictionTable,
+    CreateUserStackableAssetTable, CreateUserTable, CreateWalletBalanceTable,
+    CreateWalletTransactionTable,
+};
 use crate::app::config::DatabaseConfig;
 use anyhow::Result;
 use sea_orm::{Database, DatabaseConnection};
@@ -14,6 +21,20 @@ pub async fn run_migrations(db: &DatabaseConnection) -> Result<()> {
     let schema_manager = SchemaManager::new(db);
     CreateAuthRayTable.up(&schema_manager).await?;
     CreateUserTable.up(&schema_manager).await?;
+    AddUserSuperuserColumn.up(&schema_manager).await?;
+    AddUserDeactivationReasonColumn.up(&schema_manager).await?;
+    AddUserSquadIdColumn.up(&schema_manager).await?;
+    CreateAuditLogTable.up(&schema_manager).await?;
+    CreateSquadTable.up(&schema_manager).await?;
+    CreateSquadInviteTable.up(&schema_manager).await?;
+    CreateUserRestrictionTable.up(&schema_manager).await?;
+    CreateAssetDefinitionTable.up(&schema_manager).await?;
+    CreateUserStackableAssetTable.up(&schema_manager).await?;
+    CreateUserEntitlementTable.up(&schema_manager).await?;
+    CreateUserExpirableAssetTable.up(&schema_manager).await?;
+    CreateInventoryOperationTable.up(&schema_manager).await?;
+    CreateWalletBalanceTable.up(&schema_manager).await?;
+    CreateWalletTransactionTable.up(&schema_manager).await?;
     Ok(())
 }
 

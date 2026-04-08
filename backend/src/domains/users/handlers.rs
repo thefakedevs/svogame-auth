@@ -9,6 +9,7 @@ use crate::app::auth::get_user_from_headers;
 use crate::app::http::{HttpError, HttpResult};
 use crate::app::state::AppStateExtractor;
 use crate::entities::{User, UserModel, NICKNAME_REGEX};
+use crate::services::restrictions::list_user_restrictions;
 
 #[derive(Serialize, ToSchema)]
 pub struct UserResponse {
@@ -21,6 +22,8 @@ pub struct UserResponse {
     pub email: Option<String>,
     #[serde(rename = "isActive")]
     pub is_active: bool,
+    #[serde(rename = "isSuperuser")]
+    pub is_superuser: bool,
     #[serde(rename = "lastLoginAt")]
     pub last_login_at: chrono::DateTime<chrono::Utc>,
     #[serde(rename = "createdAt")]
@@ -36,10 +39,19 @@ impl From<UserModel> for UserResponse {
             avatar_url: user.avatar_url,
             email: user.email,
             is_active: user.is_active,
+            is_superuser: user.is_superuser,
             last_login_at: user.last_login_at,
             created_at: user.created_at,
         }
     }
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct UserRestrictionResponse {
+    pub key: String,
+    pub reason: Option<String>,
+    #[serde(rename = "createdAt")]
+    pub created_at: chrono::DateTime<chrono::Utc>,
 }
 
 #[derive(Deserialize, ToSchema)]
@@ -57,7 +69,8 @@ pub struct UpdateNicknameRequest {
     ),
     security(
         ("bearer_auth" = [])
-    )
+    ),
+    tag = "users"
 )]
 pub async fn get_me(
     State(state): AppStateExtractor,
@@ -80,7 +93,8 @@ pub async fn get_me(
     ),
     security(
         ("bearer_auth" = [])
-    )
+    ),
+    tag = "users"
 )]
 pub async fn update_nickname(
     State(state): AppStateExtractor,
@@ -124,4 +138,39 @@ pub async fn update_nickname(
         .map_err(|e| HttpError::internal_error(format!("Failed to update user: {}", e)))?;
 
     Ok(Json(updated_user.into()))
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/user/me/restrictions",
+    responses(
+        (status = 200, description = "List active restrictions currently applied to the authenticated user.", body = [UserRestrictionResponse]),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden")
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "users"
+)]
+pub async fn get_my_restrictions(
+    State(state): AppStateExtractor,
+    headers: HeaderMap,
+) -> HttpResult<Json<Vec<UserRestrictionResponse>>> {
+    let state = state.read().await;
+    let user = get_user_from_headers(&headers, &state).await?;
+    let restrictions = list_user_restrictions(&state.db, user.id)
+        .await
+        .map_err(|e| HttpError::internal_error(format!("Failed to load restrictions: {e}")))?;
+
+    Ok(Json(
+        restrictions
+            .into_iter()
+            .map(|restriction| UserRestrictionResponse {
+                key: restriction.restriction_key,
+                reason: restriction.reason,
+                created_at: restriction.created_at,
+            })
+            .collect(),
+    ))
 }
