@@ -9,7 +9,7 @@ use sea_orm::{ActiveModelTrait, EntityTrait, Set};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
-use crate::app::auth::{get_user_from_headers, require_superuser};
+use crate::app::auth::{get_user_from_headers, require_human_superuser};
 use crate::app::state::AppStateExtractor;
 use crate::domains::skins::types::{ModelParam, SkinError, SkinModel, UploadSkinResponse};
 use crate::entities::{DefaultSkin, DefaultSkinActiveModel, DefaultSkinModel};
@@ -200,7 +200,7 @@ pub async fn get_default_skin_admin(
     headers: HeaderMap,
 ) -> Result<Json<DefaultSkinResponse>, Response> {
     let state = state.read().await;
-    require_superuser(&headers, &state)
+    require_human_superuser(&headers, &state)
         .await
         .map_err(IntoResponse::into_response)?;
 
@@ -246,7 +246,7 @@ pub async fn upload_default_skin_admin(
     mut multipart: Multipart,
 ) -> Result<Json<DefaultSkinResponse>, Response> {
     let state = state.read().await;
-    let admin = require_superuser(&headers, &state)
+    let admin = require_human_superuser(&headers, &state)
         .await
         .map_err(IntoResponse::into_response)?;
 

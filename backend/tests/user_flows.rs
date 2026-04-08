@@ -1503,3 +1503,255 @@ async fn personal_skin_takes_priority_over_default_skin() {
 
     assert_ne!(response_bytes.as_ref(), default_bytes.as_ref());
 }
+
+#[tokio::test]
+#[serial]
+async fn admin_can_issue_service_token_and_view_separate_audit() {
+    let app = TestApp::spawn().await;
+    let admin = app.issue_user_token("SvcAdmin", true, &[]).await;
+
+    let create_response = app
+        .post_json(
+            "/api/admin/service-tokens",
+            &admin.access_token,
+            serde_json::json!({
+                "systemName": "matchmaker",
+                "description": "Internal matchmaker service"
+            }),
+        )
+        .await;
+    assert!(create_response.status().is_success(), "{}", create_response.text().await.unwrap_or_default());
+    let created: serde_json::Value = create_response.json().await.expect("create service token json");
+    let token_id = created["id"].as_str().expect("token id");
+    let plaintext = created["plaintextToken"].as_str().expect("plaintext token");
+    assert!(plaintext.starts_with("svcs_"));
+
+    let list_response = app
+        .get_json("/api/admin/service-tokens", &admin.access_token)
+        .await;
+    assert!(list_response.status().is_success());
+    let list_body: serde_json::Value = list_response.json().await.expect("list service tokens json");
+    let items = list_body.as_array().expect("service token list");
+    assert_eq!(items.len(), 1);
+    assert_eq!(items[0]["systemName"], "matchmaker");
+    assert!(items[0]["plaintextToken"].is_null());
+
+    let audit_response = app
+        .get_json(
+            &format!("/api/admin/service-tokens/{token_id}/audit"),
+            &admin.access_token,
+        )
+        .await;
+    assert!(audit_response.status().is_success());
+    let audit_body: serde_json::Value = audit_response.json().await.expect("service token audit json");
+    assert_eq!(audit_body.as_array().expect("audit array").len(), 1);
+    assert_eq!(audit_body[0]["action"], "service_token.created");
+    assert_eq!(audit_body[0]["metadata"]["systemName"], "matchmaker");
+}
+
+#[tokio::test]
+#[serial]
+async fn service_token_can_mutate_wallet_and_inventory_as_system_actor() {
+    let app = TestApp::spawn().await;
+    let admin = app.issue_user_token("SvcFlowAdmin", true, &[]).await;
+    let user = app.issue_user_token("SvcFlowUser", false, &[]).await;
+
+    app.create_asset(
+        &admin,
+        serde_json::json!({
+            "key": "silver",
+            "display_name": "Silver",
+            "description": null,
+            "asset_kind": "currency",
+            "ownership_model": "stackable",
+            "is_currency": true,
+            "is_user_purchasable": false,
+            "is_public": true,
+            "metadata": {}
+        }),
+    )
+    .await;
+    app.create_asset(
+        &admin,
+        serde_json::json!({
+            "key": "arena_ticket",
+            "display_name": "Arena Ticket",
+            "description": null,
+            "asset_kind": "ticket",
+            "ownership_model": "stackable",
+            "is_currency": false,
+            "is_user_purchasable": true,
+            "is_public": true,
+            "metadata": {}
+        }),
+    )
+    .await;
+
+    let created = app
+        .post_json(
+            "/api/admin/service-tokens",
+            &admin.access_token,
+            serde_json::json!({
+                "systemName": "reward_daemon",
+                "description": "Reward distributor"
+            }),
+        )
+        .await
+        .json::<serde_json::Value>()
+        .await
+        .expect("service token create body");
+    let service_token = created["plaintextToken"]
+        .as_str()
+        .expect("service token")
+        .to_string();
+
+    let credit_response = app
+        .post_json(
+            &format!("/api/admin/users/{}/wallet/silver/credit", user.user_id),
+            &service_token,
+            serde_json::json!({ "amount": 50, "reasonText": "reward" }),
+        )
+        .await;
+    assert!(credit_response.status().is_success(), "{}", credit_response.text().await.unwrap_or_default());
+
+    let add_stackable_response = app
+        .post_json(
+            &format!("/api/admin/users/{}/inventory/stackables/arena_ticket/add", user.user_id),
+            &service_token,
+            serde_json::json!({ "amount": 3, "reasonText": "grant" }),
+        )
+        .await;
+    assert!(
+        add_stackable_response.status().is_success(),
+        "{}",
+        add_stackable_response.text().await.unwrap_or_default()
+    );
+
+    let wallet_txs = app
+        .get_json(
+            &format!("/api/admin/users/{}/wallet/silver/transactions", user.user_id),
+            &admin.access_token,
+        )
+        .await;
+    let wallet_txs_body: serde_json::Value = wallet_txs.json().await.expect("wallet tx json");
+    assert_eq!(wallet_txs_body[0]["actorKind"], "system");
+    assert_eq!(wallet_txs_body[0]["actorServiceName"], "reward_daemon");
+
+    let inventory_history = app
+        .get_json(
+            &format!("/api/admin/users/{}/inventory/history", user.user_id),
+            &admin.access_token,
+        )
+        .await;
+    let inventory_history_body: serde_json::Value =
+        inventory_history.json().await.expect("inventory history json");
+    assert_eq!(inventory_history_body[0]["actorKind"], "system");
+    assert_eq!(inventory_history_body[0]["actorServiceName"], "reward_daemon");
+}
+
+#[tokio::test]
+#[serial]
+async fn service_token_rotation_and_revoke_change_validity() {
+    let app = TestApp::spawn().await;
+    let admin = app.issue_user_token("SvcRotateAdmin", true, &[]).await;
+
+    let user = app.issue_user_token("SvcRotateUser", false, &[]).await;
+    app.create_asset(
+        &admin,
+        serde_json::json!({
+            "key": "credits",
+            "display_name": "Credits",
+            "description": null,
+            "asset_kind": "currency",
+            "ownership_model": "stackable",
+            "is_currency": true,
+            "is_user_purchasable": false,
+            "is_public": true,
+            "metadata": {}
+        }),
+    )
+    .await;
+
+    let created = app
+        .post_json(
+            "/api/admin/service-tokens",
+            &admin.access_token,
+            serde_json::json!({ "systemName": "daily_rewards" }),
+        )
+        .await;
+    assert!(created.status().is_success());
+    let created_body: serde_json::Value = created.json().await.expect("created token json");
+    let token_id = created_body["id"].as_str().expect("token id").to_string();
+    let old_token = created_body["plaintextToken"]
+        .as_str()
+        .expect("old plaintext token")
+        .to_string();
+
+    let rotate_response = app
+        .post_json(
+            &format!("/api/admin/service-tokens/{token_id}/rotate"),
+            &admin.access_token,
+            serde_json::json!({ "reason": "routine rotation" }),
+        )
+        .await;
+    assert!(rotate_response.status().is_success(), "{}", rotate_response.text().await.unwrap_or_default());
+    let rotated_body: serde_json::Value = rotate_response.json().await.expect("rotated token json");
+    let new_token = rotated_body["plaintextToken"]
+        .as_str()
+        .expect("new plaintext token")
+        .to_string();
+    assert_ne!(old_token, new_token);
+
+    let old_use = app
+        .post_json(
+            &format!("/api/admin/users/{}/wallet/credits/credit", user.user_id),
+            &old_token,
+            serde_json::json!({ "amount": 1 }),
+        )
+        .await;
+    assert_eq!(old_use.status(), reqwest::StatusCode::FORBIDDEN);
+
+    let new_use = app
+        .post_json(
+            &format!("/api/admin/users/{}/wallet/credits/credit", user.user_id),
+            &new_token,
+            serde_json::json!({ "amount": 7 }),
+        )
+        .await;
+    assert!(new_use.status().is_success());
+
+    let revoke_response = app
+        .post_json(
+            &format!("/api/admin/service-tokens/{}/revoke", rotated_body["id"].as_str().expect("new token id")),
+            &admin.access_token,
+            serde_json::json!({ "reason": "disabled" }),
+        )
+        .await;
+    assert!(revoke_response.status().is_success());
+
+    let after_revoke = app
+        .post_json(
+            &format!("/api/admin/users/{}/wallet/credits/credit", user.user_id),
+            &new_token,
+            serde_json::json!({ "amount": 1 }),
+        )
+        .await;
+    assert_eq!(after_revoke.status(), reqwest::StatusCode::FORBIDDEN);
+
+    let audit_response = app
+        .get_json(
+            &format!("/api/admin/service-tokens/{}/audit", rotated_body["id"].as_str().expect("new token id")),
+            &admin.access_token,
+        )
+        .await;
+    assert!(audit_response.status().is_success());
+    let audit_body: serde_json::Value = audit_response.json().await.expect("rotated audit json");
+    let actions: Vec<_> = audit_body
+        .as_array()
+        .expect("audit array")
+        .iter()
+        .map(|item| item["action"].as_str().expect("action"))
+        .collect();
+    assert!(actions.contains(&"service_token.created"));
+    assert!(actions.contains(&"service_token.revoked"));
+}
