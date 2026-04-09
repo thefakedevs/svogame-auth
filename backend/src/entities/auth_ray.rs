@@ -1,8 +1,8 @@
+use crate::services::pow::generate_pow_prefix;
+use anyhow::Result;
 use chrono::Utc;
 use sea_orm::entity::prelude::*;
 use sea_orm::{ActiveValue, DatabaseConnection};
-use anyhow::Result;
-use crate::services::pow::generate_pow_prefix;
 
 /// Способ доставки токена после авторизации
 #[derive(Clone, Debug, PartialEq, Eq, EnumIter, DeriveActiveEnum)]
@@ -64,10 +64,7 @@ impl Entity {
         Ok(result)
     }
 
-    pub async fn delete_older_than(
-        db: &DatabaseConnection,
-        seconds: i64,
-    ) -> Result<u64> {
+    pub async fn delete_older_than(db: &DatabaseConnection, seconds: i64) -> Result<u64> {
         let threshold = Utc::now() - chrono::Duration::seconds(seconds);
         let result = Self::delete_many()
             .filter(Column::CreatedAt.lt(threshold))
@@ -76,4 +73,3 @@ impl Entity {
         Ok(result.rows_affected)
     }
 }
-

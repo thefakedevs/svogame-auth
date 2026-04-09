@@ -1,7 +1,7 @@
-use anyhow::Result;
-use serde::Deserialize;
-use reqwest::{Client, header::CONTENT_TYPE};
 use crate::app::config::DiscordConfig;
+use anyhow::Result;
+use reqwest::{Client, header::CONTENT_TYPE};
+use serde::Deserialize;
 
 const API_ENDPOINT: &str = "https://discord.com/api/v10";
 
@@ -39,7 +39,9 @@ pub async fn exchange_code(config: &DiscordConfig, code: &str) -> Result<Discord
     let client = Client::builder();
     let client = if let Some(p) = config.discord_proxy.clone() {
         client.proxy(p)
-    } else { client };
+    } else {
+        client
+    };
     let client = client.build()?;
 
     let params = [
@@ -61,11 +63,16 @@ pub async fn exchange_code(config: &DiscordConfig, code: &str) -> Result<Discord
     Ok(json)
 }
 
-pub async fn get_user_info(config: &DiscordConfig, access_token: &str) -> Result<DiscordUserResponse> {
+pub async fn get_user_info(
+    config: &DiscordConfig,
+    access_token: &str,
+) -> Result<DiscordUserResponse> {
     let client = Client::builder();
     let client = if let Some(p) = config.discord_proxy.clone() {
         client.proxy(p)
-    } else { client };
+    } else {
+        client
+    };
     let client = client.build()?;
 
     let res = client

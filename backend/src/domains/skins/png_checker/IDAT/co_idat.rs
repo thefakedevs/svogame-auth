@@ -1,4 +1,4 @@
-use crate::png_checker::{Chunk, ChunkType, CheckError, ChunkError, c_crc32};
+use crate::png_checker::{CheckError, Chunk, ChunkError, ChunkType, c_crc32};
 
 pub fn collapse_idat_chunks(chunks: &mut Vec<Chunk>) -> Result<(), CheckError> {
     fn helper(chunks: Vec<Chunk>) -> Result<Vec<Chunk>, CheckError> {

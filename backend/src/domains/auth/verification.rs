@@ -1,13 +1,13 @@
-use axum::extract::{Query, State};
 use axum::Json;
+use axum::extract::{Query, State};
 use sea_orm::EntityTrait;
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 
-use crate::entities::User;
 use crate::app::http::{HttpError, HttpResult};
 use crate::app::state::AppStateExtractor;
+use crate::entities::User;
 use crate::services::token::verify_token;
 
 #[derive(Deserialize, IntoParams, ToSchema)]
@@ -45,13 +45,13 @@ pub async fn verify(
     Query(query): Query<VerifyQuery>,
 ) -> HttpResult<Json<VerifyResponse>> {
     let state = state.read().await;
-    
+
     let jwt_content = verify_token(&query.token, &state.config)
         .map_err(|_| HttpError::forbidden("Invalid or expired token"))?;
-    
+
     let user_id = Uuid::parse_str(&jwt_content.user_id)
         .map_err(|_| HttpError::bad_request("Invalid user ID in token"))?;
-    
+
     let user = User::find_by_id(user_id)
         .one(&state.db)
         .await
@@ -65,7 +65,7 @@ pub async fn verify(
     if user.auth_epoch != jwt_content.auth_epoch {
         return Err(HttpError::forbidden("Token has been revoked"));
     }
-    
+
     Ok(Json(VerifyResponse {
         id: user.id.to_string(),
         username: user.username,

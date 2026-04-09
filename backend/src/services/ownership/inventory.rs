@@ -11,9 +11,11 @@ use crate::entities::{
     AssetDefinition, AssetDefinitionColumn, AssetDefinitionModel, InventoryOperation,
     InventoryOperationActiveModel, InventoryOperationColumn, InventoryOperationModel, User,
     UserEntitlement, UserEntitlementActiveModel, UserEntitlementColumn, UserExpirableAsset,
-    UserExpirableAssetActiveModel, UserExpirableAssetColumn,
-    UserStackableAsset, UserStackableAssetActiveModel, UserStackableAssetColumn,
-    UserStackableAssetModel,
+    UserExpirableAssetActiveModel, UserExpirableAssetColumn, UserStackableAsset,
+    UserStackableAssetActiveModel, UserStackableAssetColumn, UserStackableAssetModel,
+};
+use crate::services::ownership::catalog::{
+    SUBSCRIPTION_PLUS_ASSET_KEY, SUBSCRIPTION_PRO_ASSET_KEY,
 };
 use crate::services::ownership::types::{
     OperationContext, OwnershipActor, OwnershipModel, normalize_metadata, validate_asset_key,
@@ -84,11 +86,33 @@ pub struct InventoryOperationView {
     pub created_at: chrono::DateTime<chrono::Utc>,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SubscriptionStatus {
+    None,
+    Plus,
+    Pro,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct SubscriptionStatusView {
+    pub user_id: Uuid,
+    pub status: SubscriptionStatus,
+}
+
 #[derive(Clone, Debug)]
 pub struct StackableMutation {
     pub user_id: Uuid,
     pub asset_key: String,
     pub amount: i64,
+    pub actor: OwnershipActor,
+    pub context: OperationContext,
+}
+
+#[derive(Clone, Debug)]
+pub struct SubscriptionMutation {
+    pub user_id: Uuid,
+    pub duration_seconds: i64,
     pub actor: OwnershipActor,
     pub context: OperationContext,
 }
@@ -119,7 +143,10 @@ pub struct SetExpirationMutation {
     pub context: OperationContext,
 }
 
-pub async fn get_inventory(db: &sea_orm::DatabaseConnection, user_id: Uuid) -> Result<InventoryView> {
+pub async fn get_inventory(
+    db: &sea_orm::DatabaseConnection,
+    user_id: Uuid,
+) -> Result<InventoryView> {
     ensure_user_exists(db, user_id).await?;
     let now = chrono::Utc::now();
     Ok(InventoryView {
@@ -134,12 +161,18 @@ pub async fn get_inventory(db: &sea_orm::DatabaseConnection, user_id: Uuid) -> R
     })
 }
 
-pub async fn get_stackables(db: &sea_orm::DatabaseConnection, user_id: Uuid) -> Result<Vec<StackableView>> {
+pub async fn get_stackables(
+    db: &sea_orm::DatabaseConnection,
+    user_id: Uuid,
+) -> Result<Vec<StackableView>> {
     ensure_user_exists(db, user_id).await?;
     load_stackables(db, user_id).await
 }
 
-pub async fn get_entitlements(db: &sea_orm::DatabaseConnection, user_id: Uuid) -> Result<Vec<EntitlementView>> {
+pub async fn get_entitlements(
+    db: &sea_orm::DatabaseConnection,
+    user_id: Uuid,
+) -> Result<Vec<EntitlementView>> {
     ensure_user_exists(db, user_id).await?;
     load_entitlements(db, user_id).await
 }
@@ -157,6 +190,61 @@ pub async fn get_active_expirables(
         .collect())
 }
 
+pub async fn get_subscription_status(
+    db: &sea_orm::DatabaseConnection,
+    user_id: Uuid,
+) -> Result<SubscriptionStatusView> {
+    ensure_user_exists(db, user_id).await?;
+    let now = chrono::Utc::now();
+    let plus_active = is_subscription_active(db, user_id, SUBSCRIPTION_PLUS_ASSET_KEY, now).await?;
+    let pro_active = is_subscription_active(db, user_id, SUBSCRIPTION_PRO_ASSET_KEY, now).await?;
+    let status = if pro_active {
+        SubscriptionStatus::Pro
+    } else if plus_active {
+        SubscriptionStatus::Plus
+    } else {
+        SubscriptionStatus::None
+    };
+
+    Ok(SubscriptionStatusView { user_id, status })
+}
+
+pub async fn prolong_plus_subscription(
+    db: &sea_orm::DatabaseConnection,
+    mutation: SubscriptionMutation,
+) -> Result<ExpirableView> {
+    prolong_expirable(
+        db,
+        ProlongExpirableMutation {
+            user_id: mutation.user_id,
+            asset_key: SUBSCRIPTION_PLUS_ASSET_KEY.to_string(),
+            duration_seconds: mutation.duration_seconds,
+            actor: mutation.actor,
+            context: mutation.context,
+        },
+    )
+    .await
+}
+
+pub async fn prolong_pro_subscription(
+    db: &sea_orm::DatabaseConnection,
+    mutation: SubscriptionMutation,
+) -> Result<ExpirableView> {
+    let now = chrono::Utc::now();
+    ensure_subscription_pro_allowed_for_standard_api(db, mutation.user_id, now).await?;
+    prolong_expirable(
+        db,
+        ProlongExpirableMutation {
+            user_id: mutation.user_id,
+            asset_key: SUBSCRIPTION_PRO_ASSET_KEY.to_string(),
+            duration_seconds: mutation.duration_seconds,
+            actor: mutation.actor,
+            context: mutation.context,
+        },
+    )
+    .await
+}
+
 pub async fn check_presence(
     db: &sea_orm::DatabaseConnection,
     user_id: Uuid,
@@ -168,7 +256,9 @@ pub async fn check_presence(
 
     match parse_ownership_model(&asset)? {
         OwnershipModel::Stackable => {
-            let holding = UserStackableAsset::find_by_id((user_id, asset.id)).one(db).await?;
+            let holding = UserStackableAsset::find_by_id((user_id, asset.id))
+                .one(db)
+                .await?;
             Ok(InventoryPresenceView {
                 asset_key: asset.key,
                 ownership_model: OwnershipModel::Stackable,
@@ -179,7 +269,9 @@ pub async fn check_presence(
             })
         }
         OwnershipModel::Entitlement => {
-            let holding = UserEntitlement::find_by_id((user_id, asset.id)).one(db).await?;
+            let holding = UserEntitlement::find_by_id((user_id, asset.id))
+                .one(db)
+                .await?;
             Ok(InventoryPresenceView {
                 asset_key: asset.key,
                 ownership_model: OwnershipModel::Entitlement,
@@ -190,8 +282,12 @@ pub async fn check_presence(
             })
         }
         OwnershipModel::Expirable => {
-            let holding = UserExpirableAsset::find_by_id((user_id, asset.id)).one(db).await?;
-            let is_active = holding.as_ref().is_some_and(|holding| holding.expires_at > now);
+            let holding = UserExpirableAsset::find_by_id((user_id, asset.id))
+                .one(db)
+                .await?;
+            let is_active = holding
+                .as_ref()
+                .is_some_and(|holding| holding.expires_at > now);
             Ok(InventoryPresenceView {
                 asset_key: asset.key,
                 ownership_model: OwnershipModel::Expirable,
@@ -216,9 +312,10 @@ pub async fn grant_entitlement(
     ensure_ownership_model(&asset, OwnershipModel::Entitlement)?;
     let now = chrono::Utc::now();
 
-    let entitlement = if let Some(existing) = UserEntitlement::find_by_id((mutation.user_id, asset.id))
-        .one(&tx)
-        .await?
+    let entitlement = if let Some(existing) =
+        UserEntitlement::find_by_id((mutation.user_id, asset.id))
+            .one(&tx)
+            .await?
     {
         existing
     } else {
@@ -296,8 +393,14 @@ pub async fn revoke_entitlement(
     Ok(())
 }
 
-pub async fn add_stackable(db: &sea_orm::DatabaseConnection, mutation: StackableMutation) -> Result<StackableView> {
-    mutate_stackable(db, mutation, "stackable_added", |current, amount| Ok(current + amount)).await
+pub async fn add_stackable(
+    db: &sea_orm::DatabaseConnection,
+    mutation: StackableMutation,
+) -> Result<StackableView> {
+    mutate_stackable(db, mutation, "stackable_added", |current, amount| {
+        Ok(current + amount)
+    })
+    .await
 }
 
 pub async fn remove_stackable(
@@ -313,7 +416,10 @@ pub async fn remove_stackable(
     .await
 }
 
-pub async fn set_stackable(db: &sea_orm::DatabaseConnection, mutation: StackableMutation) -> Result<StackableView> {
+pub async fn set_stackable(
+    db: &sea_orm::DatabaseConnection,
+    mutation: StackableMutation,
+) -> Result<StackableView> {
     mutation.actor.validate()?;
     if mutation.amount < 0 {
         bail!("Amount must be non-negative");
@@ -324,9 +430,18 @@ pub async fn set_stackable(db: &sea_orm::DatabaseConnection, mutation: Stackable
     let asset = get_non_currency_asset_by_key(&tx, &asset_key).await?;
     ensure_ownership_model(&asset, OwnershipModel::Stackable)?;
     let now = chrono::Utc::now();
-
-    let existing = UserStackableAsset::find_by_id((mutation.user_id, asset.id)).one(&tx).await?;
-    let model = write_stackable_state(&tx, mutation.user_id, asset.id, mutation.amount, now, existing).await?;
+    let existing = UserStackableAsset::find_by_id((mutation.user_id, asset.id))
+        .one(&tx)
+        .await?;
+    let model = write_stackable_state(
+        &tx,
+        mutation.user_id,
+        asset.id,
+        mutation.amount,
+        now,
+        existing,
+    )
+    .await?;
 
     write_inventory_operation(
         &tx,
@@ -368,9 +483,25 @@ pub async fn prolong_expirable(
     let now = chrono::Utc::now();
     let duration = chrono::Duration::seconds(mutation.duration_seconds);
 
-    let existing = UserExpirableAsset::find_by_id((mutation.user_id, asset.id)).one(&tx).await?;
+    handle_subscription_transition(
+        &tx,
+        mutation.user_id,
+        &asset.key,
+        &mutation.actor,
+        &mutation.context,
+        now,
+    )
+    .await?;
+
+    let existing = UserExpirableAsset::find_by_id((mutation.user_id, asset.id))
+        .one(&tx)
+        .await?;
     let (previous_expires_at, model) = if let Some(existing) = existing {
-        let base = if existing.expires_at > now { existing.expires_at } else { now };
+        let base = if existing.expires_at > now {
+            existing.expires_at
+        } else {
+            now
+        };
         let mut active: UserExpirableAssetActiveModel = existing.clone().into();
         active.expires_at = Set(base + duration);
         active.last_extended_at = Set(Some(now));
@@ -402,7 +533,7 @@ pub async fn prolong_expirable(
         None,
         previous_expires_at,
         Some(model.expires_at),
-        )
+    )
     .await?;
 
     tx.commit().await?;
@@ -429,7 +560,21 @@ pub async fn set_expiration(
     ensure_ownership_model(&asset, OwnershipModel::Expirable)?;
     let now = chrono::Utc::now();
 
-    let existing = UserExpirableAsset::find_by_id((mutation.user_id, asset.id)).one(&tx).await?;
+    if mutation.expires_at > now {
+        handle_subscription_transition(
+            &tx,
+            mutation.user_id,
+            &asset.key,
+            &mutation.actor,
+            &mutation.context,
+            now,
+        )
+        .await?;
+    }
+
+    let existing = UserExpirableAsset::find_by_id((mutation.user_id, asset.id))
+        .one(&tx)
+        .await?;
     let (previous_expires_at, model) = if let Some(existing) = existing {
         let previous = existing.expires_at;
         let mut active: UserExpirableAssetActiveModel = existing.into();
@@ -487,7 +632,10 @@ pub async fn revoke_expirable(
     let asset = get_non_currency_asset_by_key(&tx, &asset_key).await?;
     ensure_ownership_model(&asset, OwnershipModel::Expirable)?;
 
-    if let Some(existing) = UserExpirableAsset::find_by_id((mutation.user_id, asset.id)).one(&tx).await? {
+    if let Some(existing) = UserExpirableAsset::find_by_id((mutation.user_id, asset.id))
+        .one(&tx)
+        .await?
+    {
         UserExpirableAsset::delete_by_id((mutation.user_id, asset.id))
             .exec(&tx)
             .await?;
@@ -572,15 +720,22 @@ where
     ensure_ownership_model(&asset, OwnershipModel::Stackable)?;
     let now = chrono::Utc::now();
 
-    let existing = UserStackableAsset::find_by_id((mutation.user_id, asset.id)).one(&tx).await?;
+    let existing = UserStackableAsset::find_by_id((mutation.user_id, asset.id))
+        .one(&tx)
+        .await?;
     let current_amount = existing.as_ref().map_or(0, |holding| holding.amount);
     let new_amount = compute_new_amount(current_amount, mutation.amount)?;
     if new_amount < 0 {
         bail!("Amount must not become negative");
     }
-    let model = write_stackable_state(&tx, mutation.user_id, asset.id, new_amount, now, existing).await?;
+    let model =
+        write_stackable_state(&tx, mutation.user_id, asset.id, new_amount, now, existing).await?;
 
-    let delta = if operation_type == "stackable_removed" { -mutation.amount } else { mutation.amount };
+    let delta = if operation_type == "stackable_removed" {
+        -mutation.amount
+    } else {
+        mutation.amount
+    };
     write_inventory_operation(
         &tx,
         mutation.user_id,
@@ -605,6 +760,105 @@ where
     })
 }
 
+async fn handle_subscription_transition(
+    db: &impl ConnectionTrait,
+    user_id: Uuid,
+    target_asset_key: &str,
+    actor: &OwnershipActor,
+    context: &OperationContext,
+    now: chrono::DateTime<chrono::Utc>,
+) -> Result<()> {
+    match target_asset_key {
+        SUBSCRIPTION_PLUS_ASSET_KEY => ensure_subscription_plus_allowed(db, user_id, now).await,
+        SUBSCRIPTION_PRO_ASSET_KEY => {
+            revoke_active_subscription(
+                db,
+                user_id,
+                SUBSCRIPTION_PLUS_ASSET_KEY,
+                actor,
+                context,
+                now,
+            )
+            .await
+        }
+        _ => Ok(()),
+    }
+}
+
+async fn ensure_subscription_plus_allowed(
+    db: &impl ConnectionTrait,
+    user_id: Uuid,
+    now: chrono::DateTime<chrono::Utc>,
+) -> Result<()> {
+    if is_subscription_active(db, user_id, SUBSCRIPTION_PRO_ASSET_KEY, now).await? {
+        bail!("Cannot activate subscription_plus while subscription_pro is active");
+    }
+    Ok(())
+}
+
+async fn ensure_subscription_pro_allowed_for_standard_api(
+    db: &impl ConnectionTrait,
+    user_id: Uuid,
+    now: chrono::DateTime<chrono::Utc>,
+) -> Result<()> {
+    if is_subscription_active(db, user_id, SUBSCRIPTION_PLUS_ASSET_KEY, now).await? {
+        bail!(
+            "Cannot activate subscription_pro while subscription_plus is active via subscription API"
+        );
+    }
+    Ok(())
+}
+
+async fn revoke_active_subscription(
+    db: &impl ConnectionTrait,
+    user_id: Uuid,
+    asset_key: &str,
+    actor: &OwnershipActor,
+    context: &OperationContext,
+    now: chrono::DateTime<chrono::Utc>,
+) -> Result<()> {
+    let asset = get_non_currency_asset_by_key(db, asset_key).await?;
+    ensure_ownership_model(&asset, OwnershipModel::Expirable)?;
+    if let Some(existing) = UserExpirableAsset::find_by_id((user_id, asset.id))
+        .one(db)
+        .await?
+        && existing.expires_at > now
+    {
+        UserExpirableAsset::delete_by_id((user_id, asset.id))
+            .exec(db)
+            .await?;
+        write_inventory_operation(
+            db,
+            user_id,
+            asset.id,
+            OwnershipModel::Expirable,
+            "expirable_revoked",
+            actor,
+            context,
+            None,
+            None,
+            Some(existing.expires_at),
+            None,
+        )
+        .await?;
+    }
+    Ok(())
+}
+
+async fn is_subscription_active(
+    db: &impl ConnectionTrait,
+    user_id: Uuid,
+    asset_key: &str,
+    now: chrono::DateTime<chrono::Utc>,
+) -> Result<bool> {
+    let asset = get_non_currency_asset_by_key(db, asset_key).await?;
+    ensure_ownership_model(&asset, OwnershipModel::Expirable)?;
+    Ok(UserExpirableAsset::find_by_id((user_id, asset.id))
+        .one(db)
+        .await?
+        .is_some_and(|holding| holding.expires_at > now))
+}
+
 async fn write_stackable_state(
     db: &impl ConnectionTrait,
     user_id: Uuid,
@@ -615,7 +869,9 @@ async fn write_stackable_state(
 ) -> Result<UserStackableAssetModel> {
     Ok(if amount == 0 {
         if existing.is_some() {
-            UserStackableAsset::delete_by_id((user_id, asset_id)).exec(db).await?;
+            UserStackableAsset::delete_by_id((user_id, asset_id))
+                .exec(db)
+                .await?;
         }
         UserStackableAssetModel {
             user_id,
@@ -682,7 +938,10 @@ async fn ensure_user_exists(db: &impl ConnectionTrait, user_id: Uuid) -> Result<
     Ok(())
 }
 
-async fn get_non_currency_asset_by_key(db: &impl ConnectionTrait, key: &str) -> Result<AssetDefinitionModel> {
+async fn get_non_currency_asset_by_key(
+    db: &impl ConnectionTrait,
+    key: &str,
+) -> Result<AssetDefinitionModel> {
     let asset = AssetDefinition::find()
         .filter(AssetDefinitionColumn::Key.eq(key))
         .one(db)
@@ -709,7 +968,10 @@ fn parse_ownership_model(asset: &AssetDefinitionModel) -> Result<OwnershipModel>
     OwnershipModel::parse(&asset.ownership_model)
 }
 
-async fn load_stackables(db: &sea_orm::DatabaseConnection, user_id: Uuid) -> Result<Vec<StackableView>> {
+async fn load_stackables(
+    db: &sea_orm::DatabaseConnection,
+    user_id: Uuid,
+) -> Result<Vec<StackableView>> {
     let holdings = UserStackableAsset::find()
         .filter(UserStackableAssetColumn::UserId.eq(user_id))
         .order_by_desc(UserStackableAssetColumn::UpdatedAt)
@@ -735,7 +997,10 @@ async fn load_stackables(db: &sea_orm::DatabaseConnection, user_id: Uuid) -> Res
         .collect()
 }
 
-async fn load_entitlements(db: &sea_orm::DatabaseConnection, user_id: Uuid) -> Result<Vec<EntitlementView>> {
+async fn load_entitlements(
+    db: &sea_orm::DatabaseConnection,
+    user_id: Uuid,
+) -> Result<Vec<EntitlementView>> {
     let holdings = UserEntitlement::find()
         .filter(UserEntitlementColumn::UserId.eq(user_id))
         .order_by_desc(UserEntitlementColumn::GrantedAt)
@@ -760,7 +1025,10 @@ async fn load_entitlements(db: &sea_orm::DatabaseConnection, user_id: Uuid) -> R
         .collect()
 }
 
-async fn load_expirables(db: &sea_orm::DatabaseConnection, user_id: Uuid) -> Result<Vec<ExpirableView>> {
+async fn load_expirables(
+    db: &sea_orm::DatabaseConnection,
+    user_id: Uuid,
+) -> Result<Vec<ExpirableView>> {
     let holdings = UserExpirableAsset::find()
         .filter(UserExpirableAssetColumn::UserId.eq(user_id))
         .order_by_desc(UserExpirableAssetColumn::ExpiresAt)

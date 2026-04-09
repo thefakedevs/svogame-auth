@@ -1,15 +1,17 @@
+use axum::Json;
 use axum::extract::{Query, State};
 use axum::http::HeaderMap;
-use axum::Json;
 use sea_orm::sea_query::{Expr, Func};
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Set};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Set,
+};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 
 use crate::app::auth::get_user_from_headers;
 use crate::app::http::{HttpError, HttpResult};
 use crate::app::state::AppStateExtractor;
-use crate::entities::{User, UserColumn, UserModel, NICKNAME_REGEX};
+use crate::entities::{NICKNAME_REGEX, User, UserColumn, UserModel};
 use crate::services::restrictions::list_user_restrictions;
 
 const DEFAULT_SEARCH_LIMIT: u64 = 10;
@@ -129,7 +131,9 @@ pub async fn update_nickname(
 
     let nickname_regex = regex::Regex::new(NICKNAME_REGEX).unwrap();
     if !nickname_regex.is_match(&body.nickname) {
-        return Err(HttpError::bad_request("Nickname must be 2-16 characters long and contain only letters, numbers, and underscores"));
+        return Err(HttpError::bad_request(
+            "Nickname must be 2-16 characters long and contain only letters, numbers, and underscores",
+        ));
     }
 
     let existing_user = User::find()
@@ -153,7 +157,9 @@ pub async fn update_nickname(
     let mut active_user: crate::entities::UserActiveModel = user.into();
     active_user.username = Set(body.nickname);
 
-    let updated_user = active_user.update(&state_guard.db).await
+    let updated_user = active_user
+        .update(&state_guard.db)
+        .await
         .map_err(|e| HttpError::internal_error(format!("Failed to update user: {}", e)))?;
 
     Ok(Json(updated_user.into()))
@@ -184,15 +190,23 @@ pub async fn search_users(
 
     let trimmed_query = query.q.trim();
     if trimmed_query.chars().count() < MIN_SEARCH_QUERY_LEN {
-        return Err(HttpError::bad_request("Search query must contain at least 3 characters"));
+        return Err(HttpError::bad_request(
+            "Search query must contain at least 3 characters",
+        ));
     }
 
-    let limit = query.limit.unwrap_or(DEFAULT_SEARCH_LIMIT).clamp(1, MAX_SEARCH_LIMIT);
+    let limit = query
+        .limit
+        .unwrap_or(DEFAULT_SEARCH_LIMIT)
+        .clamp(1, MAX_SEARCH_LIMIT);
     let lowered_query = trimmed_query.to_lowercase();
 
     let users = User::find()
         .filter(UserColumn::IsActive.eq(true))
-        .filter(Expr::expr(Func::lower(Expr::col(UserColumn::Username))).like(format!("%{lowered_query}%")))
+        .filter(
+            Expr::expr(Func::lower(Expr::col(UserColumn::Username)))
+                .like(format!("%{lowered_query}%")),
+        )
         .order_by_asc(UserColumn::Username)
         .limit(limit)
         .all(&state.db)
@@ -200,7 +214,8 @@ pub async fn search_users(
         .map_err(|e| HttpError::internal_error(format!("Failed to search users: {e}")))?;
 
     Ok(Json(
-        users.into_iter()
+        users
+            .into_iter()
             .filter(|user| user.username.to_lowercase().contains(&lowered_query))
             .map(|user| UserSearchItemResponse {
                 id: user.id.to_string(),

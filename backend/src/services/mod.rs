@@ -1,6 +1,7 @@
 pub mod audit;
 pub mod db;
 pub mod discord;
+pub mod gml;
 pub mod migration;
 pub mod ownership;
 pub mod pow;
@@ -8,4 +9,3 @@ pub mod restrictions;
 pub mod service_tokens;
 pub mod squads;
 pub mod token;
-pub mod gml;

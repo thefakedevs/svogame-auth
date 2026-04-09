@@ -129,16 +129,17 @@ impl DatabaseConfig {
 
 impl S3Config {
     fn from_env() -> Result<Self> {
-        let endpoint = std::env::var("S3_ENDPOINT").ok().filter(|it| !it.trim().is_empty());
+        let endpoint = std::env::var("S3_ENDPOINT")
+            .ok()
+            .filter(|it| !it.trim().is_empty());
         let region = std::env::var("S3_REGION").context("S3_REGION not set")?;
         let bucket = std::env::var("S3_BUCKET").context("S3_BUCKET not set")?;
         let access_key_id =
             std::env::var("S3_ACCESS_KEY_ID").context("S3_ACCESS_KEY_ID not set")?;
         let secret_access_key =
             std::env::var("S3_SECRET_ACCESS_KEY").context("S3_SECRET_ACCESS_KEY not set")?;
-        let force_path_style = std::env::var("S3_FORCE_PATH_STYLE")
-            .unwrap_or_else(|_| "true".to_string())
-            == "true";
+        let force_path_style =
+            std::env::var("S3_FORCE_PATH_STYLE").unwrap_or_else(|_| "true".to_string()) == "true";
 
         Ok(Self {
             endpoint,

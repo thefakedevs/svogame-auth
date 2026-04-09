@@ -1,9 +1,9 @@
+use axum::Json;
 use axum::extract::{Path, Query, State};
 use axum::http::HeaderMap;
-use axum::Json;
 use sea_orm::{
-    ActiveModelTrait, ActiveValue, ColumnTrait, Condition, ConnectionTrait, DatabaseTransaction, EntityTrait,
-    PaginatorTrait, QueryFilter, QueryOrder, Set, TransactionTrait,
+    ActiveModelTrait, ActiveValue, ColumnTrait, Condition, ConnectionTrait, DatabaseTransaction,
+    EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, Set, TransactionTrait,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -14,16 +14,16 @@ use crate::app::auth::require_human_superuser;
 use crate::app::http::{HttpError, HttpResult};
 use crate::app::state::{AppState, AppStateExtractor};
 use crate::entities::{
-    User, UserActiveModel, UserColumn, UserModel, UserRestriction, UserRestrictionActiveModel,
-    UserRestrictionColumn, NICKNAME_REGEX,
+    NICKNAME_REGEX, User, UserActiveModel, UserColumn, UserModel, UserRestriction,
+    UserRestrictionActiveModel, UserRestrictionColumn,
 };
 use crate::services::audit::{
-    ACTION_ADMIN_USER_ACTIVATED, ACTION_ADMIN_USER_AUTH_EPOCH_RESET,
-    ACTION_ADMIN_USER_DEACTIVATED, ACTION_ADMIN_USER_SUPERUSER_GRANTED,
-    ACTION_ADMIN_USER_SUPERUSER_REVOKED, ACTION_ADMIN_USER_UPDATED,
-    ACTION_ADMIN_USER_RESTRICTION_GRANTED, ACTION_ADMIN_USER_RESTRICTION_REVOKED, write_audit_log,
+    ACTION_ADMIN_USER_ACTIVATED, ACTION_ADMIN_USER_AUTH_EPOCH_RESET, ACTION_ADMIN_USER_DEACTIVATED,
+    ACTION_ADMIN_USER_RESTRICTION_GRANTED, ACTION_ADMIN_USER_RESTRICTION_REVOKED,
+    ACTION_ADMIN_USER_SUPERUSER_GRANTED, ACTION_ADMIN_USER_SUPERUSER_REVOKED,
+    ACTION_ADMIN_USER_UPDATED, write_audit_log,
 };
-use crate::services::restrictions::{list_user_restrictions, RestrictionKind};
+use crate::services::restrictions::{RestrictionKind, list_user_restrictions};
 
 const DEFAULT_PAGE: u64 = 1;
 const DEFAULT_PER_PAGE: u64 = 20;
@@ -200,10 +200,18 @@ pub async fn list_users(
     require_human_superuser(&headers, &state).await?;
 
     let page = query.page.unwrap_or(DEFAULT_PAGE).max(1);
-    let per_page = query.per_page.unwrap_or(DEFAULT_PER_PAGE).clamp(1, MAX_PER_PAGE);
+    let per_page = query
+        .per_page
+        .unwrap_or(DEFAULT_PER_PAGE)
+        .clamp(1, MAX_PER_PAGE);
     let mut user_query = User::find().order_by_desc(UserColumn::CreatedAt);
 
-    if let Some(q) = query.q.as_ref().map(|it| it.trim()).filter(|it| !it.is_empty()) {
+    if let Some(q) = query
+        .q
+        .as_ref()
+        .map(|it| it.trim())
+        .filter(|it| !it.is_empty())
+    {
         let mut condition = Condition::any().add(UserColumn::Username.contains(q));
         if let Ok(uuid) = Uuid::parse_str(q) {
             condition = condition.add(UserColumn::Id.eq(uuid));
@@ -220,7 +228,11 @@ pub async fn list_users(
         .fetch_page(page.saturating_sub(1))
         .await
         .map_err(|e| HttpError::internal_error(format!("Failed to fetch users: {e}")))?;
-    let total_pages = if total == 0 { 0 } else { total.div_ceil(per_page) };
+    let total_pages = if total == 0 {
+        0
+    } else {
+        total.div_ceil(per_page)
+    };
 
     Ok(Json(AdminUsersListResponse {
         items: users.into_iter().map(Into::into).collect(),
@@ -611,17 +623,11 @@ fn parse_user_id(user_id: &str) -> HttpResult<Uuid> {
     Uuid::parse_str(user_id).map_err(|_| HttpError::bad_request("Invalid user ID"))
 }
 
-async fn get_user_by_id(
-    db: &impl ConnectionTrait,
-    user_id: &str,
-) -> HttpResult<UserModel> {
+async fn get_user_by_id(db: &impl ConnectionTrait, user_id: &str) -> HttpResult<UserModel> {
     get_user_by_uuid(db, parse_user_id(user_id)?).await
 }
 
-async fn get_user_by_uuid(
-    db: &impl ConnectionTrait,
-    user_id: Uuid,
-) -> HttpResult<UserModel> {
+async fn get_user_by_uuid(db: &impl ConnectionTrait, user_id: Uuid) -> HttpResult<UserModel> {
     User::find_by_id(user_id)
         .one(db)
         .await

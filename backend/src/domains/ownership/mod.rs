@@ -24,7 +24,15 @@ pub fn router() -> Router<crate::app::state::SharedAppState> {
             "/api/user/me/inventory/expirables/active",
             get(handlers::get_my_active_expirables),
         )
+        .route(
+            "/api/user/me/subscription/status",
+            get(handlers::get_my_subscription_status),
+        )
         .route("/api/user/me/wallet", get(handlers::get_my_wallet))
+        .route(
+            "/api/user/me/wallet/default",
+            get(handlers::get_my_default_wallet_balance),
+        )
         .route(
             "/api/user/me/wallet/{currency_key}",
             get(handlers::get_my_wallet_balance),
@@ -33,7 +41,10 @@ pub fn router() -> Router<crate::app::state::SharedAppState> {
             "/api/user/me/wallet/{currency_key}/transactions",
             get(handlers::get_my_wallet_transactions),
         )
-        .route("/api/admin/assets", get(handlers::list_admin_assets).post(handlers::create_asset))
+        .route(
+            "/api/admin/assets",
+            get(handlers::list_admin_assets).post(handlers::create_asset),
+        )
         .route(
             "/api/admin/assets/{asset_id}",
             get(handlers::get_admin_asset).patch(handlers::patch_asset),
@@ -94,11 +105,38 @@ pub fn router() -> Router<crate::app::state::SharedAppState> {
             "/api/admin/users/{user_id}/inventory/expirables/{asset_key}",
             axum::routing::delete(handlers::revoke_expirable),
         )
-        .route("/api/admin/users/{user_id}/wallet", get(handlers::get_user_wallet))
+        .route(
+            "/api/admin/users/{user_id}/subscription/status",
+            get(handlers::get_user_subscription_status),
+        )
+        .route(
+            "/api/admin/users/{user_id}/subscriptions/plus/prolong",
+            post(handlers::prolong_plus_subscription),
+        )
+        .route(
+            "/api/admin/users/{user_id}/subscriptions/pro/prolong",
+            post(handlers::prolong_pro_subscription),
+        )
+        .route(
+            "/api/admin/users/{user_id}/wallet",
+            get(handlers::get_user_wallet),
+        )
+        .route(
+            "/api/admin/users/{user_id}/wallet/default",
+            get(handlers::get_user_default_wallet_balance)
+                .put(handlers::adjust_default_wallet_balance),
+        )
+        .route(
+            "/api/admin/users/{user_id}/wallet/default/credit",
+            post(handlers::credit_default_wallet),
+        )
+        .route(
+            "/api/admin/users/{user_id}/wallet/default/debit",
+            post(handlers::debit_default_wallet),
+        )
         .route(
             "/api/admin/users/{user_id}/wallet/{currency_key}",
-            get(handlers::get_user_wallet_balance)
-                .put(handlers::adjust_wallet_balance),
+            get(handlers::get_user_wallet_balance).put(handlers::adjust_wallet_balance),
         )
         .route(
             "/api/admin/users/{user_id}/wallet/{currency_key}/transactions",

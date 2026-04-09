@@ -1,12 +1,12 @@
-use std::time::Duration;
-use axum::extract::Path;
-use axum::Json;
-use serde::Serialize;
-use tokio::time::timeout;
-use utoipa::ToSchema;
 use crate::app::http::{HttpError, HttpResult};
 use crate::app::state::AppStateExtractor;
 use crate::domains::auth::runtime::AuthPollResult;
+use axum::Json;
+use axum::extract::Path;
+use serde::Serialize;
+use std::time::Duration;
+use tokio::time::timeout;
+use utoipa::ToSchema;
 
 const POLL_TIMEOUT: Duration = Duration::from_secs(30);
 
@@ -75,9 +75,12 @@ impl From<AuthPollResult> for PollResponse {
     fn from(result: AuthPollResult) -> Self {
         match result {
             AuthPollResult::Pending => PollResponse::pending(),
-            AuthPollResult::Success { access_token, user_id, username, avatar_url } => {
-                PollResponse::success(access_token, user_id, username, avatar_url)
-            }
+            AuthPollResult::Success {
+                access_token,
+                user_id,
+                username,
+                avatar_url,
+            } => PollResponse::success(access_token, user_id, username, avatar_url),
             AuthPollResult::Error { message } => PollResponse::error(message),
             AuthPollResult::Expired => PollResponse::expired(),
         }
@@ -135,21 +138,24 @@ pub async fn poll_auth_status(
                 }
                 Ok(Err(tokio::sync::broadcast::error::RecvError::Lagged(_))) => {
                     let state_guard = state.read().await;
-                    if let Some(cached_result) = state_guard.auth.get_cached_result(&poll_id).await {
+                    if let Some(cached_result) = state_guard.auth.get_cached_result(&poll_id).await
+                    {
                         return Some(cached_result);
                     }
                     continue;
                 }
                 Err(_) => {
                     let state_guard = state.read().await;
-                    if let Some(cached_result) = state_guard.auth.get_cached_result(&poll_id).await {
+                    if let Some(cached_result) = state_guard.auth.get_cached_result(&poll_id).await
+                    {
                         return Some(cached_result);
                     }
                     continue;
                 }
             }
         }
-    }).await;
+    })
+    .await;
 
     let response = match result {
         Ok(Some(poll_result)) => PollResponse::from(poll_result),
@@ -165,4 +171,3 @@ pub async fn poll_auth_status(
 
     Ok(Json(response))
 }
-

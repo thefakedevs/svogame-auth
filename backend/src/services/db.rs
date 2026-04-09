@@ -1,13 +1,12 @@
+use crate::app::config::DatabaseConfig;
 use crate::services::migration::{
     AddUserDeactivationReasonColumn, AddUserSquadIdColumn, AddUserSuperuserColumn,
-    CreateAssetDefinitionTable, CreateAuditLogTable, CreateAuthRayTable,
-    CreateDefaultSkinTable, CreateInventoryOperationTable, CreateServiceTokenAuditTable,
-    CreateServiceTokenTable, CreateSquadInviteTable, CreateSquadTable,
-    CreateUserEntitlementTable, CreateUserExpirableAssetTable, CreateUserRestrictionTable,
-    CreateUserStackableAssetTable, CreateUserTable, CreateWalletBalanceTable,
-    CreateWalletTransactionTable,
+    CreateAssetDefinitionTable, CreateAuditLogTable, CreateAuthRayTable, CreateDefaultSkinTable,
+    CreateInventoryOperationTable, CreateServiceTokenAuditTable, CreateServiceTokenTable,
+    CreateSquadInviteTable, CreateSquadTable, CreateUserEntitlementTable,
+    CreateUserExpirableAssetTable, CreateUserRestrictionTable, CreateUserStackableAssetTable,
+    CreateUserTable, CreateWalletBalanceTable, CreateWalletTransactionTable,
 };
-use crate::app::config::DatabaseConfig;
 use anyhow::Result;
 use sea_orm::{Database, DatabaseConnection};
 use sea_orm_migration::prelude::*;
@@ -41,5 +40,3 @@ pub async fn run_migrations(db: &DatabaseConnection) -> Result<()> {
     CreateServiceTokenAuditTable.up(&schema_manager).await?;
     Ok(())
 }
-
-
