@@ -47,6 +47,13 @@ pub const ACTION_ADMIN_WALLET_CREDITED: &str = "admin.wallet.credited";
 pub const ACTION_ADMIN_WALLET_DEBITED: &str = "admin.wallet.debited";
 pub const ACTION_ADMIN_WALLET_ADJUSTED: &str = "admin.wallet.adjusted";
 pub const ACTION_ADMIN_DEFAULT_SKIN_UPDATED: &str = "admin.default_skin.updated";
+pub const ACTION_ADMIN_LOOTBOX_CREATED: &str = "admin.lootbox.created";
+pub const ACTION_ADMIN_LOOTBOX_UPDATED: &str = "admin.lootbox.updated";
+pub const ACTION_ADMIN_LOOTBOX_DROP_CREATED: &str = "admin.lootbox.drop_created";
+pub const ACTION_ADMIN_LOOTBOX_DROP_UPDATED: &str = "admin.lootbox.drop_updated";
+pub const ACTION_ADMIN_LOOTBOX_DROP_DELETED: &str = "admin.lootbox.drop_deleted";
+pub const ACTION_USER_LOOTBOX_OPENED: &str = "user.lootbox.opened";
+pub const ACTION_ADMIN_LOOTBOX_OPENED_FOR_USER: &str = "admin.lootbox.opened_for_user";
 
 pub async fn write_audit_log<C>(
     db: &C,

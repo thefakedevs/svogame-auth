@@ -5,6 +5,7 @@ use crate::domains::auth::handlers as auth_handlers;
 use crate::domains::auth::polling as auth_polling;
 use crate::domains::auth::verification as auth_verification;
 use crate::domains::compat::gamervii as compat_gamervii;
+use crate::domains::lootboxes::handlers as lootbox_handlers;
 use crate::domains::meta::handlers as meta_handlers;
 use crate::domains::ownership::handlers as ownership_handlers;
 use crate::domains::skins::handlers as skins_handlers;
@@ -12,6 +13,7 @@ use crate::domains::skins::types as skins_types;
 use crate::domains::squads::handlers as squads_handlers;
 use crate::domains::system::health as system_health;
 use crate::domains::users::handlers;
+use crate::services::lootboxes as lootbox_service;
 use crate::services::ownership::catalog as ownership_catalog;
 use crate::services::ownership::types as ownership_types;
 use utoipa::OpenApi;
@@ -58,6 +60,21 @@ use utoipa::OpenApi;
         compat_gamervii::gamervii_auth,
         meta_handlers::get_restrictions_meta,
         meta_handlers::get_squads_config,
+        lootbox_handlers::list_public_lootboxes,
+        lootbox_handlers::get_public_lootbox,
+        lootbox_handlers::get_my_lootboxes,
+        lootbox_handlers::get_my_lootbox_open_history,
+        lootbox_handlers::open_my_lootbox,
+        lootbox_handlers::list_admin_lootboxes,
+        lootbox_handlers::create_lootbox,
+        lootbox_handlers::get_admin_lootbox,
+        lootbox_handlers::patch_lootbox,
+        lootbox_handlers::create_lootbox_drop,
+        lootbox_handlers::patch_lootbox_drop,
+        lootbox_handlers::delete_lootbox_drop,
+        lootbox_handlers::open_user_lootbox,
+        lootbox_handlers::get_user_lootbox_open_history,
+        lootbox_handlers::get_all_lootbox_open_history,
         ownership_handlers::list_public_assets,
         ownership_handlers::get_public_asset,
         ownership_handlers::list_admin_assets,
@@ -156,6 +173,19 @@ use utoipa::OpenApi;
             meta_handlers::RestrictionLocale,
             meta_handlers::RestrictionLocaleEntry,
             meta_handlers::SquadConfigResponse,
+            lootbox_handlers::OpenLootboxQuery,
+            lootbox_handlers::LootboxDefinitionResponse,
+            lootbox_handlers::LootboxDropResponse,
+            lootbox_handlers::LootboxDetailResponse,
+            lootbox_handlers::OwnedLootboxResponse,
+            lootbox_handlers::LootboxFeedEntryResponse,
+            lootbox_handlers::LootboxRewardResponse,
+            lootbox_handlers::LootboxOpenResultResponse,
+            lootbox_handlers::LootboxOpenHistoryResponse,
+            lootbox_service::CreateLootboxDefinitionInput,
+            lootbox_service::UpdateLootboxDefinitionInput,
+            lootbox_service::CreateLootboxDropInput,
+            lootbox_service::UpdateLootboxDropInput,
             ownership_handlers::AssetListQuery,
             ownership_handlers::MutationBody,
             ownership_handlers::AssetResponse,
@@ -193,6 +223,8 @@ use utoipa::OpenApi;
         (name = "auth", description = "Authentication API"),
         (name = "compat", description = "Compatibility endpoints for legacy or external clients"),
         (name = "debug", description = "Debug and test-only endpoints"),
+        (name = "lootboxes", description = "Public and self-service lootbox catalog, ownership, and opening API"),
+        (name = "lootboxes-admin", description = "Administrative lootbox configuration and investigation API"),
         (name = "ownership", description = "Public and self-service ownership catalog and inventory API"),
         (name = "ownership-admin", description = "Administrative inventory and asset catalog API"),
         (name = "meta", description = "Public metadata used by clients to drive UI and validation"),

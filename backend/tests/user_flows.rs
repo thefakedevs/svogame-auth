@@ -2417,3 +2417,365 @@ async fn service_token_rotation_and_revoke_change_validity() {
     assert!(actions.contains(&"service_token.created"));
     assert!(actions.contains(&"service_token.revoked"));
 }
+
+#[tokio::test]
+#[serial]
+async fn lootbox_catalog_and_user_open_flow_work_with_exact_drop_payloads() {
+    let app = TestApp::spawn().await;
+    let admin = app.issue_user_token("LootboxAdmin", true, &[]).await;
+    let user = app.issue_user_token("LootboxUser", false, &[]).await;
+
+    app.create_asset(
+        &admin,
+        serde_json::json!({
+            "key": "starter_case",
+            "display_name": "Starter Case",
+            "description": "Starter lootbox",
+            "asset_kind": "lootbox",
+            "ownership_model": "stackable",
+            "is_currency": false,
+            "is_user_purchasable": true,
+            "is_public": true,
+            "metadata": {}
+        }),
+    )
+    .await;
+    app.create_asset(
+        &admin,
+        serde_json::json!({
+            "key": "repair_kit",
+            "display_name": "Repair Kit",
+            "description": null,
+            "asset_kind": "item",
+            "ownership_model": "stackable",
+            "is_currency": false,
+            "is_user_purchasable": true,
+            "is_public": true,
+            "metadata": {}
+        }),
+    )
+    .await;
+
+    let create_lootbox = app
+        .post_json(
+            "/api/admin/lootboxes",
+            &admin.access_token,
+            serde_json::json!({
+                "asset_key": "starter_case",
+                "is_active": true,
+                "metadata": { "theme": "starter" }
+            }),
+        )
+        .await;
+    assert!(create_lootbox.status().is_success());
+    let lootbox_body: serde_json::Value = create_lootbox.json().await.expect("lootbox json");
+    let lootbox_id = lootbox_body["definition"]["id"]
+        .as_str()
+        .expect("lootbox id")
+        .to_string();
+
+    let add_drop = app
+        .post_json(
+            &format!("/api/admin/lootboxes/{lootbox_id}/drops"),
+            &admin.access_token,
+            serde_json::json!({
+                "reward_asset_key": "repair_kit",
+                "amount": 2,
+                "weight": 1,
+                "title_i18n": { "ru": "2 ремонтных набора", "en": "2 Repair Kits" },
+                "is_active": true,
+                "sort_order": 10
+            }),
+        )
+        .await;
+    assert!(add_drop.status().is_success());
+
+    let public_view = app.get_without_auth("/api/lootboxes/starter_case").await;
+    assert!(public_view.status().is_success());
+    let public_body: serde_json::Value = public_view.json().await.expect("public lootbox");
+    assert_eq!(public_body["definition"]["assetKey"], "starter_case");
+    assert_eq!(public_body["drops"].as_array().expect("drops").len(), 1);
+    assert_eq!(public_body["drops"][0]["amount"], 2);
+    assert_eq!(public_body["drops"][0]["totalWeight"], 1);
+
+    let grant_case = app
+        .post_json(
+            &format!(
+                "/api/admin/users/{}/inventory/stackables/starter_case/add",
+                user.user_id
+            ),
+            &admin.access_token,
+            serde_json::json!({ "amount": 1, "reasonText": "test grant" }),
+        )
+        .await;
+    assert!(grant_case.status().is_success());
+
+    let open = app
+        .post_json(
+            "/api/user/me/lootboxes/starter_case/open?feedLength=12&locale=ru",
+            &user.access_token,
+            serde_json::json!({}),
+        )
+        .await;
+    assert!(
+        open.status().is_success(),
+        "{}",
+        open.text().await.unwrap_or_default()
+    );
+    let open_body: serde_json::Value = open.json().await.expect("open body");
+    assert_eq!(open_body["lootboxAssetKey"], "starter_case");
+    assert_eq!(open_body["reward"]["assetKey"], "repair_kit");
+    assert_eq!(open_body["reward"]["amount"], 2);
+    assert_eq!(open_body["reward"]["title"], "2 ремонтных набора");
+    assert_eq!(open_body["feed"].as_array().expect("feed").len(), 12);
+    assert!(open_body["winnerIndex"].as_u64().expect("winner index") < 12);
+
+    let owned_after = app
+        .get_json("/api/user/me/lootboxes", &user.access_token)
+        .await;
+    assert!(owned_after.status().is_success());
+    let owned_after_body: serde_json::Value = owned_after.json().await.expect("owned after");
+    assert!(owned_after_body.as_array().expect("owned array").is_empty());
+
+    let stackables = app
+        .get_json("/api/user/me/inventory/stackables", &user.access_token)
+        .await;
+    let stackables_body: serde_json::Value = stackables.json().await.expect("stackables");
+    assert_eq!(stackables_body[0]["assetKey"], "repair_kit");
+    assert_eq!(stackables_body[0]["amount"], 2);
+
+    let history = app
+        .get_json("/api/user/me/lootboxes/open-history", &user.access_token)
+        .await;
+    assert!(history.status().is_success());
+    let history_body: serde_json::Value = history.json().await.expect("history");
+    assert_eq!(history_body.as_array().expect("history array").len(), 1);
+    assert_eq!(history_body[0]["actorKind"], "user");
+    assert_eq!(app.audit_log_count("user.lootbox.opened").await, 1);
+}
+
+#[tokio::test]
+#[serial]
+async fn service_token_can_open_lootbox_for_user_and_history_keeps_service_actor() {
+    let app = TestApp::spawn().await;
+    let admin = app.issue_user_token("LootboxSvcAdmin", true, &[]).await;
+    let user = app.issue_user_token("LootboxSvcUser", false, &[]).await;
+
+    app.create_asset(
+        &admin,
+        serde_json::json!({
+            "key": "service_case",
+            "display_name": "Service Case",
+            "description": null,
+            "asset_kind": "lootbox",
+            "ownership_model": "stackable",
+            "is_currency": false,
+            "is_user_purchasable": false,
+            "is_public": true,
+            "metadata": {}
+        }),
+    )
+    .await;
+    app.create_asset(
+        &admin,
+        serde_json::json!({
+            "key": "arena_ticket",
+            "display_name": "Arena Ticket",
+            "description": null,
+            "asset_kind": "ticket",
+            "ownership_model": "stackable",
+            "is_currency": false,
+            "is_user_purchasable": true,
+            "is_public": true,
+            "metadata": {}
+        }),
+    )
+    .await;
+
+    let created_lootbox = app
+        .post_json(
+            "/api/admin/lootboxes",
+            &admin.access_token,
+            serde_json::json!({ "asset_key": "service_case" }),
+        )
+        .await
+        .json::<serde_json::Value>()
+        .await
+        .expect("lootbox create");
+    let lootbox_id = created_lootbox["definition"]["id"]
+        .as_str()
+        .expect("lootbox id");
+
+    let add_drop = app
+        .post_json(
+            &format!("/api/admin/lootboxes/{lootbox_id}/drops"),
+            &admin.access_token,
+            serde_json::json!({
+                "reward_asset_key": "arena_ticket",
+                "amount": 1,
+                "weight": 1,
+                "title_i18n": { "en": "Arena Ticket" }
+            }),
+        )
+        .await;
+    assert!(add_drop.status().is_success());
+
+    let grant_case = app
+        .post_json(
+            &format!(
+                "/api/admin/users/{}/inventory/stackables/service_case/add",
+                user.user_id
+            ),
+            &admin.access_token,
+            serde_json::json!({ "amount": 1 }),
+        )
+        .await;
+    assert!(grant_case.status().is_success());
+
+    let created_token = app
+        .post_json(
+            "/api/admin/service-tokens",
+            &admin.access_token,
+            serde_json::json!({ "systemName": "minecraft_plugin" }),
+        )
+        .await
+        .json::<serde_json::Value>()
+        .await
+        .expect("service token");
+    let service_token = created_token["plaintextToken"]
+        .as_str()
+        .expect("plaintext token");
+
+    let open = app
+        .post_json(
+            &format!(
+                "/api/admin/users/{}/lootboxes/service_case/open?feedLength=25",
+                user.user_id
+            ),
+            service_token,
+            serde_json::json!({}),
+        )
+        .await;
+    assert!(
+        open.status().is_success(),
+        "{}",
+        open.text().await.unwrap_or_default()
+    );
+    let open_body: serde_json::Value = open.json().await.expect("service open");
+    assert_eq!(open_body["reward"]["assetKey"], "arena_ticket");
+    assert_eq!(open_body["feed"].as_array().expect("feed").len(), 25);
+
+    let history = app
+        .get_json(
+            &format!("/api/admin/users/{}/lootboxes/open-history", user.user_id),
+            &admin.access_token,
+        )
+        .await;
+    assert!(history.status().is_success());
+    let history_body: serde_json::Value = history.json().await.expect("admin history");
+    assert_eq!(history_body.as_array().expect("history").len(), 1);
+    assert_eq!(history_body[0]["actorKind"], "system");
+    assert_eq!(history_body[0]["actorServiceName"], "minecraft_plugin");
+    assert_eq!(
+        app.audit_log_count("admin.lootbox.opened_for_user").await,
+        1
+    );
+}
+
+#[tokio::test]
+#[serial]
+async fn lootbox_can_grant_expirable_reward_and_report_expiration() {
+    let app = TestApp::spawn().await;
+    let admin = app
+        .issue_user_token("LootboxExpirableAdmin", true, &[])
+        .await;
+    let user = app
+        .issue_user_token("LootboxExpirableUser", false, &[])
+        .await;
+
+    app.create_asset(
+        &admin,
+        serde_json::json!({
+            "key": "subscription_case",
+            "display_name": "Subscription Case",
+            "description": null,
+            "asset_kind": "lootbox",
+            "ownership_model": "stackable",
+            "is_currency": false,
+            "is_user_purchasable": true,
+            "is_public": true,
+            "metadata": {}
+        }),
+    )
+    .await;
+
+    let created_lootbox = app
+        .post_json(
+            "/api/admin/lootboxes",
+            &admin.access_token,
+            serde_json::json!({ "asset_key": "subscription_case" }),
+        )
+        .await
+        .json::<serde_json::Value>()
+        .await
+        .expect("lootbox create");
+    let lootbox_id = created_lootbox["definition"]["id"]
+        .as_str()
+        .expect("lootbox id");
+
+    let add_drop = app
+        .post_json(
+            &format!("/api/admin/lootboxes/{lootbox_id}/drops"),
+            &admin.access_token,
+            serde_json::json!({
+                "reward_asset_key": "subscription_plus",
+                "duration_seconds": 3600,
+                "weight": 1,
+                "title_i18n": { "ru": "Плюс на 1 час" }
+            }),
+        )
+        .await;
+    assert!(add_drop.status().is_success());
+
+    let grant_case = app
+        .post_json(
+            &format!(
+                "/api/admin/users/{}/inventory/stackables/subscription_case/add",
+                user.user_id
+            ),
+            &admin.access_token,
+            serde_json::json!({ "amount": 1 }),
+        )
+        .await;
+    assert!(grant_case.status().is_success());
+
+    let open = app
+        .post_json(
+            "/api/user/me/lootboxes/subscription_case/open?locale=ru",
+            &user.access_token,
+            serde_json::json!({}),
+        )
+        .await;
+    assert!(open.status().is_success());
+    let open_body: serde_json::Value = open.json().await.expect("open expirable");
+    assert_eq!(open_body["reward"]["assetKey"], "subscription_plus");
+    assert_eq!(open_body["reward"]["ownershipModel"], "expirable");
+    assert_eq!(open_body["reward"]["durationSeconds"], 3600);
+    assert_eq!(open_body["reward"]["title"], "Плюс на 1 час");
+    assert!(open_body["reward"]["expiresAt"].is_string());
+
+    let expirables = app
+        .get_json(
+            "/api/user/me/inventory/expirables/active",
+            &user.access_token,
+        )
+        .await;
+    assert!(expirables.status().is_success());
+    let expirables_body: serde_json::Value = expirables.json().await.expect("expirables");
+    assert_eq!(
+        expirables_body.as_array().expect("expirables array").len(),
+        1
+    );
+    assert_eq!(expirables_body[0]["assetKey"], "subscription_plus");
+    assert!(expirables_body[0]["isActive"].as_bool().expect("active"));
+}
