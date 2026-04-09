@@ -131,7 +131,13 @@ impl OwnershipActor {
     pub fn validate(&self) -> Result<()> {
         match self.kind {
             OwnershipActorKind::System => {
-                if self.service_name.as_deref().unwrap_or_default().trim().is_empty() {
+                if self
+                    .service_name
+                    .as_deref()
+                    .unwrap_or_default()
+                    .trim()
+                    .is_empty()
+                {
                     bail!("System actor must include service name");
                 }
             }
@@ -176,7 +182,9 @@ pub fn validate_asset_key(key: &str) -> Result<String> {
 
     let regex = Regex::new(ASSET_KEY_REGEX).map_err(|error| anyhow!(error))?;
     if !regex.is_match(normalized) {
-        bail!("Asset key must contain only lowercase latin letters, numbers, underscores, and hyphens");
+        bail!(
+            "Asset key must contain only lowercase latin letters, numbers, underscores, and hyphens"
+        );
     }
 
     Ok(normalized.to_string())

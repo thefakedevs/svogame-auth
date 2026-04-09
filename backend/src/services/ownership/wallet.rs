@@ -12,6 +12,7 @@ use crate::entities::{
     WalletBalanceActiveModel, WalletBalanceColumn, WalletBalanceModel, WalletTransaction,
     WalletTransactionActiveModel, WalletTransactionColumn, WalletTransactionModel,
 };
+use crate::services::ownership::catalog::DEFAULT_COIN_ASSET_KEY;
 use crate::services::ownership::types::{
     OperationContext, OwnershipActor, OwnershipModel, normalize_metadata, validate_asset_key,
 };
@@ -51,7 +52,10 @@ pub struct WalletMutation {
     pub context: OperationContext,
 }
 
-pub async fn get_wallet(db: &sea_orm::DatabaseConnection, user_id: Uuid) -> Result<Vec<WalletBalanceView>> {
+pub async fn get_wallet(
+    db: &sea_orm::DatabaseConnection,
+    user_id: Uuid,
+) -> Result<Vec<WalletBalanceView>> {
     ensure_user_exists(db, user_id).await?;
     let balances = WalletBalance::find()
         .filter(WalletBalanceColumn::UserId.eq(user_id))
@@ -86,7 +90,9 @@ pub async fn get_wallet_balance(
     ensure_user_exists(db, user_id).await?;
     let asset = get_currency_asset_by_key(db, currency_key).await?;
     let now = chrono::Utc::now();
-    let balance = WalletBalance::find_by_id((user_id, asset.id)).one(db).await?;
+    let balance = WalletBalance::find_by_id((user_id, asset.id))
+        .one(db)
+        .await?;
     let balance = balance.unwrap_or(WalletBalanceModel {
         user_id,
         currency_asset_definition_id: asset.id,
@@ -121,11 +127,69 @@ pub async fn get_wallet_transactions(
         .collect()
 }
 
-pub async fn credit(db: &sea_orm::DatabaseConnection, mutation: WalletMutation) -> Result<WalletBalanceView> {
-    mutate_balance(db, mutation, "credit", |current, amount| Ok(current + amount)).await
+pub async fn get_default_wallet_balance(
+    db: &sea_orm::DatabaseConnection,
+    user_id: Uuid,
+) -> Result<WalletBalanceView> {
+    get_wallet_balance(db, user_id, DEFAULT_COIN_ASSET_KEY).await
 }
 
-pub async fn debit(db: &sea_orm::DatabaseConnection, mutation: WalletMutation) -> Result<WalletBalanceView> {
+pub async fn credit_default_wallet(
+    db: &sea_orm::DatabaseConnection,
+    mutation: WalletMutation,
+) -> Result<WalletBalanceView> {
+    credit(
+        db,
+        WalletMutation {
+            currency_key: DEFAULT_COIN_ASSET_KEY.to_string(),
+            ..mutation
+        },
+    )
+    .await
+}
+
+pub async fn debit_default_wallet(
+    db: &sea_orm::DatabaseConnection,
+    mutation: WalletMutation,
+) -> Result<WalletBalanceView> {
+    debit(
+        db,
+        WalletMutation {
+            currency_key: DEFAULT_COIN_ASSET_KEY.to_string(),
+            ..mutation
+        },
+    )
+    .await
+}
+
+pub async fn adjust_default_wallet_balance(
+    db: &sea_orm::DatabaseConnection,
+    mutation: WalletMutation,
+) -> Result<WalletBalanceView> {
+    adjust_balance(
+        db,
+        WalletMutation {
+            currency_key: DEFAULT_COIN_ASSET_KEY.to_string(),
+            ..mutation
+        },
+    )
+    .await
+}
+
+pub async fn credit(
+    db: &sea_orm::DatabaseConnection,
+    mutation: WalletMutation,
+) -> Result<WalletBalanceView> {
+    mutate_balance(db, mutation, "credit", |current, amount| {
+        Ok(current + amount)
+    })
+    .await
+}
+
+pub async fn debit(
+    db: &sea_orm::DatabaseConnection,
+    mutation: WalletMutation,
+) -> Result<WalletBalanceView> {
     mutate_balance(db, mutation, "debit", |current, amount| {
         if current < amount {
             bail!("Insufficient wallet balance");
@@ -148,11 +212,21 @@ pub async fn adjust_balance(
     ensure_user_exists(&tx, mutation.user_id).await?;
     let asset = get_currency_asset_by_key(&tx, &currency_key).await?;
     let now = chrono::Utc::now();
-    let existing = WalletBalance::find_by_id((mutation.user_id, asset.id)).one(&tx).await?;
+    let existing = WalletBalance::find_by_id((mutation.user_id, asset.id))
+        .one(&tx)
+        .await?;
     let current = existing.as_ref().map_or(0, |balance| balance.balance);
     let delta = mutation.amount - current;
 
-    let balance = write_balance_state(&tx, mutation.user_id, asset.id, mutation.amount, now, existing).await?;
+    let balance = write_balance_state(
+        &tx,
+        mutation.user_id,
+        asset.id,
+        mutation.amount,
+        now,
+        existing,
+    )
+    .await?;
     write_wallet_transaction(
         &tx,
         mutation.user_id,
@@ -193,15 +267,22 @@ where
     ensure_user_exists(&tx, mutation.user_id).await?;
     let asset = get_currency_asset_by_key(&tx, &currency_key).await?;
     let now = chrono::Utc::now();
-    let existing = WalletBalance::find_by_id((mutation.user_id, asset.id)).one(&tx).await?;
+    let existing = WalletBalance::find_by_id((mutation.user_id, asset.id))
+        .one(&tx)
+        .await?;
     let current = existing.as_ref().map_or(0, |balance| balance.balance);
     let new_balance = compute_new_balance(current, mutation.amount)?;
     if new_balance < 0 {
         bail!("Balance must not become negative");
     }
 
-    let balance = write_balance_state(&tx, mutation.user_id, asset.id, new_balance, now, existing).await?;
-    let delta = if operation_type == "debit" { -mutation.amount } else { mutation.amount };
+    let balance =
+        write_balance_state(&tx, mutation.user_id, asset.id, new_balance, now, existing).await?;
+    let delta = if operation_type == "debit" {
+        -mutation.amount
+    } else {
+        mutation.amount
+    };
     write_wallet_transaction(
         &tx,
         mutation.user_id,
@@ -249,7 +330,10 @@ async fn write_balance_state(
     })
 }
 
-async fn get_currency_asset_by_key(db: &impl ConnectionTrait, key: &str) -> Result<AssetDefinitionModel> {
+async fn get_currency_asset_by_key(
+    db: &impl ConnectionTrait,
+    key: &str,
+) -> Result<AssetDefinitionModel> {
     let asset = AssetDefinition::find()
         .filter(AssetDefinitionColumn::Key.eq(key))
         .one(db)
@@ -303,7 +387,10 @@ async fn write_wallet_transaction(
     .await?)
 }
 
-fn map_wallet_transaction(transaction: WalletTransactionModel, currency_key: &str) -> Result<WalletTransactionView> {
+fn map_wallet_transaction(
+    transaction: WalletTransactionModel,
+    currency_key: &str,
+) -> Result<WalletTransactionView> {
     Ok(WalletTransactionView {
         id: transaction.id,
         currency_asset_definition_id: transaction.currency_asset_definition_id,

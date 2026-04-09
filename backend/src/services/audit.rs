@@ -40,7 +40,8 @@ pub const ACTION_ADMIN_INVENTORY_STACKABLE_ADDED: &str = "admin.inventory.stacka
 pub const ACTION_ADMIN_INVENTORY_STACKABLE_REMOVED: &str = "admin.inventory.stackable_removed";
 pub const ACTION_ADMIN_INVENTORY_STACKABLE_SET: &str = "admin.inventory.stackable_set";
 pub const ACTION_ADMIN_INVENTORY_EXPIRABLE_PROLONGED: &str = "admin.inventory.expirable.prolonged";
-pub const ACTION_ADMIN_INVENTORY_EXPIRABLE_EXPIRATION_SET: &str = "admin.inventory.expirable.expiration_set";
+pub const ACTION_ADMIN_INVENTORY_EXPIRABLE_EXPIRATION_SET: &str =
+    "admin.inventory.expirable.expiration_set";
 pub const ACTION_ADMIN_INVENTORY_EXPIRABLE_REVOKED: &str = "admin.inventory.expirable.revoked";
 pub const ACTION_ADMIN_WALLET_CREDITED: &str = "admin.wallet.credited";
 pub const ACTION_ADMIN_WALLET_DEBITED: &str = "admin.wallet.debited";

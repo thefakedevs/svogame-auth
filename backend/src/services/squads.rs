@@ -53,7 +53,10 @@ pub fn process_squad_image(data: &[u8]) -> Result<Vec<u8>> {
     }
 
     if data.len() > SQUAD_IMAGE_MAX_BYTES {
-        anyhow::bail!("Image exceeds maximum size of {} bytes", SQUAD_IMAGE_MAX_BYTES);
+        anyhow::bail!(
+            "Image exceeds maximum size of {} bytes",
+            SQUAD_IMAGE_MAX_BYTES
+        );
     }
 
     let format = image::guess_format(data)?;

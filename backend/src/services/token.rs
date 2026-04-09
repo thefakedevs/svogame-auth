@@ -1,5 +1,5 @@
-use crate::entities::UserModel;
 use crate::app::config::AppConfig;
+use crate::entities::UserModel;
 use anyhow::anyhow;
 use hmac::{Hmac, Mac};
 use jwt::{SignWithKey, VerifyWithKey};
@@ -27,7 +27,9 @@ pub fn sign_token(user: &UserModel, config: &AppConfig) -> anyhow::Result<String
 pub fn verify_token(token: &str, config: &AppConfig) -> anyhow::Result<JwtContent> {
     let key: Hmac<Sha256> = Hmac::new_from_slice(config.jwt_secret.as_bytes())?;
     let claims: BTreeMap<String, String> = token.verify_with_key(&key)?;
-    let user_id = claims.get("user_id").ok_or(anyhow!("user_id not found in token"))?;
+    let user_id = claims
+        .get("user_id")
+        .ok_or(anyhow!("user_id not found in token"))?;
     let auth_epoch = claims
         .get("auth_epoch")
         .map(|it| it.parse::<i32>())

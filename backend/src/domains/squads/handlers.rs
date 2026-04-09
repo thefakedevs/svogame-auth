@@ -1,8 +1,10 @@
+use aws_sdk_s3::primitives::ByteStream;
+use axum::Json;
 use axum::body::Bytes;
 use axum::extract::{Multipart, Path, State};
 use axum::http::HeaderMap;
-use axum::Json;
-use aws_sdk_s3::primitives::ByteStream;
+use axum::http::header;
+use axum::response::{IntoResponse, Response};
 use sea_orm::{
     ActiveModelTrait, ActiveValue, ColumnTrait, ConnectionTrait, EntityTrait, PaginatorTrait,
     QueryFilter, QueryOrder, Set, TransactionTrait,
@@ -20,15 +22,14 @@ use crate::entities::{
     SquadInviteModel, SquadModel, User, UserActiveModel, UserColumn, UserModel,
 };
 use crate::services::audit::{
-    write_audit_log, ACTION_USER_SQUAD_CREATED, ACTION_USER_SQUAD_DISBANDED,
-    ACTION_USER_SQUAD_IMAGE_DELETED, ACTION_USER_SQUAD_IMAGE_UPDATED,
-    ACTION_USER_SQUAD_INVITE_CREATED, ACTION_USER_SQUAD_KICKED, ACTION_USER_SQUAD_LEFT,
-    ACTION_USER_SQUAD_UPDATED,
+    ACTION_USER_SQUAD_CREATED, ACTION_USER_SQUAD_DISBANDED, ACTION_USER_SQUAD_IMAGE_DELETED,
+    ACTION_USER_SQUAD_IMAGE_UPDATED, ACTION_USER_SQUAD_INVITE_CREATED, ACTION_USER_SQUAD_KICKED,
+    ACTION_USER_SQUAD_LEFT, ACTION_USER_SQUAD_UPDATED, write_audit_log,
 };
-use crate::services::restrictions::{has_restriction, RestrictionKind};
+use crate::services::restrictions::{RestrictionKind, has_restriction};
 use crate::services::squads::{
-    process_squad_image, squad_image_key, validate_squad_name, SQUAD_INVITE_TTL_HOURS,
-    SQUAD_MAX_MEMBERS,
+    SQUAD_INVITE_TTL_HOURS, SQUAD_MAX_MEMBERS, process_squad_image, squad_image_key,
+    validate_squad_name,
 };
 
 #[derive(Deserialize, ToSchema)]
@@ -126,7 +127,8 @@ pub async fn create_squad(
     let state = state.read().await;
     let user = get_user_from_headers(&headers, &state).await?;
     ensure_can_create_squad(&state, &user).await?;
-    let name = validate_squad_name(&body.name).map_err(|e| HttpError::bad_request(e.to_string()))?;
+    let name =
+        validate_squad_name(&body.name).map_err(|e| HttpError::bad_request(e.to_string()))?;
 
     let tx = state
         .db
@@ -261,7 +263,8 @@ pub async fn patch_squad(
     let user = get_user_from_headers(&headers, &state).await?;
     let squad = require_squad_leader(&state, &user, &squad_id).await?;
     ensure_squad_not_restricted_for_member_actions(&squad)?;
-    let name = validate_squad_name(&body.name).map_err(|e| HttpError::bad_request(e.to_string()))?;
+    let name =
+        validate_squad_name(&body.name).map_err(|e| HttpError::bad_request(e.to_string()))?;
 
     let mut active_squad: SquadActiveModel = squad.into();
     active_squad.name = Set(name.clone());
@@ -284,6 +287,46 @@ pub async fn patch_squad(
 
     let member_count = squad_member_count(&state.db, updated_squad.id).await?;
     Ok(Json(to_squad_response(updated_squad, member_count)))
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/squads/{squad_id}/image",
+    params(
+        ("squad_id" = String, Path, description = "Squad UUID.")
+    ),
+    responses(
+        (status = 200, description = "Get squad image as PNG when configured.", content_type = "image/png"),
+        (status = 400, description = "Invalid squad ID."),
+        (status = 404, description = "Squad not found or squad has no image.")
+    ),
+    tag = "squads"
+)]
+pub async fn get_squad_image(
+    State(state): AppStateExtractor,
+    Path(squad_id): Path<String>,
+) -> HttpResult<Response> {
+    let state = state.read().await;
+    let squad = get_squad_by_id(&state.db, &squad_id).await?;
+    let image_key = squad
+        .image_key
+        .ok_or_else(|| HttpError::not_found("Squad image not found"))?;
+
+    let bytes = state
+        .s3
+        .get_object()
+        .bucket(&state.config.s3.bucket)
+        .key(&image_key)
+        .send()
+        .await
+        .map_err(|e| HttpError::not_found(format!("Failed to load squad image: {e}")))?
+        .body
+        .collect()
+        .await
+        .map_err(|e| HttpError::internal_error(format!("Failed to read squad image body: {e}")))?
+        .into_bytes();
+
+    Ok(([(header::CONTENT_TYPE, "image/png")], bytes).into_response())
 }
 
 #[utoipa::path(
@@ -318,7 +361,8 @@ pub async fn upload_squad_image(
     let squad = require_squad_leader(&state, &user, &squad_id).await?;
     ensure_squad_not_restricted_for_member_actions(&squad)?;
     let data = read_first_image(&mut multipart).await?;
-    let processed = process_squad_image(&data).map_err(|e| HttpError::bad_request(e.to_string()))?;
+    let processed =
+        process_squad_image(&data).map_err(|e| HttpError::bad_request(e.to_string()))?;
     let key = squad_image_key(squad.id);
 
     state
@@ -445,10 +489,9 @@ pub async fn delete_squad(
     for member in members {
         let mut active_member: UserActiveModel = member.into();
         active_member.squad_id = Set(None);
-        active_member
-            .update(&tx)
-            .await
-            .map_err(|e| HttpError::internal_error(format!("Failed to detach squad member: {e}")))?;
+        active_member.update(&tx).await.map_err(|e| {
+            HttpError::internal_error(format!("Failed to detach squad member: {e}"))
+        })?;
     }
 
     SquadInvite::delete_many()
@@ -515,7 +558,9 @@ pub async fn leave_squad(
         return Err(HttpError::forbidden("User is not a member of this squad"));
     }
     if squad.leader_user_id == user.id {
-        return Err(HttpError::forbidden("Leader cannot leave the squad. Delete it instead"));
+        return Err(HttpError::forbidden(
+            "Leader cannot leave the squad. Delete it instead",
+        ));
     }
 
     let mut active_user: UserActiveModel = user.clone().into();
@@ -609,7 +654,9 @@ pub async fn create_invite(
         squad_id: ActiveValue::Set(squad.id),
         inviter_user_id: ActiveValue::Set(user.id),
         invited_user_id: ActiveValue::Set(invited_user.id),
-        expires_at: ActiveValue::Set(chrono::Utc::now() + chrono::Duration::hours(SQUAD_INVITE_TTL_HOURS)),
+        expires_at: ActiveValue::Set(
+            chrono::Utc::now() + chrono::Duration::hours(SQUAD_INVITE_TTL_HOURS),
+        ),
         created_at: ActiveValue::Set(chrono::Utc::now()),
     }
     .insert(&state.db)
@@ -661,7 +708,9 @@ pub async fn list_my_invites(
         if let Some(squad) = Squad::find_by_id(invite.squad_id)
             .one(&state.db)
             .await
-            .map_err(|e| HttpError::internal_error(format!("Failed to load squad for invite: {e}")))?
+            .map_err(|e| {
+                HttpError::internal_error(format!("Failed to load squad for invite: {e}"))
+            })?
         {
             response.push(to_invite_response(invite, squad.name));
         }
@@ -718,7 +767,9 @@ pub async fn accept_invite(
         .ok_or_else(|| HttpError::not_found("Invite not found"))?;
 
     if invite.invited_user_id != user.id {
-        return Err(HttpError::forbidden("Invite does not belong to the current user"));
+        return Err(HttpError::forbidden(
+            "Invite does not belong to the current user",
+        ));
     }
     if invite.expires_at <= chrono::Utc::now() {
         return Err(HttpError::bad_request("Invite has expired"));
@@ -968,7 +1019,9 @@ fn to_squad_response(squad: SquadModel, member_count: u64) -> SquadResponse {
         leader_user_id: squad.leader_user_id.to_string(),
         member_count,
         max_members: SQUAD_MAX_MEMBERS,
-        image_url: squad.image_key.map(|_| format!("/api/squads/{}/image", squad_id)),
+        image_url: squad
+            .image_key
+            .map(|_| format!("/api/squads/{}/image", squad_id)),
         is_restricted: squad.is_restricted,
         restriction_reason: squad.restriction_reason,
         created_at: squad.created_at,
@@ -1001,10 +1054,16 @@ async fn ensure_can_create_squad(state: &AppState, user: &UserModel) -> HttpResu
     Ok(())
 }
 
-async fn require_squad_leader(state: &AppState, user: &UserModel, squad_id: &str) -> HttpResult<SquadModel> {
+async fn require_squad_leader(
+    state: &AppState,
+    user: &UserModel,
+    squad_id: &str,
+) -> HttpResult<SquadModel> {
     let squad = get_squad_by_id(&state.db, squad_id).await?;
     if squad.leader_user_id != user.id || user.squad_id != Some(squad.id) {
-        return Err(HttpError::forbidden("Only squad leader can perform this action"));
+        return Err(HttpError::forbidden(
+            "Only squad leader can perform this action",
+        ));
     }
     Ok(squad)
 }
@@ -1035,7 +1094,10 @@ async fn squad_member_count(db: &impl ConnectionTrait, squad_id: Uuid) -> HttpRe
         .map_err(|e| HttpError::internal_error(format!("Failed to count squad members: {e}")))
 }
 
-async fn load_squad_members(db: &impl ConnectionTrait, squad_id: Uuid) -> HttpResult<Vec<UserModel>> {
+async fn load_squad_members(
+    db: &impl ConnectionTrait,
+    squad_id: Uuid,
+) -> HttpResult<Vec<UserModel>> {
     User::find()
         .filter(UserColumn::SquadId.eq(squad_id))
         .order_by_asc(UserColumn::CreatedAt)
@@ -1050,7 +1112,9 @@ async fn cleanup_expired_invites(db: &impl ConnectionTrait, squad_id: Uuid) -> H
         .filter(SquadInviteColumn::ExpiresAt.lte(chrono::Utc::now()))
         .exec(db)
         .await
-        .map_err(|e| HttpError::internal_error(format!("Failed to cleanup expired invites: {e}")))?;
+        .map_err(|e| {
+            HttpError::internal_error(format!("Failed to cleanup expired invites: {e}"))
+        })?;
     Ok(())
 }
 
@@ -1066,7 +1130,9 @@ async fn get_owned_invite(
         .map_err(|e| HttpError::internal_error(format!("Failed to load invite: {e}")))?
         .ok_or_else(|| HttpError::not_found("Invite not found"))?;
     if invite.invited_user_id != user_id {
-        return Err(HttpError::forbidden("Invite does not belong to current user"));
+        return Err(HttpError::forbidden(
+            "Invite does not belong to current user",
+        ));
     }
     Ok(invite)
 }
@@ -1079,7 +1145,8 @@ async fn read_first_image(multipart: &mut Multipart) -> HttpResult<Bytes> {
     while let Some(field) = multipart
         .next_field()
         .await
-        .map_err(|e| HttpError::bad_request(format!("Invalid multipart body: {e}")))? {
+        .map_err(|e| HttpError::bad_request(format!("Invalid multipart body: {e}")))?
+    {
         let content_type = field
             .content_type()
             .ok_or_else(|| HttpError::bad_request("Missing content type"))?;

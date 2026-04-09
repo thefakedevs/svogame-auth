@@ -1,10 +1,10 @@
-use axum::body::Bytes;
-use axum::extract::{Multipart, Path, Query, State};
-use axum::http::{header, HeaderMap, StatusCode};
-use axum::response::{IntoResponse, Response};
-use axum::Json;
 use aws_sdk_s3::error::ProvideErrorMetadata;
 use aws_sdk_s3::primitives::ByteStream;
+use axum::Json;
+use axum::body::Bytes;
+use axum::extract::{Multipart, Path, Query, State};
+use axum::http::{HeaderMap, StatusCode, header};
+use axum::response::{IntoResponse, Response};
 use sea_orm::{ActiveModelTrait, EntityTrait, Set};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -13,7 +13,7 @@ use crate::app::auth::{get_user_from_headers, require_human_superuser};
 use crate::app::state::AppStateExtractor;
 use crate::domains::skins::types::{ModelParam, SkinError, SkinModel, UploadSkinResponse};
 use crate::entities::{DefaultSkin, DefaultSkinActiveModel, DefaultSkinModel};
-use crate::services::audit::{write_audit_log, ACTION_ADMIN_DEFAULT_SKIN_UPDATED};
+use crate::services::audit::{ACTION_ADMIN_DEFAULT_SKIN_UPDATED, write_audit_log};
 
 const DEFAULT_SKIN_ROW_ID: i32 = 1;
 const MIN_SIZE: usize = 78;
@@ -79,10 +79,14 @@ pub async fn upload_my_skin(
         .map_err(IntoResponse::into_response)?
     {
         let field_content_type = field.content_type().map(|s| s.to_owned());
-        validate_content_type(field_content_type.as_deref()).map_err(IntoResponse::into_response)?;
+        validate_content_type(field_content_type.as_deref())
+            .map_err(IntoResponse::into_response)?;
 
-        let data = read_multipart_field(field).await.map_err(IntoResponse::into_response)?;
-        let processed_png = process_skin(&data, model.model).map_err(IntoResponse::into_response)?;
+        let data = read_multipart_field(field)
+            .await
+            .map_err(IntoResponse::into_response)?;
+        let processed_png =
+            process_skin(&data, model.model).map_err(IntoResponse::into_response)?;
 
         let key = skin_key(user.id);
         state
@@ -96,7 +100,11 @@ pub async fn upload_my_skin(
             .send()
             .await
             .map_err(|error| {
-                tracing::error!("Failed to upload skin to S3 for user {}: {}", user.id, error);
+                tracing::error!(
+                    "Failed to upload skin to S3 for user {}: {}",
+                    user.id,
+                    error
+                );
                 SkinError::WriteFailed.into_response()
             })?;
 
@@ -120,9 +128,7 @@ pub async fn upload_my_skin(
     ),
     tag = "skins"
 )]
-pub async fn get_default_skin(
-    State(state): AppStateExtractor,
-) -> Result<Response, Response> {
+pub async fn get_default_skin(State(state): AppStateExtractor) -> Result<Response, Response> {
     let state = state.read().await;
     let default_skin = DefaultSkin::find_by_id(DEFAULT_SKIN_ROW_ID)
         .one(&state.db)
@@ -259,10 +265,14 @@ pub async fn upload_default_skin_admin(
         .map_err(IntoResponse::into_response)?
     {
         let field_content_type = field.content_type().map(|s| s.to_owned());
-        validate_content_type(field_content_type.as_deref()).map_err(IntoResponse::into_response)?;
+        validate_content_type(field_content_type.as_deref())
+            .map_err(IntoResponse::into_response)?;
 
-        let data = read_multipart_field(field).await.map_err(IntoResponse::into_response)?;
-        let processed_png = process_skin(&data, model.model).map_err(IntoResponse::into_response)?;
+        let data = read_multipart_field(field)
+            .await
+            .map_err(IntoResponse::into_response)?;
+        let processed_png =
+            process_skin(&data, model.model).map_err(IntoResponse::into_response)?;
         let key = default_skin_key();
 
         state
@@ -287,8 +297,7 @@ pub async fn upload_default_skin_admin(
             .map_err(|error| {
                 tracing::error!("Failed to load default skin row for update: {}", error);
                 SkinError::ReadFailed.into_response()
-            })?
-        {
+            })? {
             let mut active: DefaultSkinActiveModel = existing.into();
             active.s3_key = Set(key.clone());
             active.content_type = Set(PNG_CONTENT_TYPE.to_string());
@@ -424,8 +433,13 @@ async fn load_object_bytes(
     let object = match s3.get_object().bucket(bucket).key(key).send().await {
         Ok(object) => object,
         Err(error) => {
-            let maybe_code = error.as_service_error().and_then(|service_error| service_error.code());
-            if matches!(maybe_code, Some("NoSuchKey") | Some("NotFound") | Some("404")) {
+            let maybe_code = error
+                .as_service_error()
+                .and_then(|service_error| service_error.code());
+            if matches!(
+                maybe_code,
+                Some("NoSuchKey") | Some("NotFound") | Some("404")
+            ) {
                 return Ok(None);
             }
             tracing::error!("Failed to load skin object '{}': {}", key, error);
@@ -438,7 +452,11 @@ async fn load_object_bytes(
         .collect()
         .await
         .map_err(|error| {
-            tracing::error!("Failed to read skin body from S3 for key '{}': {}", key, error);
+            tracing::error!(
+                "Failed to read skin body from S3 for key '{}': {}",
+                key,
+                error
+            );
             SkinError::ReadFailed.into_response()
         })?
         .into_bytes();
@@ -447,7 +465,12 @@ async fn load_object_bytes(
 }
 
 fn png_response(bytes: Bytes) -> Response {
-    (StatusCode::OK, [(header::CONTENT_TYPE, PNG_CONTENT_TYPE)], bytes).into_response()
+    (
+        StatusCode::OK,
+        [(header::CONTENT_TYPE, PNG_CONTENT_TYPE)],
+        bytes,
+    )
+        .into_response()
 }
 
 fn map_default_skin_response(model: &DefaultSkinModel) -> DefaultSkinResponse {

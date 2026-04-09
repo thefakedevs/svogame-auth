@@ -112,7 +112,9 @@ async fn generate_unique_nickname(db: &DatabaseConnection) -> Result<String> {
         }
         tries += 1;
         if tries >= 5 {
-            return Err(anyhow::anyhow!("Failed to generate unique nickname after 5 tries"));
+            return Err(anyhow::anyhow!(
+                "Failed to generate unique nickname after 5 tries"
+            ));
         }
     }
 }

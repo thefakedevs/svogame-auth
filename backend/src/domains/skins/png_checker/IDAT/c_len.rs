@@ -8,11 +8,11 @@ pub fn validate_idat_length(
     color_type: u8,
 ) -> bool {
     let bits_per_pixel: u32 = match color_type {
-        0 => bit_depth as u32,           // Grayscale
-        2 => (bit_depth as u32) * 3,     // RGB
-        3 => bit_depth as u32,           // Indexed
-        4 => (bit_depth as u32) * 2,     // Gray+Alpha
-        6 => (bit_depth as u32) * 4,     // RGBA
+        0 => bit_depth as u32,       // Grayscale
+        2 => (bit_depth as u32) * 3, // RGB
+        3 => bit_depth as u32,       // Indexed
+        4 => (bit_depth as u32) * 2, // Gray+Alpha
+        6 => (bit_depth as u32) * 4, // RGBA
         _ => return false,
     };
 

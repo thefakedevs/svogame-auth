@@ -5,15 +5,16 @@ use auth::app::config::{AppConfig, DatabaseConfig, DiscordConfig, S3Config};
 use auth::app::router::build_router;
 use auth::app::state::{AppState, SharedAppState};
 use auth::entities::{
-    AuditLog, AuditLogColumn, InventoryOperation, InventoryOperationColumn, Squad, User,
-    WalletTransaction, WalletTransactionColumn,
+    AssetDefinition, AssetDefinitionColumn, AuditLog, AuditLogColumn, InventoryOperation,
+    InventoryOperationColumn, Squad, User, WalletTransaction, WalletTransactionColumn,
 };
 use auth::services::db::{connect_db, run_migrations};
+use auth::services::ownership::catalog::ensure_system_assets;
 use aws_credential_types::Credentials;
+use axum::http::StatusCode;
+use axum::response::IntoResponse;
 use reqwest::Client;
 use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter};
-use axum::response::IntoResponse;
-use axum::http::StatusCode;
 use tokio::net::TcpListener;
 use tokio::sync::RwLock;
 use uuid::Uuid;
@@ -44,6 +45,7 @@ impl TestApp {
         };
         let db = connect_db(&database).await.expect("connect test db");
         run_migrations(&db).await.expect("run migrations");
+        ensure_system_assets(&db).await.expect("seed system assets");
 
         let config = AppConfig {
             binding_address: "127.0.0.1:0".to_string(),
@@ -75,7 +77,9 @@ impl TestApp {
             test_s3_client(&s3_endpoint).await,
         )));
         let app = build_router(state);
-        let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind test port");
+        let listener = TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind test port");
         let address = format!("http://{}", listener.local_addr().expect("local addr"));
         let server_task = tokio::spawn(async move {
             if let Err(error) = axum::serve(listener, app.into_make_service()).await {
@@ -135,7 +139,8 @@ impl TestApp {
     }
 
     pub async fn get_without_auth(&self, path: &str) -> reqwest::Response {
-        self.send_with_retry(|| self.client.get(self.url(path))).await
+        self.send_with_retry(|| self.client.get(self.url(path)))
+            .await
     }
 
     pub async fn post_json(
@@ -144,8 +149,13 @@ impl TestApp {
         token: &str,
         body: serde_json::Value,
     ) -> reqwest::Response {
-        self.send_with_retry(|| self.client.post(self.url(path)).bearer_auth(token).json(&body))
-            .await
+        self.send_with_retry(|| {
+            self.client
+                .post(self.url(path))
+                .bearer_auth(token)
+                .json(&body)
+        })
+        .await
     }
 
     pub async fn patch_json(
@@ -154,8 +164,13 @@ impl TestApp {
         token: &str,
         body: serde_json::Value,
     ) -> reqwest::Response {
-        self.send_with_retry(|| self.client.patch(self.url(path)).bearer_auth(token).json(&body))
-            .await
+        self.send_with_retry(|| {
+            self.client
+                .patch(self.url(path))
+                .bearer_auth(token)
+                .json(&body)
+        })
+        .await
     }
 
     pub async fn put_json(
@@ -164,8 +179,13 @@ impl TestApp {
         token: &str,
         body: serde_json::Value,
     ) -> reqwest::Response {
-        self.send_with_retry(|| self.client.put(self.url(path)).bearer_auth(token).json(&body))
-            .await
+        self.send_with_retry(|| {
+            self.client
+                .put(self.url(path))
+                .bearer_auth(token)
+                .json(&body)
+        })
+        .await
     }
 
     pub async fn delete(&self, path: &str, token: &str) -> reqwest::Response {
@@ -179,11 +199,21 @@ impl TestApp {
         token: &str,
         body: serde_json::Value,
     ) -> reqwest::Response {
-        self.send_with_retry(|| self.client.delete(self.url(path)).bearer_auth(token).json(&body))
-            .await
+        self.send_with_retry(|| {
+            self.client
+                .delete(self.url(path))
+                .bearer_auth(token)
+                .json(&body)
+        })
+        .await
     }
 
-    pub async fn issue_invite(&self, leader: &IssuedUser, squad_id: &str, invited_user_id: &str) -> String {
+    pub async fn issue_invite(
+        &self,
+        leader: &IssuedUser,
+        squad_id: &str,
+        invited_user_id: &str,
+    ) -> String {
         let response = self
             .post_json(
                 &format!("/api/squads/{squad_id}/invites"),
@@ -228,7 +258,11 @@ impl TestApp {
 
     pub async fn create_squad(&self, user: &IssuedUser, name: &str) -> serde_json::Value {
         let response = self
-            .post_json("/api/squads", &user.access_token, serde_json::json!({ "name": name }))
+            .post_json(
+                "/api/squads",
+                &user.access_token,
+                serde_json::json!({ "name": name }),
+            )
             .await;
         assert!(
             response.status().is_success(),
@@ -249,9 +283,10 @@ impl TestApp {
 
     pub async fn invite_count_for_squad(&self, squad_id: &str) -> u64 {
         auth::entities::SquadInvite::find()
-            .filter(auth::entities::SquadInviteColumn::SquadId.eq(
-                Uuid::parse_str(squad_id).expect("uuid"),
-            ))
+            .filter(
+                auth::entities::SquadInviteColumn::SquadId
+                    .eq(Uuid::parse_str(squad_id).expect("uuid")),
+            )
             .count(&self.db)
             .await
             .expect("count invites")
@@ -261,11 +296,12 @@ impl TestApp {
         use auth::entities::SquadInviteActiveModel;
         use sea_orm::{ActiveModelTrait, Set};
 
-        let invite = auth::entities::SquadInvite::find_by_id(Uuid::parse_str(invite_id).expect("uuid"))
-            .one(&self.db)
-            .await
-            .expect("load invite")
-            .expect("invite exists");
+        let invite =
+            auth::entities::SquadInvite::find_by_id(Uuid::parse_str(invite_id).expect("uuid"))
+                .one(&self.db)
+                .await
+                .expect("load invite")
+                .expect("invite exists");
         let mut active: SquadInviteActiveModel = invite.into();
         active.expires_at = Set(chrono::Utc::now() - chrono::Duration::hours(1));
         active.update(&self.db).await.expect("update invite");
@@ -327,6 +363,35 @@ impl TestApp {
         response.json().await.expect("asset json")
     }
 
+    pub async fn patch_asset(
+        &self,
+        admin: &IssuedUser,
+        asset_id: &str,
+        body: serde_json::Value,
+    ) -> serde_json::Value {
+        let response = self
+            .patch_json(
+                &format!("/api/admin/assets/{asset_id}"),
+                &admin.access_token,
+                body,
+            )
+            .await;
+        assert!(
+            response.status().is_success(),
+            "patch asset failed: {}",
+            response.text().await.unwrap_or_default()
+        );
+        response.json().await.expect("patched asset json")
+    }
+
+    pub async fn asset_by_key(&self, key: &str) -> Option<auth::entities::AssetDefinitionModel> {
+        AssetDefinition::find()
+            .filter(AssetDefinitionColumn::Key.eq(key))
+            .one(&self.db)
+            .await
+            .expect("load asset by key")
+    }
+
     pub async fn inventory_operation_count(&self, operation_type: &str) -> u64 {
         InventoryOperation::find()
             .filter(InventoryOperationColumn::OperationType.eq(operation_type))
@@ -356,7 +421,11 @@ impl TestApp {
         panic!("test server did not become ready in time");
     }
 
-    pub async fn post_without_auth(&self, path: &str, body: serde_json::Value) -> reqwest::Response {
+    pub async fn post_without_auth(
+        &self,
+        path: &str,
+        body: serde_json::Value,
+    ) -> reqwest::Response {
         self.send_with_retry(|| self.client.post(self.url(path)).json(&body))
             .await
     }
@@ -400,7 +469,8 @@ impl TestApp {
     }
 
     pub async fn get_bytes_without_auth(&self, path: &str) -> reqwest::Response {
-        self.send_with_retry(|| self.client.get(self.url(path))).await
+        self.send_with_retry(|| self.client.get(self.url(path)))
+            .await
     }
 
     async fn send_with_retry(

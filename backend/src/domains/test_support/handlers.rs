@@ -1,6 +1,8 @@
-use axum::extract::State;
 use axum::Json;
-use sea_orm::{ActiveModelTrait, ActiveValue, ColumnTrait, EntityTrait, QueryFilter, Set, TransactionTrait};
+use axum::extract::State;
+use sea_orm::{
+    ActiveModelTrait, ActiveValue, ColumnTrait, EntityTrait, QueryFilter, Set, TransactionTrait,
+};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -80,7 +82,10 @@ pub async fn issue_token(
     let requested_restrictions = body.restrictions.unwrap_or_default();
     let parsed_restrictions = requested_restrictions
         .iter()
-        .map(|key| key.parse::<RestrictionKind>().map_err(|e| HttpError::bad_request(e.to_string())))
+        .map(|key| {
+            key.parse::<RestrictionKind>()
+                .map_err(|e| HttpError::bad_request(e.to_string()))
+        })
         .collect::<Result<Vec<_>, _>>()?;
 
     let existing_user = User::find_by_id(requested_user_id)
@@ -119,10 +124,9 @@ pub async fn issue_token(
                 body.discord_id
                     .unwrap_or_else(|| format!("debug-discord-{}", requested_user_id)),
             ),
-            username: ActiveValue::Set(
-                body.username
-                    .unwrap_or_else(|| format!("User{}", &requested_user_id.simple().to_string()[..8])),
-            ),
+            username: ActiveValue::Set(body.username.unwrap_or_else(|| {
+                format!("User{}", &requested_user_id.simple().to_string()[..8])
+            })),
             avatar_url: ActiveValue::Set(body.avatar_url),
             email: ActiveValue::Set(body.email),
             auth_epoch: ActiveValue::Set(body.auth_epoch.unwrap_or(0)),
@@ -142,7 +146,9 @@ pub async fn issue_token(
         .filter(UserRestrictionColumn::UserId.eq(user.id))
         .exec(&tx)
         .await
-        .map_err(|e| HttpError::internal_error(format!("Failed to reset user restrictions: {e}")))?;
+        .map_err(|e| {
+            HttpError::internal_error(format!("Failed to reset user restrictions: {e}"))
+        })?;
 
     for restriction in &parsed_restrictions {
         UserRestrictionActiveModel {
@@ -154,12 +160,14 @@ pub async fn issue_token(
         }
         .insert(&tx)
         .await
-        .map_err(|e| HttpError::internal_error(format!("Failed to create test restriction: {e}")))?;
+        .map_err(|e| {
+            HttpError::internal_error(format!("Failed to create test restriction: {e}"))
+        })?;
     }
 
-    tx.commit()
-        .await
-        .map_err(|e| HttpError::internal_error(format!("Failed to commit test token transaction: {e}")))?;
+    tx.commit().await.map_err(|e| {
+        HttpError::internal_error(format!("Failed to commit test token transaction: {e}"))
+    })?;
 
     let token = sign_token(&user, &state.config)
         .map_err(|e| HttpError::internal_error(format!("Failed to sign token: {e}")))?;

@@ -2,15 +2,110 @@ mod common;
 
 use common::TestApp;
 use image::{ImageBuffer, Rgba};
+use sea_orm::ActiveModelTrait;
+use sea_orm::ActiveValue::Set;
 use serial_test::serial;
 
 fn make_skin_png(fill: [u8; 4]) -> Vec<u8> {
     let image = ImageBuffer::from_pixel(64, 64, Rgba(fill));
     let mut bytes = Vec::new();
     image::DynamicImage::ImageRgba8(image)
-        .write_to(&mut std::io::Cursor::new(&mut bytes), image::ImageFormat::Png)
+        .write_to(
+            &mut std::io::Cursor::new(&mut bytes),
+            image::ImageFormat::Png,
+        )
         .expect("write png");
     bytes
+}
+
+#[tokio::test]
+#[serial]
+async fn startup_seeds_required_system_assets() {
+    let app = TestApp::spawn().await;
+
+    let subscription_plus = app
+        .asset_by_key("subscription_plus")
+        .await
+        .expect("subscription_plus asset");
+    assert_eq!(subscription_plus.asset_kind, "subscription");
+    assert_eq!(subscription_plus.ownership_model, "expirable");
+    assert!(!subscription_plus.is_currency);
+
+    let subscription_pro = app
+        .asset_by_key("subscription_pro")
+        .await
+        .expect("subscription_pro asset");
+    assert_eq!(subscription_pro.asset_kind, "subscription");
+    assert_eq!(subscription_pro.ownership_model, "expirable");
+    assert!(!subscription_pro.is_currency);
+
+    let coin_default = app
+        .asset_by_key("coin_default")
+        .await
+        .expect("coin_default asset");
+    assert_eq!(coin_default.asset_kind, "currency");
+    assert_eq!(coin_default.ownership_model, "stackable");
+    assert!(coin_default.is_currency);
+}
+
+#[tokio::test]
+#[serial]
+async fn seeded_system_assets_keep_user_edited_display_fields() {
+    let app = TestApp::spawn().await;
+    let admin = app.issue_user_token("AssetAdmin", true, &[]).await;
+
+    let asset = app
+        .asset_by_key("subscription_plus")
+        .await
+        .expect("subscription_plus asset");
+
+    let patched = app
+        .patch_asset(
+            &admin,
+            &asset.id.to_string(),
+            serde_json::json!({
+                "display_name": "Premium Plus",
+                "description": "Custom renamed tier"
+            }),
+        )
+        .await;
+
+    assert_eq!(patched["displayName"], "Premium Plus");
+    assert_eq!(patched["description"], "Custom renamed tier");
+
+    auth::services::ownership::catalog::ensure_system_assets(&app.db)
+        .await
+        .expect("rerun system asset seeding");
+
+    let updated = app
+        .asset_by_key("subscription_plus")
+        .await
+        .expect("subscription_plus asset after reseed");
+    assert_eq!(updated.display_name, "Premium Plus");
+    assert_eq!(updated.description.as_deref(), Some("Custom renamed tier"));
+}
+
+#[tokio::test]
+#[serial]
+async fn system_asset_seeding_fails_when_existing_asset_breaks_invariants() {
+    let app = TestApp::spawn().await;
+
+    let asset = app
+        .asset_by_key("coin_default")
+        .await
+        .expect("coin_default asset");
+    let mut active: auth::entities::AssetDefinitionActiveModel = asset.into();
+    active.is_currency = Set(false);
+    active
+        .update(&app.db)
+        .await
+        .expect("break coin_default invariant");
+
+    let error = auth::services::ownership::catalog::ensure_system_assets(&app.db)
+        .await
+        .expect_err("expected invariant validation error");
+    assert!(error.to_string().contains("coin_default"));
+    assert!(error.to_string().contains("is_currency"));
 }
 
 #[tokio::test]
@@ -22,13 +117,18 @@ async fn user_can_create_squad_and_see_it_in_profile() {
     let squad = app.create_squad(&leader, "Alpha Team").await;
     let squad_id = squad["id"].as_str().expect("squad id");
 
-    let my_squad_response = app.get_json("/api/user/me/squad", &leader.access_token).await;
+    let my_squad_response = app
+        .get_json("/api/user/me/squad", &leader.access_token)
+        .await;
     assert!(my_squad_response.status().is_success());
     let my_squad: serde_json::Value = my_squad_response.json().await.expect("my squad json");
 
     assert_eq!(my_squad["id"], squad_id);
     assert_eq!(my_squad["memberCount"], 1);
-    assert_eq!(app.user_squad_id(&leader.user_id).await.as_deref(), Some(squad_id));
+    assert_eq!(
+        app.user_squad_id(&leader.user_id).await.as_deref(),
+        Some(squad_id)
+    );
     assert_eq!(app.audit_log_count("user.squad.created").await, 1);
 }
 
@@ -73,7 +173,10 @@ async fn leader_can_invite_and_user_can_accept_invite() {
         .await;
 
     assert!(response.status().is_success());
-    assert_eq!(app.user_squad_id(&invited.user_id).await.as_deref(), Some(squad_id));
+    assert_eq!(
+        app.user_squad_id(&invited.user_id).await.as_deref(),
+        Some(squad_id)
+    );
     assert_eq!(app.invite_count_for_squad(squad_id).await, 0);
     assert_eq!(app.audit_log_count("user.squad.invite_created").await, 1);
     assert_eq!(app.audit_log_count("user.squad.invite_accepted").await, 1);
@@ -101,6 +204,54 @@ async fn expired_invite_cannot_be_accepted() {
 
     assert_eq!(response.status(), reqwest::StatusCode::BAD_REQUEST);
     assert_eq!(app.user_squad_id(&invited.user_id).await, None);
+}
+
+#[tokio::test]
+#[serial]
+async fn squad_image_can_be_uploaded_fetched_and_deleted() {
+    let app = TestApp::spawn().await;
+    let leader = app.issue_user_token("LeaderImage", false, &[]).await;
+    let squad = app.create_squad(&leader, "Image Team").await;
+    let squad_id = squad["id"].as_str().expect("squad id");
+    let png = make_skin_png([64, 128, 255, 255]);
+
+    let upload = app
+        .post_multipart(
+            &format!("/api/squads/{squad_id}/image"),
+            &leader.access_token,
+            "squad.png",
+            "image/png",
+            png.clone(),
+        )
+        .await;
+    assert!(upload.status().is_success());
+
+    let get_image = app
+        .get_bytes_without_auth(&format!("/api/squads/{squad_id}/image"))
+        .await;
+    assert!(get_image.status().is_success());
+    assert_eq!(
+        get_image
+            .headers()
+            .get(reqwest::header::CONTENT_TYPE)
+            .and_then(|value| value.to_str().ok()),
+        Some("image/png")
+    );
+    let fetched = get_image.bytes().await.expect("image bytes");
+    assert!(!fetched.is_empty());
+
+    let delete = app
+        .delete(
+            &format!("/api/squads/{squad_id}/image"),
+            &leader.access_token,
+        )
+        .await;
+    assert!(delete.status().is_success());
+
+    let missing = app
+        .get_bytes_without_auth(&format!("/api/squads/{squad_id}/image"))
+        .await;
+    assert_eq!(missing.status(), reqwest::StatusCode::NOT_FOUND);
 }
 
 #[tokio::test]
@@ -154,7 +305,9 @@ async fn leader_cannot_leave_squad_but_can_disband_it() {
         .await;
     assert_eq!(leave_response.status(), reqwest::StatusCode::FORBIDDEN);
 
-    let delete_response = app.delete(&format!("/api/squads/{squad_id}"), &leader.access_token).await;
+    let delete_response = app
+        .delete(&format!("/api/squads/{squad_id}"), &leader.access_token)
+        .await;
     assert!(delete_response.status().is_success());
     assert!(!app.squad_exists(&squad_id).await);
     assert_eq!(app.user_squad_id(&leader.user_id).await, None);
@@ -231,7 +384,10 @@ async fn admin_can_kick_member_from_squad() {
 
     let response = app
         .post_json(
-            &format!("/api/admin/squads/{squad_id}/members/{}/kick", member.user_id),
+            &format!(
+                "/api/admin/squads/{squad_id}/members/{}/kick",
+                member.user_id
+            ),
             &admin.access_token,
             serde_json::json!({}),
         )
@@ -316,8 +472,14 @@ async fn admin_can_grant_and_revoke_restrictions_and_user_sees_them() {
 
     let restrictions_after_revoke = app.my_restrictions(&user).await;
     assert!(restrictions_after_revoke.is_empty());
-    assert_eq!(app.audit_log_count("admin.user.restriction_granted").await, 1);
-    assert_eq!(app.audit_log_count("admin.user.restriction_revoked").await, 1);
+    assert_eq!(
+        app.audit_log_count("admin.user.restriction_granted").await,
+        1
+    );
+    assert_eq!(
+        app.audit_log_count("admin.user.restriction_revoked").await,
+        1
+    );
 }
 
 #[tokio::test]
@@ -326,22 +488,36 @@ async fn admin_can_search_users_by_username_and_uuid() {
     let app = TestApp::spawn().await;
     let admin = app.issue_user_token("SearchAdmin", true, &[]).await;
     let searched_user = app.issue_user_token("UniqueSearchTarget", false, &[]).await;
-    let _another_user = app.issue_user_token("AnotherSearchTarget", false, &[]).await;
+    let _another_user = app
+        .issue_user_token("AnotherSearchTarget", false, &[])
+        .await;
 
     let username_search = app
-        .get_json("/api/admin/users?q=UniqueSearchTarget&page=1&perPage=10", &admin.access_token)
+        .get_json(
+            "/api/admin/users?q=UniqueSearchTarget&page=1&perPage=10",
+            &admin.access_token,
+        )
         .await;
     assert!(username_search.status().is_success());
     let username_search_body: serde_json::Value =
         username_search.json().await.expect("username search json");
 
     assert_eq!(username_search_body["total"], 1);
-    assert_eq!(username_search_body["items"][0]["id"], searched_user.user_id);
-    assert_eq!(username_search_body["items"][0]["username"], "UniqueSearchTarget");
+    assert_eq!(
+        username_search_body["items"][0]["id"],
+        searched_user.user_id
+    );
+    assert_eq!(
+        username_search_body["items"][0]["username"],
+        "UniqueSearchTarget"
+    );
 
     let uuid_search = app
         .get_json(
-            &format!("/api/admin/users?q={}&page=1&perPage=10", searched_user.user_id),
+            &format!(
+                "/api/admin/users?q={}&page=1&perPage=10",
+                searched_user.user_id
+            ),
             &admin.access_token,
         )
         .await;
@@ -363,7 +539,10 @@ async fn authenticated_user_can_search_users_by_username_for_autocomplete() {
     let _other = app.issue_user_token("DifferentPlayer", false, &[]).await;
 
     let response = app
-        .get_json("/api/users/search?q=AlphaSearch&limit=3", &requester.access_token)
+        .get_json(
+            "/api/users/search?q=AlphaSearch&limit=3",
+            &requester.access_token,
+        )
         .await;
     assert!(response.status().is_success());
 
@@ -374,7 +553,11 @@ async fn authenticated_user_can_search_users_by_username_for_autocomplete() {
     assert!(items.iter().any(|item| item["id"] == alpha.user_id));
     assert!(items.iter().any(|item| item["id"] == beta.user_id));
     assert!(items.iter().all(|item| item.get("discordId").is_none()));
-    assert!(items.iter().all(|item| item["username"].as_str().unwrap().contains("AlphaSearch")));
+    assert!(
+        items
+            .iter()
+            .all(|item| item["username"].as_str().unwrap().contains("AlphaSearch"))
+    );
 }
 
 #[tokio::test]
@@ -396,7 +579,9 @@ async fn user_search_requires_minimum_query_length_and_authentication() {
 #[serial]
 async fn user_search_uses_default_limit_of_ten_results() {
     let app = TestApp::spawn().await;
-    let requester = app.issue_user_token("DefaultLimitRequester", false, &[]).await;
+    let requester = app
+        .issue_user_token("DefaultLimitRequester", false, &[])
+        .await;
 
     for index in 0..12 {
         let username = format!("GroupSearch{:02}", index);
@@ -439,7 +624,10 @@ async fn admin_can_patch_user_profile_fields() {
     assert_eq!(patched_user["avatarUrl"], "https://cdn.test/avatar.png");
 
     let get_response = app
-        .get_json(&format!("/api/admin/users/{}", user.user_id), &admin.access_token)
+        .get_json(
+            &format!("/api/admin/users/{}", user.user_id),
+            &admin.access_token,
+        )
         .await;
     assert!(get_response.status().is_success());
     let fetched_user: serde_json::Value = get_response.json().await.expect("fetched user json");
@@ -528,7 +716,9 @@ async fn squad_capacity_counts_members_and_active_invites() {
     let squad = app.create_squad(&leader, "Juliet Team").await;
     let squad_id = squad["id"].as_str().expect("squad id").to_string();
 
-    let invite_one = app.issue_invite(&leader, &squad_id, &member_one.user_id).await;
+    let invite_one = app
+        .issue_invite(&leader, &squad_id, &member_one.user_id)
+        .await;
     app.post_json(
         &format!("/api/squad-invites/{invite_one}/accept"),
         &member_one.access_token,
@@ -536,7 +726,9 @@ async fn squad_capacity_counts_members_and_active_invites() {
     )
     .await;
 
-    let invite_two = app.issue_invite(&leader, &squad_id, &member_two.user_id).await;
+    let invite_two = app
+        .issue_invite(&leader, &squad_id, &member_two.user_id)
+        .await;
     app.post_json(
         &format!("/api/squad-invites/{invite_two}/accept"),
         &member_two.access_token,
@@ -544,7 +736,9 @@ async fn squad_capacity_counts_members_and_active_invites() {
     )
     .await;
 
-    let invite_three = app.issue_invite(&leader, &squad_id, &member_three.user_id).await;
+    let invite_three = app
+        .issue_invite(&leader, &squad_id, &member_three.user_id)
+        .await;
     let blocked_invite = app
         .post_json(
             &format!("/api/squads/{squad_id}/invites"),
@@ -564,7 +758,10 @@ async fn squad_capacity_counts_members_and_active_invites() {
         )
         .await;
     assert!(accept_third.status().is_success());
-    assert_eq!(app.user_squad_id(&member_three.user_id).await.as_deref(), Some(squad_id.as_str()));
+    assert_eq!(
+        app.user_squad_id(&member_three.user_id).await.as_deref(),
+        Some(squad_id.as_str())
+    );
 }
 
 #[tokio::test]
@@ -604,7 +801,9 @@ async fn restricted_squad_member_can_leave_and_leader_can_delete() {
     assert!(member_leave.status().is_success());
     assert_eq!(app.user_squad_id(&member.user_id).await, None);
 
-    let delete_response = app.delete(&format!("/api/squads/{squad_id}"), &leader.access_token).await;
+    let delete_response = app
+        .delete(&format!("/api/squads/{squad_id}"), &leader.access_token)
+        .await;
     assert!(delete_response.status().is_success());
     assert!(!app.squad_exists(&squad_id).await);
 }
@@ -624,13 +823,18 @@ async fn admin_can_deactivate_activate_and_toggle_superuser() {
         )
         .await;
     assert!(deactivate_response.status().is_success());
-    let deactivated: serde_json::Value =
-        deactivate_response.json().await.expect("deactivated user json");
+    let deactivated: serde_json::Value = deactivate_response
+        .json()
+        .await
+        .expect("deactivated user json");
     assert_eq!(deactivated["isActive"], false);
     assert_eq!(deactivated["deactivationReason"], "Violation review");
 
     let me_while_deactivated = app.get_json("/api/user/me", &user.access_token).await;
-    assert_eq!(me_while_deactivated.status(), reqwest::StatusCode::FORBIDDEN);
+    assert_eq!(
+        me_while_deactivated.status(),
+        reqwest::StatusCode::FORBIDDEN
+    );
 
     let activate_response = app
         .post_json(
@@ -663,7 +867,10 @@ async fn admin_can_deactivate_activate_and_toggle_superuser() {
         )
         .await;
     assert!(revoke_superuser.status().is_success());
-    let revoked: serde_json::Value = revoke_superuser.json().await.expect("revoke superuser json");
+    let revoked: serde_json::Value = revoke_superuser
+        .json()
+        .await
+        .expect("revoke superuser json");
     assert_eq!(revoked["isSuperuser"], false);
 
     let me_after_activate = app.get_json("/api/user/me", &user.access_token).await;
@@ -681,19 +888,25 @@ async fn meta_endpoints_expose_restrictions_and_squad_limits() {
 
     let restrictions_response = app.get_without_auth("/api/meta/restrictions").await;
     assert!(restrictions_response.status().is_success());
-    let restrictions: serde_json::Value =
-        restrictions_response.json().await.expect("restrictions meta json");
+    let restrictions: serde_json::Value = restrictions_response
+        .json()
+        .await
+        .expect("restrictions meta json");
     assert!(restrictions.as_array().expect("restrictions array").len() >= 2);
-    assert!(restrictions
-        .as_array()
-        .expect("restrictions array")
-        .iter()
-        .any(|item| item["key"] == "create_squad" && item["locale"]["en"]["title"].is_string()));
+    assert!(
+        restrictions
+            .as_array()
+            .expect("restrictions array")
+            .iter()
+            .any(|item| item["key"] == "create_squad" && item["locale"]["en"]["title"].is_string())
+    );
 
     let squad_config_response = app.get_without_auth("/api/meta/squads/config").await;
     assert!(squad_config_response.status().is_success());
-    let squad_config: serde_json::Value =
-        squad_config_response.json().await.expect("squad config json");
+    let squad_config: serde_json::Value = squad_config_response
+        .json()
+        .await
+        .expect("squad config json");
     assert_eq!(squad_config["maxMembers"], 4);
     assert_eq!(squad_config["inviteTtlHours"], 24);
     assert_eq!(squad_config["nameMinChars"], 4);
@@ -794,13 +1007,19 @@ async fn admin_cannot_kick_squad_leader() {
 
     let kick_leader = app
         .post_json(
-            &format!("/api/admin/squads/{squad_id}/members/{}/kick", leader.user_id),
+            &format!(
+                "/api/admin/squads/{squad_id}/members/{}/kick",
+                leader.user_id
+            ),
             &admin.access_token,
             serde_json::json!({}),
         )
         .await;
     assert_eq!(kick_leader.status(), reqwest::StatusCode::BAD_REQUEST);
-    assert_eq!(app.user_squad_id(&leader.user_id).await.as_deref(), Some(squad_id.as_str()));
+    assert_eq!(
+        app.user_squad_id(&leader.user_id).await.as_deref(),
+        Some(squad_id.as_str())
+    );
     assert_eq!(app.audit_log_count("admin.squad.member_kicked").await, 0);
 }
 
@@ -828,7 +1047,10 @@ async fn user_cannot_create_squad_when_already_in_one() {
             serde_json::json!({ "name": "Should Fail" }),
         )
         .await;
-    assert_eq!(second_squad_attempt.status(), reqwest::StatusCode::FORBIDDEN);
+    assert_eq!(
+        second_squad_attempt.status(),
+        reqwest::StatusCode::FORBIDDEN
+    );
 }
 
 #[tokio::test]
@@ -840,8 +1062,13 @@ async fn user_cannot_accept_invite_when_already_in_squad() {
     let member = app.issue_user_token("MemberBusy", false, &[]).await;
 
     let first_squad = app.create_squad(&leader_one, "Papa Team").await;
-    let first_squad_id = first_squad["id"].as_str().expect("first squad id").to_string();
-    let first_invite = app.issue_invite(&leader_one, &first_squad_id, &member.user_id).await;
+    let first_squad_id = first_squad["id"]
+        .as_str()
+        .expect("first squad id")
+        .to_string();
+    let first_invite = app
+        .issue_invite(&leader_one, &first_squad_id, &member.user_id)
+        .await;
     app.post_json(
         &format!("/api/squad-invites/{first_invite}/accept"),
         &member.access_token,
@@ -850,7 +1077,10 @@ async fn user_cannot_accept_invite_when_already_in_squad() {
     .await;
 
     let second_squad = app.create_squad(&leader_two, "Quebec Team").await;
-    let second_squad_id = second_squad["id"].as_str().expect("second squad id").to_string();
+    let second_squad_id = second_squad["id"]
+        .as_str()
+        .expect("second squad id")
+        .to_string();
     let second_invite_attempt = app
         .post_json(
             &format!("/api/squads/{second_squad_id}/invites"),
@@ -858,8 +1088,14 @@ async fn user_cannot_accept_invite_when_already_in_squad() {
             serde_json::json!({ "userId": member.user_id }),
         )
         .await;
-    assert_eq!(second_invite_attempt.status(), reqwest::StatusCode::BAD_REQUEST);
-    assert_eq!(app.user_squad_id(&member.user_id).await.as_deref(), Some(first_squad_id.as_str()));
+    assert_eq!(
+        second_invite_attempt.status(),
+        reqwest::StatusCode::BAD_REQUEST
+    );
+    assert_eq!(
+        app.user_squad_id(&member.user_id).await.as_deref(),
+        Some(first_squad_id.as_str())
+    );
     assert_eq!(app.invite_count_for_squad(&second_squad_id).await, 0);
 }
 
@@ -939,17 +1175,36 @@ async fn admin_can_manage_assets_and_public_catalog_only_shows_public_active_ent
     let public_list = app.get_without_auth("/api/assets").await;
     assert!(public_list.status().is_success());
     let public_list_body: serde_json::Value = public_list.json().await.expect("public assets json");
-    assert_eq!(public_list_body["total"], 1);
-    assert_eq!(public_list_body["items"][0]["key"], "premium_pass");
+    let public_keys: Vec<_> = public_list_body["items"]
+        .as_array()
+        .expect("public asset items")
+        .iter()
+        .map(|item| item["key"].as_str().expect("public asset key"))
+        .collect();
+    assert!(public_keys.contains(&"premium_pass"));
+    assert!(public_keys.contains(&"subscription_plus"));
+    assert!(public_keys.contains(&"subscription_pro"));
+    assert!(public_keys.contains(&"coin_default"));
+    assert_eq!(public_list_body["total"], 4);
 
     let admin_list = app.get_json("/api/admin/assets", &admin.access_token).await;
     assert!(admin_list.status().is_success());
     let admin_list_body: serde_json::Value = admin_list.json().await.expect("admin assets json");
-    assert_eq!(admin_list_body["total"], 2);
+    assert_eq!(admin_list_body["total"], 5);
+    let admin_keys: Vec<_> = admin_list_body["items"]
+        .as_array()
+        .expect("admin asset items")
+        .iter()
+        .map(|item| item["key"].as_str().expect("admin asset key"))
+        .collect();
+    assert!(admin_keys.contains(&"admin_only_token"));
 
     let patch_response = app
         .patch_json(
-            &format!("/api/admin/assets/{}", hidden_asset["id"].as_str().expect("asset id")),
+            &format!(
+                "/api/admin/assets/{}",
+                hidden_asset["id"].as_str().expect("asset id")
+            ),
             &admin.access_token,
             serde_json::json!({
                 "display_name": "Admin Token Updated",
@@ -961,12 +1216,18 @@ async fn admin_can_manage_assets_and_public_catalog_only_shows_public_active_ent
     assert!(patch_response.status().is_success());
 
     let public_get = app
-        .get_without_auth(&format!("/api/assets/{}", public_asset["id"].as_str().expect("asset id")))
+        .get_without_auth(&format!(
+            "/api/assets/{}",
+            public_asset["id"].as_str().expect("asset id")
+        ))
         .await;
     assert!(public_get.status().is_success());
 
     let hidden_public_get = app
-        .get_without_auth(&format!("/api/assets/{}", hidden_asset["id"].as_str().expect("asset id")))
+        .get_without_auth(&format!(
+            "/api/assets/{}",
+            hidden_asset["id"].as_str().expect("asset id")
+        ))
         .await;
     assert_eq!(hidden_public_get.status(), reqwest::StatusCode::NOT_FOUND);
 
@@ -1043,7 +1304,10 @@ async fn admin_can_grant_and_revoke_entitlement_idempotently_and_user_sees_it() 
 
     let first_grant = app
         .post_json(
-            &format!("/api/admin/users/{}/inventory/entitlements/dragon_skin/grant", user.user_id),
+            &format!(
+                "/api/admin/users/{}/inventory/entitlements/dragon_skin/grant",
+                user.user_id
+            ),
             &admin.access_token,
             serde_json::json!({ "reasonText": "reward" }),
         )
@@ -1052,7 +1316,10 @@ async fn admin_can_grant_and_revoke_entitlement_idempotently_and_user_sees_it() 
 
     let second_grant = app
         .post_json(
-            &format!("/api/admin/users/{}/inventory/entitlements/dragon_skin/grant", user.user_id),
+            &format!(
+                "/api/admin/users/{}/inventory/entitlements/dragon_skin/grant",
+                user.user_id
+            ),
             &admin.access_token,
             serde_json::json!({ "reasonText": "duplicate grant" }),
         )
@@ -1063,14 +1330,21 @@ async fn admin_can_grant_and_revoke_entitlement_idempotently_and_user_sees_it() 
         .get_json("/api/user/me/inventory/entitlements", &user.access_token)
         .await;
     assert!(entitlements.status().is_success());
-    let entitlements_body: serde_json::Value = entitlements.json().await.expect("entitlements json");
+    let entitlements_body: serde_json::Value =
+        entitlements.json().await.expect("entitlements json");
     assert_eq!(entitlements_body.as_array().expect("array").len(), 1);
     assert_eq!(entitlements_body[0]["assetKey"], "dragon_skin");
-    assert_eq!(app.inventory_operation_count("entitlement_granted").await, 1);
+    assert_eq!(
+        app.inventory_operation_count("entitlement_granted").await,
+        1
+    );
 
     let revoke = app
         .post_json(
-            &format!("/api/admin/users/{}/inventory/entitlements/dragon_skin/revoke", user.user_id),
+            &format!(
+                "/api/admin/users/{}/inventory/entitlements/dragon_skin/revoke",
+                user.user_id
+            ),
             &admin.access_token,
             serde_json::json!({ "reasonText": "cleanup" }),
         )
@@ -1080,9 +1354,15 @@ async fn admin_can_grant_and_revoke_entitlement_idempotently_and_user_sees_it() 
     let after_revoke = app
         .get_json("/api/user/me/inventory/entitlements", &user.access_token)
         .await;
-    let after_revoke_body: serde_json::Value = after_revoke.json().await.expect("entitlements after revoke");
+    let after_revoke_body: serde_json::Value = after_revoke
+        .json()
+        .await
+        .expect("entitlements after revoke");
     assert!(after_revoke_body.as_array().expect("array").is_empty());
-    assert_eq!(app.inventory_operation_count("entitlement_revoked").await, 1);
+    assert_eq!(
+        app.inventory_operation_count("entitlement_revoked").await,
+        1
+    );
 }
 
 #[tokio::test]
@@ -1109,7 +1389,10 @@ async fn stackable_flow_supports_add_remove_set_presence_and_history() {
 
     let add = app
         .post_json(
-            &format!("/api/admin/users/{}/inventory/stackables/event_ticket/add", user.user_id),
+            &format!(
+                "/api/admin/users/{}/inventory/stackables/event_ticket/add",
+                user.user_id
+            ),
             &admin.access_token,
             serde_json::json!({ "amount": 5, "reasonText": "grant" }),
         )
@@ -1118,7 +1401,10 @@ async fn stackable_flow_supports_add_remove_set_presence_and_history() {
 
     let remove = app
         .post_json(
-            &format!("/api/admin/users/{}/inventory/stackables/event_ticket/remove", user.user_id),
+            &format!(
+                "/api/admin/users/{}/inventory/stackables/event_ticket/remove",
+                user.user_id
+            ),
             &admin.access_token,
             serde_json::json!({ "amount": 2, "reasonText": "consume" }),
         )
@@ -1127,7 +1413,10 @@ async fn stackable_flow_supports_add_remove_set_presence_and_history() {
 
     let set_amount = app
         .put_json(
-            &format!("/api/admin/users/{}/inventory/stackables/event_ticket", user.user_id),
+            &format!(
+                "/api/admin/users/{}/inventory/stackables/event_ticket",
+                user.user_id
+            ),
             &admin.access_token,
             serde_json::json!({ "amount": 10, "reasonText": "sync" }),
         )
@@ -1144,7 +1433,9 @@ async fn stackable_flow_supports_add_remove_set_presence_and_history() {
     assert_eq!(presence_body["exists"], true);
     assert_eq!(presence_body["amount"], 10);
 
-    let stackables = app.get_json("/api/user/me/inventory/stackables", &user.access_token).await;
+    let stackables = app
+        .get_json("/api/user/me/inventory/stackables", &user.access_token)
+        .await;
     let stackables_body: serde_json::Value = stackables.json().await.expect("stackables json");
     assert_eq!(stackables_body[0]["amount"], 10);
 
@@ -1185,7 +1476,10 @@ async fn stackable_remove_rejects_insufficient_amount() {
 
     let response = app
         .post_json(
-            &format!("/api/admin/users/{}/inventory/stackables/raid_key/remove", user.user_id),
+            &format!(
+                "/api/admin/users/{}/inventory/stackables/raid_key/remove",
+                user.user_id
+            ),
             &admin.access_token,
             serde_json::json!({ "amount": 1, "reasonText": "consume" }),
         )
@@ -1195,7 +1489,8 @@ async fn stackable_remove_rejects_insufficient_amount() {
 
 #[tokio::test]
 #[serial]
-async fn expirable_active_prolong_accumulates_but_expired_restart_from_now_and_hidden_when_inactive() {
+async fn expirable_active_prolong_accumulates_but_expired_restart_from_now_and_hidden_when_inactive()
+ {
     let app = TestApp::spawn().await;
     let admin = app.issue_user_token("ExpAdmin", true, &[]).await;
     let user = app.issue_user_token("ExpUser", false, &[]).await;
@@ -1217,51 +1512,71 @@ async fn expirable_active_prolong_accumulates_but_expired_restart_from_now_and_h
 
     let first = app
         .post_json(
-            &format!("/api/admin/users/{}/inventory/expirables/premium_1d/prolong", user.user_id),
+            &format!(
+                "/api/admin/users/{}/inventory/expirables/premium_1d/prolong",
+                user.user_id
+            ),
             &admin.access_token,
             serde_json::json!({ "durationSeconds": 120 }),
         )
         .await;
     let first_body: serde_json::Value = first.json().await.expect("first prolong");
-    let first_expires = chrono::DateTime::parse_from_rfc3339(
-        first_body["expiresAt"].as_str().expect("expiresAt"),
-    )
-    .expect("first expires")
-    .with_timezone(&chrono::Utc);
+    let first_expires =
+        chrono::DateTime::parse_from_rfc3339(first_body["expiresAt"].as_str().expect("expiresAt"))
+            .expect("first expires")
+            .with_timezone(&chrono::Utc);
 
     let second = app
         .post_json(
-            &format!("/api/admin/users/{}/inventory/expirables/premium_1d/prolong", user.user_id),
+            &format!(
+                "/api/admin/users/{}/inventory/expirables/premium_1d/prolong",
+                user.user_id
+            ),
             &admin.access_token,
             serde_json::json!({ "durationSeconds": 120 }),
         )
         .await;
     let second_body: serde_json::Value = second.json().await.expect("second prolong");
-    let second_expires = chrono::DateTime::parse_from_rfc3339(
-        second_body["expiresAt"].as_str().expect("expiresAt"),
-    )
-    .expect("second expires")
-    .with_timezone(&chrono::Utc);
+    let second_expires =
+        chrono::DateTime::parse_from_rfc3339(second_body["expiresAt"].as_str().expect("expiresAt"))
+            .expect("second expires")
+            .with_timezone(&chrono::Utc);
     assert!(second_expires >= first_expires + chrono::Duration::seconds(119));
 
     let past = chrono::Utc::now() - chrono::Duration::seconds(5);
     let set_past = app
         .put_json(
-            &format!("/api/admin/users/{}/inventory/expirables/premium_1d/expiration", user.user_id),
+            &format!(
+                "/api/admin/users/{}/inventory/expirables/premium_1d/expiration",
+                user.user_id
+            ),
             &admin.access_token,
             serde_json::json!({ "expiresAt": past.to_rfc3339() }),
         )
         .await;
     assert!(set_past.status().is_success());
 
-    let inventory_after_past = app.get_json("/api/user/me/inventory", &user.access_token).await;
-    let inventory_after_past_body: serde_json::Value = inventory_after_past.json().await.expect("inventory after past");
-    assert!(inventory_after_past_body["expirables"].as_array().expect("exp array").is_empty());
+    let inventory_after_past = app
+        .get_json("/api/user/me/inventory", &user.access_token)
+        .await;
+    let inventory_after_past_body: serde_json::Value = inventory_after_past
+        .json()
+        .await
+        .expect("inventory after past");
+    assert!(
+        inventory_after_past_body["expirables"]
+            .as_array()
+            .expect("exp array")
+            .is_empty()
+    );
 
     let before_restart = chrono::Utc::now();
     let restart = app
         .post_json(
-            &format!("/api/admin/users/{}/inventory/expirables/premium_1d/prolong", user.user_id),
+            &format!(
+                "/api/admin/users/{}/inventory/expirables/premium_1d/prolong",
+                user.user_id
+            ),
             &admin.access_token,
             serde_json::json!({ "durationSeconds": 60 }),
         )
@@ -1327,7 +1642,9 @@ async fn wallet_supports_credit_debit_adjustment_and_transaction_history() {
     let adjust_body: serde_json::Value = adjust.json().await.expect("adjust json");
     assert_eq!(adjust_body["balance"], 250);
 
-    let my_wallet = app.get_json("/api/user/me/wallet/gold", &user.access_token).await;
+    let my_wallet = app
+        .get_json("/api/user/me/wallet/gold", &user.access_token)
+        .await;
     let my_wallet_body: serde_json::Value = my_wallet.json().await.expect("wallet json");
     assert_eq!(my_wallet_body["balance"], 250);
 
@@ -1388,7 +1705,10 @@ async fn wallet_operations_require_currency_assets_and_debit_checks_balance() {
             serde_json::json!({ "amount": 10 }),
         )
         .await;
-    assert_eq!(non_currency_wallet.status(), reqwest::StatusCode::BAD_REQUEST);
+    assert_eq!(
+        non_currency_wallet.status(),
+        reqwest::StatusCode::BAD_REQUEST
+    );
 
     let overdraft = app
         .post_json(
@@ -1397,7 +1717,303 @@ async fn wallet_operations_require_currency_assets_and_debit_checks_balance() {
             serde_json::json!({ "amount": 1 }),
         )
         .await;
-    assert_eq!(overdraft.status(), reqwest::StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(
+        overdraft.status(),
+        reqwest::StatusCode::UNPROCESSABLE_ENTITY
+    );
+}
+
+#[tokio::test]
+#[serial]
+async fn default_wallet_shortcuts_support_balance_credit_debit_and_adjustment() {
+    let app = TestApp::spawn().await;
+    let admin = app.issue_user_token("DefaultWalletAdmin", true, &[]).await;
+    let user = app.issue_user_token("DefaultWalletUser", false, &[]).await;
+
+    let self_initial = app
+        .get_json("/api/user/me/wallet/default", &user.access_token)
+        .await;
+    assert!(self_initial.status().is_success());
+    let self_initial_body: serde_json::Value =
+        self_initial.json().await.expect("self default wallet");
+    assert_eq!(self_initial_body["currencyKey"], "coin_default");
+    assert_eq!(self_initial_body["balance"], 0);
+
+    let admin_initial = app
+        .get_json(
+            &format!("/api/admin/users/{}/wallet/default", user.user_id),
+            &admin.access_token,
+        )
+        .await;
+    assert!(admin_initial.status().is_success());
+    let admin_initial_body: serde_json::Value =
+        admin_initial.json().await.expect("admin default wallet");
+    assert_eq!(admin_initial_body["currencyKey"], "coin_default");
+    assert_eq!(admin_initial_body["balance"], 0);
+
+    let credit = app
+        .post_json(
+            &format!("/api/admin/users/{}/wallet/default/credit", user.user_id),
+            &admin.access_token,
+            serde_json::json!({ "amount": 120, "reasonText": "quest_reward" }),
+        )
+        .await;
+    assert!(credit.status().is_success());
+    let credit_body: serde_json::Value = credit.json().await.expect("credit json");
+    assert_eq!(credit_body["currencyKey"], "coin_default");
+    assert_eq!(credit_body["balance"], 120);
+
+    let debit = app
+        .post_json(
+            &format!("/api/admin/users/{}/wallet/default/debit", user.user_id),
+            &admin.access_token,
+            serde_json::json!({ "amount": 45, "reasonText": "purchase" }),
+        )
+        .await;
+    assert!(debit.status().is_success());
+    let debit_body: serde_json::Value = debit.json().await.expect("debit json");
+    assert_eq!(debit_body["balance"], 75);
+
+    let adjust = app
+        .put_json(
+            &format!("/api/admin/users/{}/wallet/default", user.user_id),
+            &admin.access_token,
+            serde_json::json!({ "amount": 500, "reasonText": "repair" }),
+        )
+        .await;
+    assert!(adjust.status().is_success());
+    let adjust_body: serde_json::Value = adjust.json().await.expect("adjust json");
+    assert_eq!(adjust_body["currencyKey"], "coin_default");
+    assert_eq!(adjust_body["balance"], 500);
+
+    let self_after = app
+        .get_json("/api/user/me/wallet/default", &user.access_token)
+        .await;
+    let self_after_body: serde_json::Value =
+        self_after.json().await.expect("self default wallet after");
+    assert_eq!(self_after_body["balance"], 500);
+
+    let txs = app
+        .get_json(
+            &format!(
+                "/api/admin/users/{}/wallet/coin_default/transactions",
+                user.user_id
+            ),
+            &admin.access_token,
+        )
+        .await;
+    let txs_body: serde_json::Value = txs.json().await.expect("default wallet txs");
+    assert_eq!(txs_body.as_array().expect("tx array").len(), 3);
+}
+
+#[tokio::test]
+#[serial]
+async fn default_wallet_balance_returns_zero_without_balance_row() {
+    let app = TestApp::spawn().await;
+    let admin = app.issue_user_token("DefaultZeroAdmin", true, &[]).await;
+    let user = app.issue_user_token("DefaultZeroUser", false, &[]).await;
+
+    let self_balance = app
+        .get_json("/api/user/me/wallet/default", &user.access_token)
+        .await;
+    assert!(self_balance.status().is_success());
+    let self_body: serde_json::Value = self_balance.json().await.expect("self default balance");
+    assert_eq!(self_body["currencyKey"], "coin_default");
+    assert_eq!(self_body["balance"], 0);
+
+    let admin_balance = app
+        .get_json(
+            &format!("/api/admin/users/{}/wallet/default", user.user_id),
+            &admin.access_token,
+        )
+        .await;
+    assert!(admin_balance.status().is_success());
+    let admin_body: serde_json::Value = admin_balance.json().await.expect("admin default balance");
+    assert_eq!(admin_body["currencyKey"], "coin_default");
+    assert_eq!(admin_body["balance"], 0);
+
+    let txs = app
+        .get_json(
+            &format!(
+                "/api/admin/users/{}/wallet/coin_default/transactions",
+                user.user_id
+            ),
+            &admin.access_token,
+        )
+        .await;
+    assert!(txs.status().is_success());
+    let txs_body: serde_json::Value = txs.json().await.expect("default tx history");
+    assert_eq!(txs_body.as_array().expect("tx array").len(), 0);
+}
+
+#[tokio::test]
+#[serial]
+async fn subscription_shortcuts_report_status_and_reject_pro_while_plus_is_active() {
+    let app = TestApp::spawn().await;
+    let admin = app.issue_user_token("SubscriptionAdmin", true, &[]).await;
+    let user = app.issue_user_token("SubscriptionUser", false, &[]).await;
+
+    let initial = app
+        .get_json("/api/user/me/subscription/status", &user.access_token)
+        .await;
+    assert!(initial.status().is_success());
+    let initial_body: serde_json::Value =
+        initial.json().await.expect("initial subscription status");
+    assert_eq!(initial_body["status"], "none");
+
+    let plus = app
+        .post_json(
+            &format!(
+                "/api/admin/users/{}/subscriptions/plus/prolong",
+                user.user_id
+            ),
+            &admin.access_token,
+            serde_json::json!({ "durationSeconds": 3600, "reasonText": "plus_grant" }),
+        )
+        .await;
+    assert!(plus.status().is_success());
+    let plus_body: serde_json::Value = plus.json().await.expect("plus json");
+    assert_eq!(plus_body["assetKey"], "subscription_plus");
+
+    let plus_status = app
+        .get_json("/api/user/me/subscription/status", &user.access_token)
+        .await;
+    let plus_status_body: serde_json::Value = plus_status.json().await.expect("plus status");
+    assert_eq!(plus_status_body["status"], "plus");
+
+    let pro_conflict = app
+        .post_json(
+            &format!(
+                "/api/admin/users/{}/subscriptions/pro/prolong",
+                user.user_id
+            ),
+            &admin.access_token,
+            serde_json::json!({ "durationSeconds": 3600, "reasonText": "pro_upgrade_attempt" }),
+        )
+        .await;
+    assert_eq!(pro_conflict.status(), reqwest::StatusCode::BAD_REQUEST);
+    let pro_conflict_body: serde_json::Value =
+        pro_conflict.json().await.expect("pro conflict json");
+    assert!(
+        pro_conflict_body["error"]
+            .as_str()
+            .expect("error message")
+            .contains("subscription_plus")
+    );
+
+    let pro_asset = app
+        .asset_by_key("subscription_pro")
+        .await
+        .expect("subscription_pro asset");
+    let now = chrono::Utc::now();
+
+    auth::entities::UserExpirableAssetActiveModel {
+        user_id: Set(uuid::Uuid::parse_str(&user.user_id).expect("user uuid")),
+        asset_definition_id: Set(pro_asset.id),
+        expires_at: Set(now + chrono::Duration::hours(4)),
+        granted_at: Set(now),
+        last_extended_at: Set(Some(now)),
+        granted_by_actor: Set("{\"kind\":\"admin\"}".to_string()),
+        updated_at: Set(now),
+    }
+    .insert(&app.db)
+    .await
+    .expect("insert pro raw row");
+
+    let admin_status = app
+        .get_json(
+            &format!("/api/admin/users/{}/subscription/status", user.user_id),
+            &admin.access_token,
+        )
+        .await;
+    assert!(admin_status.status().is_success());
+    let admin_status_body: serde_json::Value = admin_status.json().await.expect("admin status");
+    assert_eq!(admin_status_body["status"], "pro");
+}
+
+#[tokio::test]
+#[serial]
+async fn subscription_status_reports_none_plus_pro_and_pro_wins_over_double_state() {
+    let app = TestApp::spawn().await;
+    let admin = app
+        .issue_user_token("SubscriptionMatrixAdmin", true, &[])
+        .await;
+
+    let none_user = app.issue_user_token("SubscriptionNone", false, &[]).await;
+    let plus_user = app.issue_user_token("SubscriptionPlus", false, &[]).await;
+    let pro_user = app.issue_user_token("SubscriptionPro", false, &[]).await;
+    let both_user = app.issue_user_token("SubscriptionBoth", false, &[]).await;
+
+    let plus_response = app
+        .post_json(
+            &format!(
+                "/api/admin/users/{}/subscriptions/plus/prolong",
+                plus_user.user_id
+            ),
+            &admin.access_token,
+            serde_json::json!({ "durationSeconds": 3600 }),
+        )
+        .await;
+    assert!(plus_response.status().is_success());
+
+    let pro_response = app
+        .post_json(
+            &format!(
+                "/api/admin/users/{}/inventory/expirables/subscription_pro/prolong",
+                pro_user.user_id
+            ),
+            &admin.access_token,
+            serde_json::json!({ "durationSeconds": 3600 }),
+        )
+        .await;
+    assert!(pro_response.status().is_success());
+
+    let both_plus = app
+        .post_json(
+            &format!(
+                "/api/admin/users/{}/inventory/expirables/subscription_plus/prolong",
+                both_user.user_id
+            ),
+            &admin.access_token,
+            serde_json::json!({ "durationSeconds": 3600 }),
+        )
+        .await;
+    assert!(both_plus.status().is_success());
+    let both_pro = app
+        .post_json(
+            &format!(
+                "/api/admin/users/{}/inventory/expirables/subscription_pro/prolong",
+                both_user.user_id
+            ),
+            &admin.access_token,
+            serde_json::json!({ "durationSeconds": 3600 }),
+        )
+        .await;
+    assert!(both_pro.status().is_success());
+
+    let none_status = app
+        .get_json("/api/user/me/subscription/status", &none_user.access_token)
+        .await;
+    let none_body: serde_json::Value = none_status.json().await.expect("none status");
+    assert_eq!(none_body["status"], "none");
+
+    let plus_status = app
+        .get_json("/api/user/me/subscription/status", &plus_user.access_token)
+        .await;
+    let plus_body: serde_json::Value = plus_status.json().await.expect("plus status");
+    assert_eq!(plus_body["status"], "plus");
+
+    let pro_status = app
+        .get_json("/api/user/me/subscription/status", &pro_user.access_token)
+        .await;
+    let pro_body: serde_json::Value = pro_status.json().await.expect("pro status");
+    assert_eq!(pro_body["status"], "pro");
+
+    let both_status = app
+        .get_json("/api/user/me/subscription/status", &both_user.access_token)
+        .await;
+    let both_body: serde_json::Value = both_status.json().await.expect("both status");
+    assert_eq!(both_body["status"], "pro");
 }
 
 #[tokio::test]
@@ -1429,7 +2045,11 @@ async fn missing_user_skin_falls_back_to_admin_default_skin() {
             fallback_png.clone(),
         )
         .await;
-    assert!(upload.status().is_success(), "{}", upload.text().await.unwrap_or_default());
+    assert!(
+        upload.status().is_success(),
+        "{}",
+        upload.text().await.unwrap_or_default()
+    );
 
     let metadata = app
         .get_json("/api/admin/skins/default", &admin.access_token)
@@ -1489,7 +2109,11 @@ async fn personal_skin_takes_priority_over_default_skin() {
             personal_png.clone(),
         )
         .await;
-    assert!(upload_personal.status().is_success(), "{}", upload_personal.text().await.unwrap_or_default());
+    assert!(
+        upload_personal.status().is_success(),
+        "{}",
+        upload_personal.text().await.unwrap_or_default()
+    );
 
     let response = app
         .get_bytes_without_auth(&format!("/api/skins/{}", user.user_id))
@@ -1520,8 +2144,15 @@ async fn admin_can_issue_service_token_and_view_separate_audit() {
             }),
         )
         .await;
-    assert!(create_response.status().is_success(), "{}", create_response.text().await.unwrap_or_default());
-    let created: serde_json::Value = create_response.json().await.expect("create service token json");
+    assert!(
+        create_response.status().is_success(),
+        "{}",
+        create_response.text().await.unwrap_or_default()
+    );
+    let created: serde_json::Value = create_response
+        .json()
+        .await
+        .expect("create service token json");
     let token_id = created["id"].as_str().expect("token id");
     let plaintext = created["plaintextToken"].as_str().expect("plaintext token");
     assert!(plaintext.starts_with("svcs_"));
@@ -1530,7 +2161,10 @@ async fn admin_can_issue_service_token_and_view_separate_audit() {
         .get_json("/api/admin/service-tokens", &admin.access_token)
         .await;
     assert!(list_response.status().is_success());
-    let list_body: serde_json::Value = list_response.json().await.expect("list service tokens json");
+    let list_body: serde_json::Value = list_response
+        .json()
+        .await
+        .expect("list service tokens json");
     let items = list_body.as_array().expect("service token list");
     assert_eq!(items.len(), 1);
     assert_eq!(items[0]["systemName"], "matchmaker");
@@ -1543,7 +2177,10 @@ async fn admin_can_issue_service_token_and_view_separate_audit() {
         )
         .await;
     assert!(audit_response.status().is_success());
-    let audit_body: serde_json::Value = audit_response.json().await.expect("service token audit json");
+    let audit_body: serde_json::Value = audit_response
+        .json()
+        .await
+        .expect("service token audit json");
     assert_eq!(audit_body.as_array().expect("audit array").len(), 1);
     assert_eq!(audit_body[0]["action"], "service_token.created");
     assert_eq!(audit_body[0]["metadata"]["systemName"], "matchmaker");
@@ -1612,11 +2249,18 @@ async fn service_token_can_mutate_wallet_and_inventory_as_system_actor() {
             serde_json::json!({ "amount": 50, "reasonText": "reward" }),
         )
         .await;
-    assert!(credit_response.status().is_success(), "{}", credit_response.text().await.unwrap_or_default());
+    assert!(
+        credit_response.status().is_success(),
+        "{}",
+        credit_response.text().await.unwrap_or_default()
+    );
 
     let add_stackable_response = app
         .post_json(
-            &format!("/api/admin/users/{}/inventory/stackables/arena_ticket/add", user.user_id),
+            &format!(
+                "/api/admin/users/{}/inventory/stackables/arena_ticket/add",
+                user.user_id
+            ),
             &service_token,
             serde_json::json!({ "amount": 3, "reasonText": "grant" }),
         )
@@ -1629,7 +2273,10 @@ async fn service_token_can_mutate_wallet_and_inventory_as_system_actor() {
 
     let wallet_txs = app
         .get_json(
-            &format!("/api/admin/users/{}/wallet/silver/transactions", user.user_id),
+            &format!(
+                "/api/admin/users/{}/wallet/silver/transactions",
+                user.user_id
+            ),
             &admin.access_token,
         )
         .await;
@@ -1643,10 +2290,15 @@ async fn service_token_can_mutate_wallet_and_inventory_as_system_actor() {
             &admin.access_token,
         )
         .await;
-    let inventory_history_body: serde_json::Value =
-        inventory_history.json().await.expect("inventory history json");
+    let inventory_history_body: serde_json::Value = inventory_history
+        .json()
+        .await
+        .expect("inventory history json");
     assert_eq!(inventory_history_body[0]["actorKind"], "system");
-    assert_eq!(inventory_history_body[0]["actorServiceName"], "reward_daemon");
+    assert_eq!(
+        inventory_history_body[0]["actorServiceName"],
+        "reward_daemon"
+    );
 }
 
 #[tokio::test]
@@ -1694,7 +2346,11 @@ async fn service_token_rotation_and_revoke_change_validity() {
             serde_json::json!({ "reason": "routine rotation" }),
         )
         .await;
-    assert!(rotate_response.status().is_success(), "{}", rotate_response.text().await.unwrap_or_default());
+    assert!(
+        rotate_response.status().is_success(),
+        "{}",
+        rotate_response.text().await.unwrap_or_default()
+    );
     let rotated_body: serde_json::Value = rotate_response.json().await.expect("rotated token json");
     let new_token = rotated_body["plaintextToken"]
         .as_str()
@@ -1722,7 +2378,10 @@ async fn service_token_rotation_and_revoke_change_validity() {
 
     let revoke_response = app
         .post_json(
-            &format!("/api/admin/service-tokens/{}/revoke", rotated_body["id"].as_str().expect("new token id")),
+            &format!(
+                "/api/admin/service-tokens/{}/revoke",
+                rotated_body["id"].as_str().expect("new token id")
+            ),
             &admin.access_token,
             serde_json::json!({ "reason": "disabled" }),
         )
@@ -1740,7 +2399,10 @@ async fn service_token_rotation_and_revoke_change_validity() {
 
     let audit_response = app
         .get_json(
-            &format!("/api/admin/service-tokens/{}/audit", rotated_body["id"].as_str().expect("new token id")),
+            &format!(
+                "/api/admin/service-tokens/{}/audit",
+                rotated_body["id"].as_str().expect("new token id")
+            ),
             &admin.access_token,
         )
         .await;

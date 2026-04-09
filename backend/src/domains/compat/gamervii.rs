@@ -1,5 +1,5 @@
-use axum::extract::State;
 use axum::Json;
+use axum::extract::State;
 use sea_orm::EntityTrait;
 use serde::{Deserialize, Serialize};
 use tracing::{error, info};
@@ -75,24 +75,34 @@ pub async fn gamervii_auth(
         Ok(id) => id,
         Err(_) => {
             info!("Invalid UUID format in GamerVii auth login: {}", body.login);
-            return Json(GamerViiAuthResponse::error("Неверный формат логина (ожидается UUID)"))
-        },
+            return Json(GamerViiAuthResponse::error(
+                "Неверный формат логина (ожидается UUID)",
+            ));
+        }
     };
 
     let jwt_content = match verify_token(&body.password, &state.config) {
         Ok(content) => content,
         Err(_) => {
-            info!("Invalid or expired token in GamerVii auth for user_id: {}", user_id);
-            return Json(GamerViiAuthResponse::error("Неверный или истёкший токен"))
-        },
+            info!(
+                "Invalid or expired token in GamerVii auth for user_id: {}",
+                user_id
+            );
+            return Json(GamerViiAuthResponse::error("Неверный или истёкший токен"));
+        }
     };
 
     let token_user_id = match Uuid::parse_str(&jwt_content.user_id) {
         Ok(id) => id,
         Err(_) => {
-            info!("Invalid UUID format in token user_id: {}", jwt_content.user_id);
-            return Json(GamerViiAuthResponse::error("Неверный формат user_id в токене"))
-        },
+            info!(
+                "Invalid UUID format in token user_id: {}",
+                jwt_content.user_id
+            );
+            return Json(GamerViiAuthResponse::error(
+                "Неверный формат user_id в токене",
+            ));
+        }
     };
 
     if user_id != token_user_id {
@@ -103,12 +113,15 @@ pub async fn gamervii_auth(
         Ok(Some(user)) => user,
         Ok(None) => {
             info!("User not found in GamerVii auth: {}", user_id);
-            return Json(GamerViiAuthResponse::error("Пользователь не найден"))
-        },
+            return Json(GamerViiAuthResponse::error("Пользователь не найден"));
+        }
         Err(_) => {
-            error!("Database error while fetching user in GamerVii auth: {}", user_id);
-            return Json(GamerViiAuthResponse::error("Ошибка базы данных"))
-        },
+            error!(
+                "Database error while fetching user in GamerVii auth: {}",
+                user_id
+            );
+            return Json(GamerViiAuthResponse::error("Ошибка базы данных"));
+        }
     };
 
     if !user.is_active {

@@ -19,6 +19,7 @@ pub async fn run() -> Result<()> {
 
     let db = services::db::connect_db(&config.database).await?;
     services::db::run_migrations(&db).await?;
+    services::ownership::catalog::ensure_system_assets(&db).await?;
     let s3 = build_s3_client(&config).await?;
     verify_s3_access(&config, &s3).await?;
 
@@ -93,7 +94,10 @@ async fn verify_s3_access(config: &AppConfig, s3: &aws_sdk_s3::Client) -> Result
             })?;
     }
 
-    info!("S3 connection established for bucket '{}'", config.s3.bucket);
+    info!(
+        "S3 connection established for bucket '{}'",
+        config.s3.bucket
+    );
     Ok(())
 }
 
