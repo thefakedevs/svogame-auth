@@ -7,8 +7,8 @@ flock -n 9 || {
   exit 1
 }
 
-git fetch origin production
-git reset --hard origin/production
+git fetch origin stage
+git reset --hard origin/stage
 
 docker compose pull
 docker compose up -d --build --remove-orphans
