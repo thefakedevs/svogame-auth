@@ -67,6 +67,53 @@ export function useProfileDashboard(query: URLSearchParams) {
     await loadDashboard(authToken)
   }, [authToken, loadDashboard])
 
+  const reloadSquads = useCallback(async () => {
+    if (!authToken) {
+      setStatus('unauthorized')
+      return
+    }
+
+    if (!data) {
+      await reload()
+      return
+    }
+
+    try {
+      const [squad, squadInvites, squadConfig] = await Promise.all([
+        getMySquad(authToken),
+        getMySquadInvites(authToken),
+        getSquadConfig(),
+      ])
+
+      const squadMembers = squad ? await getSquadMembers(authToken, squad.id) : []
+
+      setData((prev) => {
+        if (!prev) {
+          return prev
+        }
+
+        return {
+          ...prev,
+          squad,
+          squadMembers,
+          squadInvites,
+          squadConfig,
+        }
+      })
+      setError('')
+    } catch (cause) {
+      if (cause instanceof ApiError && cause.isAuthError()) {
+        void tokenManager.clearToken()
+        setAuthToken(null)
+        setAuthUser(null)
+        setStatus('unauthorized')
+        return
+      }
+
+      setError(toDisplayError(cause, 'Не удалось обновить данные сквада.'))
+    }
+  }, [authToken, data, reload, setAuthToken, setAuthUser])
+
   const logout = useCallback(() => {
     void tokenManager.clearToken()
     setAuthToken(null)
@@ -120,6 +167,7 @@ export function useProfileDashboard(query: URLSearchParams) {
     setData,
     setAuthUser,
     reload,
+    reloadSquads,
     logout,
   }
 }

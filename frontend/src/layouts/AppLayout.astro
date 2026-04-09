@@ -14,7 +14,7 @@ const { title = 'SVOCraft', description, pageTitle } = Astro.props
 <BaseLayout title={title} description={description}>
   <div class="ui-kit-vhs" aria-hidden="true"></div>
   <div class="ui-kit-page app-shell">
-    <AppHeader client:load pageTitle={pageTitle} />
+    <AppHeader client:only="react" pageTitle={pageTitle} />
     <slot />
   </div>
 </BaseLayout>

@@ -1,8 +1,11 @@
 ---
-import AppLayout from '../layouts/AppLayout.astro'
+import BaseLayout from '../layouts/BaseLayout.astro'
 import AuthPage from '../components/auth/AuthPage'
 ---
 
-<AppLayout title="Авторизация | SVOCraft" pageTitle="Авторизация">
-  <AuthPage client:load />
-</AppLayout>
+<BaseLayout title="Авторизация | SVOCraft">
+  <div class="ui-kit-vhs" aria-hidden="true"></div>
+  <div class="ui-kit-page app-shell">
+    <AuthPage client:only="react" />
+  </div>
+</BaseLayout>

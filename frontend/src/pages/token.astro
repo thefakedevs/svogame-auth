@@ -1,8 +1,11 @@
 ---
-import AppLayout from '../layouts/AppLayout.astro'
+import BaseLayout from '../layouts/BaseLayout.astro'
 import TokenHandler from './_TokenHandler'
 ---
 
-<AppLayout title="Завершение авторизации | SVOCraft" pageTitle="Авторизация">
-  <TokenHandler client:load />
-</AppLayout>
+<BaseLayout title="Завершение авторизации | SVOCraft">
+  <div class="ui-kit-vhs" aria-hidden="true"></div>
+  <div class="ui-kit-page app-shell">
+    <TokenHandler client:only="react" />
+  </div>
+</BaseLayout>

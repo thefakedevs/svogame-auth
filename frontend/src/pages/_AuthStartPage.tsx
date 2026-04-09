@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from 'react'
-import AuthStartCard from '../components/auth/AuthStartCard'
 import AuthFlowStages from '../components/auth/AuthFlowStages'
 import { type DiscordAuthInitResponse, requestDiscordAuthInit } from '../api/auth'
 import { toDisplayError } from '../api/http'
@@ -18,14 +17,13 @@ interface InitState {
 }
 
 export default function AuthStartPage() {
-  const [state, setState] = useState<InitState>({ status: 'idle' })
+  const [state, setState] = useState<InitState>({ status: 'loading' })
   const authHydrated = useAuthStore((store) => store.hydrated)
   const setUser = useAuthStore((store) => store.setUser)
   const setPoWData = useAuthStore((store) => store.setPoWData)
   const query = useQuery()
   const returnUrl = query.get('redirectUrl')
   const pollingData = query.get('polling')
-  const shouldAutoStart = Boolean(returnUrl || pollingData)
 
   useEffect(() => {
     if (!authHydrated) {
@@ -82,7 +80,7 @@ export default function AuthStartPage() {
   }, [pollingData, returnUrl])
 
   useEffect(() => {
-    if (!authHydrated || !shouldAutoStart) {
+    if (!authHydrated) {
       return
     }
 
@@ -91,7 +89,7 @@ export default function AuthStartPage() {
     }, 0)
 
     return () => window.clearTimeout(timerId)
-  }, [authHydrated, shouldAutoStart, startAuth])
+  }, [authHydrated, startAuth])
 
   useEffect(() => {
     if (state.status !== 'redirecting' || !state.oauthUrl) return
@@ -104,26 +102,14 @@ export default function AuthStartPage() {
   }, [state.oauthUrl, state.status])
 
   return (
-    state.status === 'idle' || (!shouldAutoStart && state.status === 'error') ? (
-      <AuthStartCard
-        onStart={() => void startAuth()}
-        errorMessage={state.status === 'error' ? state.errorMessage : undefined}
-        isLoading={state.status === 'loading'}
+    <div className="page auth-start-page auth-pow-fullbleed">
+      <AuthFlowStages
+        stage={state}
+        onRetryError={() => {
+          setState({ status: 'loading' })
+          void startAuth()
+        }}
       />
-    ) : (
-      <div className="page auth-start-page auth-pow-fullbleed">
-        <AuthFlowStages
-          stage={state}
-          onRetryError={() => {
-            if (shouldAutoStart) {
-              setState({ status: 'loading' })
-              void startAuth()
-              return
-            }
-            setState({ status: 'idle' })
-          }}
-        />
-      </div>
-    )
+    </div>
   )
 }

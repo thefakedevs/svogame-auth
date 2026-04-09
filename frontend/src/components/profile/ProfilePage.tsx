@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react'
 import { Toaster } from 'react-hot-toast'
 import { useQuery } from '../../util/query'
+import '../../pages/ProfilePage.css'
 import ProfileOverviewTab from './ProfileOverviewTab'
 import ProfileSettingsTab from './ProfileSettingsTab'
 import ProfileSkeleton from './ProfileSkeleton'
-import ProfileSquadsTab from './ProfileSquadsTab'
 import { ProfileErrorState, ProfileUnauthorizedState } from './ProfileStates'
-import { useProfileDashboard } from './useProfileDashboard'
+import ProfileSquadsTab from './ProfileSquadsTab'
 import type { ProfileTab } from './types'
-import '../../pages/ProfilePage.css'
+import { useProfileDashboard } from './useProfileDashboard'
 
 function normalizeRequestedTab(value: string | null): ProfileTab {
   if (value === 'squads') return 'squads'
@@ -18,16 +18,7 @@ function normalizeRequestedTab(value: string | null): ProfileTab {
 
 export default function ProfilePage() {
   const query = useQuery()
-  const {
-    authToken,
-    status,
-    data,
-    error,
-    setData,
-    setAuthUser,
-    reload,
-    logout,
-  } = useProfileDashboard(query)
+  const { authToken, status, data, error, setData, setAuthUser, reload, reloadSquads, logout } = useProfileDashboard(query)
 
   const [activeTab, setActiveTab] = useState<ProfileTab>(() => normalizeRequestedTab(query.get('tab')))
   const [nicknameDraft, setNicknameDraft] = useState('')
@@ -48,27 +39,6 @@ export default function ProfilePage() {
     }
   }, [data])
 
-  useEffect(() => {
-    if (status === 'loading') {
-      setShowSkeletonOverlay(true)
-      if (!data) setContentVisible(false)
-      return
-    }
-
-    if (status === 'loaded' && data) {
-      setShowSkeletonOverlay(true)
-      const frameId = window.requestAnimationFrame(() => setContentVisible(true))
-      const timeoutId = window.setTimeout(() => setShowSkeletonOverlay(false), 320)
-      return () => {
-        window.cancelAnimationFrame(frameId)
-        window.clearTimeout(timeoutId)
-      }
-    }
-
-    setShowSkeletonOverlay(false)
-    setContentVisible(false)
-  }, [data, status])
-
   if (status === 'unauthorized') {
     return <ProfileUnauthorizedState />
   }
@@ -76,6 +46,31 @@ export default function ProfilePage() {
   if (status === 'error' || (!data && status !== 'loading')) {
     return <ProfileErrorState error={error} onRetry={() => void reload()} onLogout={logout} />
   }
+
+  const isLoading = status === 'loading'
+
+  useEffect(() => {
+    if (isLoading) {
+      setShowSkeletonOverlay(true)
+      setContentVisible(false)
+      return
+    }
+
+    if (!data) {
+      setShowSkeletonOverlay(false)
+      setContentVisible(false)
+      return
+    }
+
+    setShowSkeletonOverlay(true)
+    const frameId = window.requestAnimationFrame(() => setContentVisible(true))
+    const timeoutId = window.setTimeout(() => setShowSkeletonOverlay(false), 280)
+
+    return () => {
+      window.cancelAnimationFrame(frameId)
+      window.clearTimeout(timeoutId)
+    }
+  }, [data, isLoading, activeTab])
 
   return (
     <div className="ui-kit-page profile-page">
@@ -92,28 +87,28 @@ export default function ProfilePage() {
         }}
       />
       <div className="profile-shell">
-        <div className="profile-transition-shell">
-          {data ? (
-            <div className={`profile-content-stage ${contentVisible ? 'is-visible' : ''}`}>
-              <div className="profile-topbar">
-                <nav className="profile-tabs" aria-label="Разделы профиля">
-                  {([
-                    ['overview', 'Обзор'],
-                    ['squads', 'Сквад'],
-                    ['settings', 'Настройки'],
-                  ] as const).map(([key, label]) => (
-                    <button
-                      key={key}
-                      className={`profile-tab ${activeTab === key ? 'is-active' : ''}`}
-                      type="button"
-                      onClick={() => setActiveTab(key)}
-                    >
-                      <span>{label}</span>
-                    </button>
-                  ))}
-                </nav>
-              </div>
+        <div className="profile-topbar">
+          <nav className="profile-tabs" aria-label="Разделы профиля">
+            {([
+              ['overview', 'Обзор'],
+              ['squads', 'Сквад'],
+              ['settings', 'Настройки'],
+            ] as const).map(([key, label]) => (
+              <button
+                key={key}
+                className={`profile-tab ${activeTab === key ? 'is-active' : ''}`}
+                type="button"
+                onClick={() => setActiveTab(key)}
+              >
+                <span>{label}</span>
+              </button>
+            ))}
+          </nav>
+        </div>
 
+        <div className="profile-transition-shell">
+          {!isLoading && data ? (
+            <div key={activeTab} className={`profile-content-stage ${contentVisible ? 'is-visible' : ''}`}>
               {activeTab === 'overview' ? (
                 <ProfileOverviewTab
                   data={data}
@@ -128,7 +123,7 @@ export default function ProfilePage() {
                 <ProfileSquadsTab
                   data={data}
                   authToken={authToken}
-                  onChanged={reload}
+                  onChanged={reloadSquads}
                 />
               ) : null}
 
@@ -153,8 +148,8 @@ export default function ProfilePage() {
           ) : null}
 
           {showSkeletonOverlay ? (
-            <div className={`profile-loading-overlay ${status === 'loaded' && contentVisible ? 'is-exiting' : ''}`} aria-hidden>
-              <ProfileSkeleton />
+            <div className={`profile-loading-overlay ${!isLoading && contentVisible ? 'is-exiting' : ''}`} aria-hidden>
+              <ProfileSkeleton activeTab={activeTab} />
             </div>
           ) : null}
         </div>

@@ -484,6 +484,29 @@
   overflow-wrap: anywhere;
 }
 
+.profile-squad-stage {
+  opacity: 1;
+  transform: none;
+  filter: none;
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease,
+    filter 180ms ease;
+}
+
+.profile-squad-stage.is-fading-out {
+  opacity: 0;
+  transform: translateY(10px);
+  filter: blur(2px);
+  pointer-events: none;
+}
+
+.profile-squad-stage.is-fading-in {
+  opacity: 1;
+  transform: none;
+  filter: none;
+}
+
 .profile-page .btn:focus,
 .profile-page .btn:focus-visible,
 .profile-page .profile-tab:focus,

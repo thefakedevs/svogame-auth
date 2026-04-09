@@ -17,6 +17,17 @@ import {
 import { toDisplayError } from '../../api/http'
 import type { ProfileDashboardData } from './types'
 
+const SQUAD_VIEW_FADE_OUT_MS = 120
+const SQUAD_VIEW_FADE_IN_MS = 180
+
+type SquadViewMode = 'no_squad' | 'leader' | 'member'
+type SquadViewTransition = 'idle' | 'fade-out' | 'fade-in'
+
+function resolveSquadViewMode(data: ProfileDashboardData): SquadViewMode {
+  if (!data.squad) return 'no_squad'
+  return data.squad.leaderUserId === data.user.id ? 'leader' : 'member'
+}
+
 const dateTimeFormatter = new Intl.DateTimeFormat('ru-RU', {
   day: '2-digit',
   month: 'short',
@@ -615,32 +626,80 @@ export default function ProfileSquadsTab({
     return null
   }
 
-  if (!data.squad) {
-    return <NoSquadState authToken={authToken} data={data} onChanged={onChanged} />
+  const nextMode = resolveSquadViewMode(data)
+  const [displayMode, setDisplayMode] = useState<SquadViewMode>(nextMode)
+  const [transition, setTransition] = useState<SquadViewTransition>('idle')
+  const [displayData, setDisplayData] = useState<ProfileDashboardData>(data)
+
+  useEffect(() => {
+    if (nextMode === displayMode) {
+      if (transition === 'idle') {
+        setDisplayData(data)
+      }
+      return
+    }
+
+    setTransition('fade-out')
+
+    const switchTimerId = window.setTimeout(() => {
+      setDisplayMode(nextMode)
+      setDisplayData(data)
+      setTransition('fade-in')
+    }, SQUAD_VIEW_FADE_OUT_MS)
+
+    const endTimerId = window.setTimeout(() => {
+      setTransition('idle')
+    }, SQUAD_VIEW_FADE_OUT_MS + SQUAD_VIEW_FADE_IN_MS)
+
+    return () => {
+      window.clearTimeout(switchTimerId)
+      window.clearTimeout(endTimerId)
+    }
+  }, [data, displayMode, nextMode, transition])
+
+  const stageClass =
+    transition === 'fade-out'
+      ? 'is-fading-out'
+      : transition === 'fade-in'
+        ? 'is-fading-in'
+        : ''
+
+  if (displayMode === 'no_squad') {
+    return (
+      <div className={`profile-squad-stage ${stageClass}`}>
+        <NoSquadState authToken={authToken} data={displayData} onChanged={onChanged} />
+      </div>
+    )
   }
 
-  const isLeader = data.squad.leaderUserId === data.user.id
+  if (!displayData.squad) {
+    return null
+  }
 
-  if (isLeader) {
+  if (displayMode === 'leader') {
     return (
-      <div className="profile-split">
-        <div className="profile-stack">
-          <SquadInfoCard data={data} isLeader />
-          <LeaderManagementCard authToken={authToken} data={data} onChanged={onChanged} />
-          <LeaderInviteCard authToken={authToken} data={data} onChanged={onChanged} />
+      <div className={`profile-squad-stage ${stageClass}`}>
+        <div className="profile-split">
+          <div className="profile-stack">
+            <SquadInfoCard data={displayData} isLeader />
+            <LeaderManagementCard authToken={authToken} data={displayData} onChanged={onChanged} />
+            <LeaderInviteCard authToken={authToken} data={displayData} onChanged={onChanged} />
+          </div>
+          <SquadMembersCard data={displayData} isLeader authToken={authToken} onChanged={onChanged} />
         </div>
-        <SquadMembersCard data={data} isLeader authToken={authToken} onChanged={onChanged} />
       </div>
     )
   }
 
   return (
-    <div className="profile-split">
-      <div className="profile-stack">
-        <SquadInfoCard data={data} isLeader={false} />
-        <MemberActionsCard authToken={authToken} squadId={data.squad.id} onChanged={onChanged} />
+    <div className={`profile-squad-stage ${stageClass}`}>
+      <div className="profile-split">
+        <div className="profile-stack">
+          <SquadInfoCard data={displayData} isLeader={false} />
+          <MemberActionsCard authToken={authToken} squadId={displayData.squad.id} onChanged={onChanged} />
+        </div>
+        <SquadMembersCard data={displayData} isLeader={false} authToken={authToken} onChanged={onChanged} />
       </div>
-      <SquadMembersCard data={data} isLeader={false} authToken={authToken} onChanged={onChanged} />
     </div>
   )
 }

@@ -1,6 +1,6 @@
 import { buildSkinUrl } from '../../api/skins'
-import type { ProfileDashboardData } from './types'
 import SkinPreview2D from '../SkinPreview2D'
+import type { ProfileDashboardData } from './types'
 
 const dateTimeFormatter = new Intl.DateTimeFormat('ru-RU', {
   day: '2-digit',
@@ -66,7 +66,9 @@ export default function ProfileOverviewTab({
         <div className="profile-skin-card">
           <div className="profile-section-head">
             <span className="ui-section-title">Текущий скин</span>
-            <button className="btn btn-sm" type="button" onClick={() => setActiveTab('settings')}>Изменить</button>
+            <button className="btn btn-sm" type="button" onClick={() => setActiveTab('settings')}>
+              Изменить
+            </button>
           </div>
           <div className="profile-skin-preview">
             {!skinFailed ? (
@@ -86,10 +88,24 @@ export default function ProfileOverviewTab({
         </div>
 
         <dl className="profile-kv">
-          {data.squad ? <div><dt>Состоит в скваде</dt><dd>{data.squad.name}</dd></div> : null}
-          <div><dt>Последний вход</dt><dd>{formatDateTime(data.user.lastLoginAt)}</dd></div>
-          <div><dt>Создан</dt><dd>{formatDate(data.user.createdAt)}</dd></div>
-          <div><dt>Discord ID</dt><dd>{data.user.discordId}</dd></div>
+          {data.squad ? (
+            <div>
+              <dt>Состоит в скваде</dt>
+              <dd>{data.squad.name}</dd>
+            </div>
+          ) : null}
+          <div>
+            <dt>Последний вход</dt>
+            <dd>{formatDateTime(data.user.lastLoginAt)}</dd>
+          </div>
+          <div>
+            <dt>Создан</dt>
+            <dd>{formatDate(data.user.createdAt)}</dd>
+          </div>
+          <div>
+            <dt>Discord ID</dt>
+            <dd>{data.user.discordId}</dd>
+          </div>
         </dl>
       </aside>
 
@@ -101,7 +117,11 @@ export default function ProfileOverviewTab({
           <div className="profile-stack">
             <div className="profile-inline-card">
               <strong>Статус профиля</strong>
-              <span className="profile-subtle">{data.user.isActive ? 'Аккаунт активен и готов к использованию' : 'Аккаунт временно недоступен'}</span>
+              <span className="profile-subtle">
+                {data.user.isActive
+                  ? 'Аккаунт активен и готов к использованию'
+                  : 'Аккаунт временно недоступен'}
+              </span>
             </div>
             <div className="profile-inline-card">
               <strong>Никнейм</strong>
@@ -109,7 +129,9 @@ export default function ProfileOverviewTab({
             </div>
             <div className="profile-inline-card">
               <strong>Скин</strong>
-              <span className="profile-subtle">{skinFailed ? 'Скин не загружен' : 'Скин загружен и отображается'}</span>
+              <span className="profile-subtle">
+                {skinFailed ? 'Скин не загружен' : 'Скин загружен и отображается'}
+              </span>
             </div>
           </div>
         </section>
@@ -117,16 +139,21 @@ export default function ProfileOverviewTab({
         <section className="card profile-panel">
           <div className="ui-card-header">
             <h2 className="card-title">Сквад</h2>
+            <button className="btn btn-sm" type="button" onClick={() => setActiveTab('squads')}>
+              {data.squad ? 'Открыть страницу сквада' : 'Перейти к сквадам'}
+            </button>
           </div>
           {data.squad ? (
             <div className="profile-stack">
               <strong>{data.squad.name}</strong>
-              <span className="profile-subtle">Подробная информация, состав и приглашения доступны во вкладке сквада.</span>
+              <span className="profile-subtle">
+                Подробная информация, состав и приглашения доступны во вкладке сквада.
+              </span>
             </div>
           ) : (
             <div className="profile-empty">
               <span className="ui-badge ui-badge-neutral">Нет сквада</span>
-              <p>Если вы вступите в команду, здесь появится только краткая ссылка на нее.</p>
+              <p>Во вкладке сквадов можно создать команду, принять приглашение или посмотреть доступные действия.</p>
             </div>
           )}
         </section>
