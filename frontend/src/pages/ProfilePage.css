@@ -218,6 +218,9 @@
   margin: 0;
   color: var(--ui-text);
   font-size: 1.5rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .profile-identity-head .profile-chip-row {
@@ -482,6 +485,263 @@
 .profile-invite-card strong {
   min-width: 0;
   overflow-wrap: anywhere;
+}
+
+.profile-invite-card__content {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.profile-invite-card .profile-actions {
+  margin-left: auto;
+  justify-content: flex-end;
+  align-items: stretch;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+.profile-squad-head-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.75rem;
+}
+
+.profile-squad-head-row--overview {
+  min-width: 0;
+}
+
+.profile-squad-name-block {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.profile-squad-name-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.profile-squad-name-inline {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  display: block;
+  color: var(--ui-text);
+  font-weight: 700;
+  font-size: 1rem;
+  line-height: 1.2;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.profile-icon-button {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid var(--ui-border);
+  background: rgba(0, 0, 0, 0.28);
+  color: #f7a41d;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+.profile-icon-button:hover:not(:disabled),
+.profile-icon-button:focus-visible {
+  border-color: rgba(247, 164, 29, 0.45);
+  background: rgba(247, 164, 29, 0.08);
+}
+
+.profile-icon-button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.profile-icon-button svg {
+  width: 16px;
+  height: 16px;
+}
+
+.profile-squad-avatar-image {
+  width: 100%;
+  max-width: 96px;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border: 1px solid var(--ui-border);
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.profile-squad-avatar-image--overview {
+  flex: 0 0 84px;
+  max-width: 84px;
+}
+
+.profile-squad-avatar-tile {
+  position: relative;
+  width: 96px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  display: flex;
+  flex: 0 0 96px;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0;
+  text-align: center;
+}
+
+.profile-squad-avatar-tile.is-clickable {
+  cursor: pointer;
+}
+
+.profile-squad-avatar-input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.profile-squad-avatar-input:disabled {
+  cursor: progress;
+}
+
+.profile-squad-avatar-tile.is-clickable:hover .profile-squad-avatar-image,
+.profile-squad-avatar-tile.is-clickable:hover .profile-squad-avatar-placeholder,
+.profile-squad-avatar-tile.is-drag-active .profile-squad-avatar-image,
+.profile-squad-avatar-tile.is-drag-active .profile-squad-avatar-placeholder {
+  border-color: rgba(247, 164, 29, 0.45);
+  background: rgba(247, 164, 29, 0.06);
+}
+
+.profile-squad-avatar-tile.is-clickable:focus-within {
+  outline: 1px solid rgba(247, 164, 29, 0.45);
+  outline-offset: 2px;
+}
+
+.profile-squad-avatar-tile.is-drag-active {
+  outline: 1px solid rgba(247, 164, 29, 0.65);
+  outline-offset: 2px;
+}
+
+.profile-squad-avatar-tile.is-readonly,
+.profile-squad-avatar-tile[aria-disabled='true'] {
+  cursor: not-allowed;
+}
+
+.profile-squad-avatar-tile.is-readonly .profile-squad-avatar-image,
+.profile-squad-avatar-tile.is-readonly .profile-squad-avatar-placeholder,
+.profile-squad-avatar-tile[aria-disabled='true'] .profile-squad-avatar-image,
+.profile-squad-avatar-tile[aria-disabled='true'] .profile-squad-avatar-placeholder {
+  filter: grayscale(0.2) brightness(0.72);
+}
+
+.profile-squad-avatar-tile.is-readonly .profile-squad-avatar-tooltip,
+.profile-squad-avatar-tile[aria-disabled='true'] .profile-squad-avatar-tooltip,
+.profile-squad-avatar-tile.is-readonly .profile-squad-avatar-placeholder-copy {
+  color: rgba(247, 164, 29, 0.7);
+}
+
+.profile-squad-head-row .profile-squad-name-inline {
+  font-size: 1.4rem;
+  line-height: 1.2;
+}
+
+.profile-squad-head-row .profile-squad-avatar-placeholder svg {
+  width: 22px;
+  height: 22px;
+}
+
+.profile-squad-avatar-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  width: 100%;
+  max-width: 96px;
+  aspect-ratio: 1 / 1;
+  border: 1px solid var(--ui-border);
+  background: rgba(0, 0, 0, 0.35);
+  padding: 0.45rem;
+}
+
+.profile-squad-avatar-placeholder svg {
+  width: 28px;
+  height: 28px;
+  color: #f7a41d;
+  opacity: 0.85;
+}
+
+.profile-squad-avatar-placeholder-copy,
+.profile-squad-avatar-tooltip {
+  color: #f7a41d;
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-align: center;
+  line-height: 1.2;
+}
+
+.profile-squad-avatar-tooltip {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 0.4rem);
+  z-index: 1;
+  width: max-content;
+  max-width: 160px;
+  padding: 0.3rem 0.45rem;
+  border: 1px solid rgba(247, 164, 29, 0.45);
+  background: rgba(12, 8, 2, 0.95);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.28);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 0.2rem);
+  transition:
+    opacity 140ms ease,
+    transform 140ms ease;
+}
+
+.profile-squad-avatar-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem;
+  border: 1px dashed rgba(247, 164, 29, 0.75);
+  background: rgba(12, 8, 2, 0.78);
+  color: #f7a41d;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 140ms ease;
+}
+
+.profile-squad-avatar-tile:hover .profile-squad-avatar-tooltip,
+.profile-squad-avatar-tile:focus-within .profile-squad-avatar-tooltip {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.profile-squad-avatar-tile.is-drag-active .profile-squad-avatar-tooltip {
+  opacity: 0;
+}
+
+.profile-squad-avatar-tile.is-drag-active .profile-squad-avatar-overlay {
+  opacity: 1;
 }
 
 .profile-squad-stage {

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import toast from 'react-hot-toast'
 import {
   acceptSquadInvite,
@@ -11,6 +12,7 @@ import {
   patchSquad,
   revokeSquadInvite,
   searchUsers,
+  uploadSquadImage,
   type SquadInviteResponse,
   type UserSearchItemResponse,
 } from '../../api/profile'
@@ -66,6 +68,23 @@ function renderUserAvatar(user: { username: string; avatarUrl?: string | null })
   )
 }
 
+function sanitizeSquadName(value: string) {
+  return value.replace(/[^A-Za-zА-Яа-яЁё-]/g, '')
+}
+
+function getModalPortalTarget() {
+  if (typeof document === 'undefined') return null
+  return document.querySelector('.ui-kit-page.app-shell')
+}
+
+function hasInvalidSquadNameBoundary(value: string) {
+  return value.startsWith('-') || value.endsWith('-')
+}
+
+function isInvalidSquadNameLength(value: string) {
+  return value.length < 4 || value.length > 16
+}
+
 function useUserSearch(authToken: string | null, query: string) {
   const [items, setItems] = useState<UserSearchItemResponse[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -113,16 +132,255 @@ function useUserSearch(authToken: string | null, query: string) {
   return { items, isLoading, error }
 }
 
-function SquadInfoCard({ data, isLeader }: { data: ProfileDashboardData; isLeader: boolean }) {
+function SquadInfoCard({
+  data,
+  isLeader,
+  authToken,
+  onChanged,
+}: {
+  data: ProfileDashboardData
+  isLeader: boolean
+  authToken: string
+  onChanged: () => Promise<void>
+}) {
+  const [isUploadingImage, setIsUploadingImage] = useState(false)
+  const [isDragActive, setIsDragActive] = useState(false)
+  const [nameDraft, setNameDraft] = useState(data.squad?.name ?? '')
+  const [hasInvalidNameInput, setHasInvalidNameInput] = useState(false)
+  const [isEditingName, setIsEditingName] = useState(false)
+  const [isSavingName, setIsSavingName] = useState(false)
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
+  const [isDeletingSquad, setIsDeletingSquad] = useState(false)
+  const squadImageUrl = data.squad?.imageUrl ? `${data.squad.imageUrl}?v=${encodeURIComponent(data.squad.updatedAt)}` : null
+  const isAvatarUploadDisabled = !isLeader || isUploadingImage
+  const squadAvatarInputId = `squad-avatar-upload-${data.squad?.id ?? 'current'}`
+  const avatarActionLabel = isUploadingImage
+    ? 'Загрузка...'
+    : isLeader
+      ? 'Аватар до 1024x1024 и 2 МБ'
+      : 'Недоступно: только лидер'
+
+  useEffect(() => {
+    setNameDraft(data.squad?.name ?? '')
+    setHasInvalidNameInput(false)
+  }, [data.squad?.name])
+
+  const onNameDraftChange = (value: string) => {
+    const sanitizedValue = sanitizeSquadName(value)
+    setHasInvalidNameInput(sanitizedValue !== value || hasInvalidSquadNameBoundary(sanitizedValue))
+    setNameDraft(sanitizedValue)
+  }
+
+  const onImageSelected = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file || !data.squad) return
+
+    setIsUploadingImage(true)
+    const request = uploadSquadImage(authToken, data.squad.id, file)
+    toast.promise(request, {
+      loading: 'Загружаем аватар сквада...',
+      success: 'Аватар сквада обновлен.',
+      error: (cause) => toDisplayError(cause, 'Не удалось загрузить аватар сквада.'),
+    })
+
+    try {
+      await request
+      await onChanged()
+    } finally {
+      setIsUploadingImage(false)
+      setIsDragActive(false)
+      event.target.value = ''
+    }
+  }
+
+  const onSaveName = async () => {
+    if (!data.squad) return
+    const trimmed = nameDraft.trim()
+    if (hasInvalidSquadNameBoundary(trimmed)) {
+      setHasInvalidNameInput(true)
+      return
+    }
+    if (isInvalidSquadNameLength(trimmed)) {
+      setHasInvalidNameInput(true)
+      return
+    }
+    if (!trimmed || trimmed === data.squad.name) {
+      setIsEditingName(false)
+      setNameDraft(data.squad.name)
+      return
+    }
+
+    setIsSavingName(true)
+    const request = patchSquad(authToken, data.squad.id, trimmed)
+    toast.promise(request, {
+      loading: 'Сохраняем сквад...',
+      success: 'Настройки сквада обновлены.',
+      error: (cause) => toDisplayError(cause, 'Не удалось обновить сквад.'),
+    })
+
+    try {
+      await request
+      await onChanged()
+      setIsEditingName(false)
+    } finally {
+      setIsSavingName(false)
+    }
+  }
+
+  const onCancelNameEdit = () => {
+    setNameDraft(data.squad?.name ?? '')
+    setHasInvalidNameInput(false)
+    setIsEditingName(false)
+  }
+
+  const onDeleteSquad = async () => {
+    if (!data.squad) return
+
+    setIsDeletingSquad(true)
+    const request = deleteSquad(authToken, data.squad.id)
+    toast.promise(request, {
+      loading: 'Распускаем сквад...',
+      success: 'Сквад удален.',
+      error: (cause) => toDisplayError(cause, 'Не удалось удалить сквад.'),
+    })
+
+    try {
+      await request
+      setIsDeleteModalOpen(false)
+      await onChanged()
+    } finally {
+      setIsDeletingSquad(false)
+    }
+  }
+
   return (
     <section className="card profile-panel">
       <div className="ui-card-header">
         <h2 className="card-title">{isLeader ? 'Настройки сквада' : 'Информация о скваде'}</h2>
       </div>
       <div className="profile-stack">
-        <div className="profile-inline-card">
-          <strong>Название</strong>
-          <span className="profile-subtle">{data.squad?.name ?? 'Нет данных'}</span>
+        <div className="profile-squad-head-row">
+          {isLeader ? (
+            <label
+              className={`profile-squad-avatar-tile is-clickable ${isDragActive ? 'is-drag-active' : ''}`}
+              aria-disabled={isAvatarUploadDisabled}
+              aria-label={avatarActionLabel}
+              htmlFor={squadAvatarInputId}
+              onDragEnter={(event) => {
+                if (!event.dataTransfer.types.includes('Files')) return
+                setIsDragActive(true)
+              }}
+              onDragOver={(event) => {
+                if (!event.dataTransfer.types.includes('Files')) return
+                event.preventDefault()
+                event.dataTransfer.dropEffect = 'copy'
+                if (!isDragActive) setIsDragActive(true)
+              }}
+              onDragLeave={(event) => {
+                const nextTarget = event.relatedTarget
+                if (nextTarget instanceof Node && event.currentTarget.contains(nextTarget)) return
+                setIsDragActive(false)
+              }}
+              onDrop={() => {
+                setIsDragActive(false)
+              }}
+            >
+              {squadImageUrl ? (
+                <img className="profile-squad-avatar-image" src={squadImageUrl} alt={`Аватар сквада ${data.squad?.name ?? ''}`} />
+              ) : (
+                <span className="profile-squad-avatar-placeholder" aria-hidden>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+                    <polyline points="17 8 12 3 7 8" />
+                    <line x1="12" y1="3" x2="12" y2="15" />
+                  </svg>
+                  <span className="profile-squad-avatar-placeholder-copy">До 1024x1024, до 2 МБ</span>
+                </span>
+              )}
+              <span className="profile-squad-avatar-tooltip" role="tooltip">
+                {avatarActionLabel}
+              </span>
+              <span className="profile-squad-avatar-overlay" aria-hidden>
+                Отпустите файл
+              </span>
+              <input
+                id={squadAvatarInputId}
+                className="profile-squad-avatar-input"
+                type="file"
+                accept="image/*"
+                disabled={isUploadingImage}
+                onChange={(event) => void onImageSelected(event)}
+              />
+            </label>
+          ) : (
+            <div className="profile-squad-avatar-tile is-readonly" aria-disabled="true" aria-label={avatarActionLabel}>
+              {squadImageUrl ? (
+                <img className="profile-squad-avatar-image" src={squadImageUrl} alt={`Аватар сквада ${data.squad?.name ?? ''}`} />
+              ) : (
+                <span className="profile-squad-avatar-placeholder" aria-hidden>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+                    <polyline points="17 8 12 3 7 8" />
+                    <line x1="12" y1="3" x2="12" y2="15" />
+                  </svg>
+                  <span className="profile-squad-avatar-placeholder-copy">Недоступно</span>
+                </span>
+              )}
+              <span className="profile-squad-avatar-tooltip" role="tooltip">
+                {avatarActionLabel}
+              </span>
+            </div>
+          )}
+          <div className="profile-squad-name-block">
+            {!isEditingName ? (
+              <div className="profile-squad-name-row">
+                <strong className="profile-squad-name-inline">{data.squad?.name ?? 'Нет данных'}</strong>
+                {isLeader ? (
+                  <button
+                    className="profile-icon-button"
+                    type="button"
+                    aria-label="Изменить название сквада"
+                    onClick={() => setIsEditingName(true)}
+                    disabled={isSavingName || isDeletingSquad}
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 20h9" />
+                      <path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4 12.5-12.5z" />
+                    </svg>
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
+            {isLeader && isEditingName ? (
+              <div className="profile-form">
+                <div className={`ui-field ${hasInvalidNameInput ? 'ui-field-error' : ''}`}>
+                  <input
+                    id="squad-name"
+                    className="ui-input"
+                    value={nameDraft}
+                    onChange={(event) => onNameDraftChange(event.target.value)}
+                    placeholder="Введите название сквада"
+                    minLength={4}
+                    maxLength={16}
+                    inputMode="text"
+                    autoComplete="off"
+                    autoFocus
+                  />
+                  <div className={`ui-hint ${hasInvalidNameInput ? 'ui-hint-error' : ''}`}>
+                    Лимиты: 4–16 символов. Разрешены латиница, кириллица и `-`. Имя не может начинаться или заканчиваться на `-`.
+                  </div>
+                </div>
+                <div className="profile-actions">
+                  <button className="btn primary" type="button" disabled={isSavingName} onClick={() => void onSaveName()}>
+                    {isSavingName ? 'Сохранение...' : 'Сохранить'}
+                  </button>
+                  <button className="btn" type="button" disabled={isSavingName} onClick={onCancelNameEdit}>
+                    Отменить
+                  </button>
+                </div>
+              </div>
+            ) : null}
+          </div>
         </div>
         <div className="profile-inline-card">
           <strong>Создан</strong>
@@ -138,7 +396,56 @@ function SquadInfoCard({ data, isLeader }: { data: ProfileDashboardData; isLeade
             {data.squadMembers.find((member) => member.isLeader)?.username ?? 'Нет данных'}
           </span>
         </div>
+        {isLeader ? (
+          <div className="profile-actions">
+            <button className="btn danger" type="button" disabled={isDeletingSquad} onClick={() => setIsDeleteModalOpen(true)}>
+              {isDeletingSquad ? 'Удаление...' : 'Удалить сквад'}
+            </button>
+          </div>
+        ) : null}
       </div>
+      {isLeader && isDeleteModalOpen && getModalPortalTarget()
+        ? createPortal(
+            <div className="ui-modal-backdrop" role="presentation" onClick={() => !isDeletingSquad && setIsDeleteModalOpen(false)}>
+              <div
+                className="ui-modal"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="delete-squad-modal-title"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <div className="ui-modal-header">
+                  <h2 id="delete-squad-modal-title" className="ui-modal-title">
+                    Удалить сквад?
+                  </h2>
+                  <button
+                    className="ui-modal-close"
+                    type="button"
+                    aria-label="Закрыть"
+                    onClick={() => setIsDeleteModalOpen(false)}
+                    disabled={isDeletingSquad}
+                  >
+                    ×
+                  </button>
+                </div>
+                <div className="ui-modal-body">
+                  <p>
+                    Сквад <strong>{data.squad?.name ?? ''}</strong> будет удален без возможности восстановления. Подтвердите действие.
+                  </p>
+                </div>
+                <div className="ui-modal-footer">
+                  <button className="btn" type="button" onClick={() => setIsDeleteModalOpen(false)} disabled={isDeletingSquad}>
+                    Отменить
+                  </button>
+                  <button className="btn danger" type="button" onClick={() => void onDeleteSquad()} disabled={isDeletingSquad}>
+                    {isDeletingSquad ? 'Удаление...' : 'Удалить'}
+                  </button>
+                </div>
+              </div>
+            </div>,
+            getModalPortalTarget()!,
+          )
+        : null}
     </section>
   )
 }
@@ -155,6 +462,11 @@ function SquadMembersCard({
   onChanged: () => Promise<void>
 }) {
   const [processingMemberId, setProcessingMemberId] = useState<string | null>(null)
+  const orderedMembers = useMemo(() => {
+    const leader = data.squadMembers.find((member) => member.isLeader)
+    if (!leader) return data.squadMembers
+    return [leader, ...data.squadMembers.filter((member) => member.id !== leader.id)]
+  }, [data.squadMembers])
 
   const onKick = async (userId: string) => {
     if (!data.squad) return
@@ -182,7 +494,7 @@ function SquadMembersCard({
         <span className="ui-badge ui-badge-neutral">{data.squadMembers.length} / {data.squad?.maxMembers ?? data.squadConfig.maxMembers}</span>
       </div>
       <div className="profile-member-list">
-        {data.squadMembers.map((member) => (
+        {orderedMembers.map((member) => (
           <div key={member.id} className="profile-member">
             <div className="profile-member-avatar">
               {member.avatarUrl ? <img src={member.avatarUrl} alt={member.username} /> : <span>{initials(member.username)}</span>}
@@ -342,94 +654,6 @@ function LeaderInviteCard({
   )
 }
 
-function LeaderManagementCard({
-  authToken,
-  data,
-  onChanged,
-}: {
-  authToken: string
-  data: ProfileDashboardData
-  onChanged: () => Promise<void>
-}) {
-  const [nameDraft, setNameDraft] = useState(data.squad?.name ?? '')
-  const [isSaving, setIsSaving] = useState(false)
-  const [isDeleting, setIsDeleting] = useState(false)
-
-  useEffect(() => {
-    setNameDraft(data.squad?.name ?? '')
-  }, [data.squad?.name])
-
-  const onSave = async () => {
-    if (!data.squad) return
-    const trimmed = nameDraft.trim()
-    if (!trimmed || trimmed === data.squad.name) return
-
-    setIsSaving(true)
-    const request = patchSquad(authToken, data.squad.id, trimmed)
-    toast.promise(request, {
-      loading: 'Сохраняем сквад...',
-      success: 'Настройки сквада обновлены.',
-      error: (cause) => toDisplayError(cause, 'Не удалось обновить сквад.'),
-    })
-
-    try {
-      await request
-      await onChanged()
-    } finally {
-      setIsSaving(false)
-    }
-  }
-
-  const onDelete = async () => {
-    if (!data.squad) return
-    setIsDeleting(true)
-    const request = deleteSquad(authToken, data.squad.id)
-    toast.promise(request, {
-      loading: 'Распускаем сквад...',
-      success: 'Сквад удален.',
-      error: (cause) => toDisplayError(cause, 'Не удалось удалить сквад.'),
-    })
-
-    try {
-      await request
-      await onChanged()
-    } finally {
-      setIsDeleting(false)
-    }
-  }
-
-  return (
-    <section className="card profile-panel">
-      <div className="ui-card-header">
-        <h2 className="card-title">Управление сквадом</h2>
-      </div>
-      <div className="profile-form">
-        <div className="ui-field">
-          <label className="ui-label" htmlFor="squad-name">Название</label>
-          <input
-            id="squad-name"
-            className="ui-input"
-            value={nameDraft}
-            onChange={(event) => setNameDraft(event.target.value)}
-            placeholder="Введите название сквада"
-          />
-          <div className="ui-hint">
-            Лимиты: {data.squadConfig.nameMinChars}–{data.squadConfig.nameMaxChars} символов.
-          </div>
-        </div>
-        <div className="profile-actions">
-          <button className="btn primary" type="button" disabled={isSaving} onClick={() => void onSave()}>
-            {isSaving ? 'Сохранение...' : 'Сохранить название'}
-          </button>
-          <button className="btn danger" type="button" disabled={isDeleting} onClick={() => void onDelete()}>
-            {isDeleting ? 'Удаление...' : 'Удалить сквад'}
-          </button>
-        </div>
-      </div>
-    </section>
-  )
-}
-
 function MemberActionsCard({
   authToken,
   squadId,
@@ -482,11 +706,26 @@ function NoSquadState({
   onChanged: () => Promise<void>
 }) {
   const [nameDraft, setNameDraft] = useState('')
+  const [hasInvalidNameInput, setHasInvalidNameInput] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
   const [processingInviteId, setProcessingInviteId] = useState<string | null>(null)
 
+  const onNameDraftChange = (value: string) => {
+    const sanitizedValue = sanitizeSquadName(value)
+    setHasInvalidNameInput(sanitizedValue !== value || hasInvalidSquadNameBoundary(sanitizedValue))
+    setNameDraft(sanitizedValue)
+  }
+
   const onCreate = async () => {
     const trimmed = nameDraft.trim()
+    if (hasInvalidSquadNameBoundary(trimmed)) {
+      setHasInvalidNameInput(true)
+      return
+    }
+    if (isInvalidSquadNameLength(trimmed)) {
+      setHasInvalidNameInput(true)
+      return
+    }
     if (!trimmed) return
 
     setIsCreating(true)
@@ -500,6 +739,7 @@ function NoSquadState({
     try {
       await request
       setNameDraft('')
+      setHasInvalidNameInput(false)
       await onChanged()
     } finally {
       setIsCreating(false)
@@ -547,17 +787,21 @@ function NoSquadState({
           <h2 className="card-title">Создать сквад</h2>
         </div>
         <div className="profile-form">
-          <div className="ui-field">
+          <div className={`ui-field ${hasInvalidNameInput ? 'ui-field-error' : ''}`}>
             <label className="ui-label" htmlFor="create-squad-name">Название</label>
             <input
               id="create-squad-name"
               className="ui-input"
               value={nameDraft}
-              onChange={(event) => setNameDraft(event.target.value)}
+              onChange={(event) => onNameDraftChange(event.target.value)}
               placeholder="Введите название сквада"
+              minLength={4}
+              maxLength={16}
+              inputMode="text"
+              autoComplete="off"
             />
-            <div className="ui-hint">
-              Лимиты: {data.squadConfig.nameMinChars}–{data.squadConfig.nameMaxChars} символов, инвайт действует {data.squadConfig.inviteTtlHours} часа.
+            <div className={`ui-hint ${hasInvalidNameInput ? 'ui-hint-error' : ''}`}>
+              Лимиты: 4–16 символов. Разрешены латиница, кириллица и `-`. Имя не может начинаться или заканчиваться на `-`. Инвайт действует {data.squadConfig.inviteTtlHours} часа.
             </div>
           </div>
           <div className="profile-actions">
@@ -577,7 +821,7 @@ function NoSquadState({
           <div className="profile-stack">
             {data.squadInvites.map((invite) => (
               <div key={invite.id} className="profile-invite-card">
-                <div className="profile-stack">
+                <div className="profile-stack profile-invite-card__content">
                   <strong>{invite.squadName}</strong>
                   <span className="profile-subtle">Истекает {formatDateTime(invite.expiresAt)}</span>
                 </div>
@@ -681,8 +925,7 @@ export default function ProfileSquadsTab({
       <div className={`profile-squad-stage ${stageClass}`}>
         <div className="profile-split">
           <div className="profile-stack">
-            <SquadInfoCard data={displayData} isLeader />
-            <LeaderManagementCard authToken={authToken} data={displayData} onChanged={onChanged} />
+            <SquadInfoCard data={displayData} isLeader authToken={authToken} onChanged={onChanged} />
             <LeaderInviteCard authToken={authToken} data={displayData} onChanged={onChanged} />
           </div>
           <SquadMembersCard data={displayData} isLeader authToken={authToken} onChanged={onChanged} />
@@ -695,7 +938,7 @@ export default function ProfileSquadsTab({
     <div className={`profile-squad-stage ${stageClass}`}>
       <div className="profile-split">
         <div className="profile-stack">
-          <SquadInfoCard data={displayData} isLeader={false} />
+          <SquadInfoCard data={displayData} isLeader={false} authToken={authToken} onChanged={onChanged} />
           <MemberActionsCard authToken={authToken} squadId={displayData.squad.id} onChanged={onChanged} />
         </div>
         <SquadMembersCard data={displayData} isLeader={false} authToken={authToken} onChanged={onChanged} />

@@ -76,6 +76,9 @@ export default function ProfilePage() {
     <div className="ui-kit-page profile-page">
       <Toaster
         position="top-right"
+        containerStyle={{
+          zIndex: 1000,
+        }}
         toastOptions={{
           duration: 3000,
           style: {
