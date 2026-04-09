@@ -279,10 +279,20 @@ fn generate_plaintext_token() -> String {
 
 fn parse_plaintext_token(token: &str) -> Result<(&str, &str)> {
     let mut parts = token.split('_');
-    let kind = parts.next().ok_or_else(|| anyhow!("Invalid service token"))?;
-    let prefix = parts.next().ok_or_else(|| anyhow!("Invalid service token"))?;
-    let secret = parts.next().ok_or_else(|| anyhow!("Invalid service token"))?;
-    if kind != "svcs" || prefix.len() != TOKEN_PREFIX_LEN || secret.trim().is_empty() || parts.next().is_some() {
+    let kind = parts
+        .next()
+        .ok_or_else(|| anyhow!("Invalid service token"))?;
+    let prefix = parts
+        .next()
+        .ok_or_else(|| anyhow!("Invalid service token"))?;
+    let secret = parts
+        .next()
+        .ok_or_else(|| anyhow!("Invalid service token"))?;
+    if kind != "svcs"
+        || prefix.len() != TOKEN_PREFIX_LEN
+        || secret.trim().is_empty()
+        || parts.next().is_some()
+    {
         bail!("Invalid service token");
     }
     Ok((prefix, secret))

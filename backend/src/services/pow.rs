@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use sha2::{Sha256, Digest};
+use sha2::{Digest, Sha256};
 
 pub fn generate_pow_prefix() -> String {
     use rand::Rng;

@@ -1,8 +1,8 @@
 pub mod handlers;
 pub mod types;
 
-use axum::routing::{get, post};
 use axum::Router;
+use axum::routing::{get, post};
 
 pub fn router() -> Router<crate::app::state::SharedAppState> {
     Router::new()

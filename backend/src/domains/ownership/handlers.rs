@@ -1,12 +1,12 @@
+use axum::Json;
 use axum::extract::{Path, Query, State};
 use axum::http::HeaderMap;
-use axum::Json;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 
-use crate::app::auth::{get_user_from_headers, require_privileged_actor, PrivilegedActor};
+use crate::app::auth::{PrivilegedActor, get_user_from_headers, require_privileged_actor};
 use crate::app::http::{HttpError, HttpResult};
 use crate::app::state::AppStateExtractor;
 use crate::services::audit::{
@@ -18,15 +18,16 @@ use crate::services::audit::{
     ACTION_ADMIN_WALLET_ADJUSTED, ACTION_ADMIN_WALLET_CREDITED, ACTION_ADMIN_WALLET_DEBITED,
     write_audit_log,
 };
-use crate::services::ownership::{catalog, inventory, wallet};
 use crate::services::ownership::catalog::{
     AssetDefinitionQuery, CreateAssetDefinitionInput, UpdateAssetDefinitionInput,
 };
 use crate::services::ownership::inventory::{
     EntitlementMutation, ProlongExpirableMutation, SetExpirationMutation, StackableMutation,
+    SubscriptionMutation, SubscriptionStatus,
 };
 use crate::services::ownership::types::{OperationContext, OwnershipActor};
 use crate::services::ownership::wallet::WalletMutation;
+use crate::services::ownership::{catalog, inventory, wallet};
 
 #[derive(Debug, Deserialize, IntoParams, ToSchema)]
 pub struct AssetListQuery {
@@ -250,6 +251,13 @@ pub struct WalletTransactionResponse {
     pub metadata: Value,
     #[schema(rename = "createdAt")]
     pub created_at: chrono::DateTime<chrono::Utc>,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct SubscriptionStatusResponse {
+    #[schema(rename = "userId")]
+    pub user_id: String,
+    pub status: String,
 }
 
 #[derive(Serialize, ToSchema)]
@@ -524,7 +532,9 @@ pub async fn get_my_stackables(
     let items = inventory::get_stackables(&state.db, user.id)
         .await
         .map_err(map_domain_error)?;
-    Ok(Json(Value::Array(items.into_iter().map(stackable_json).collect())))
+    Ok(Json(Value::Array(
+        items.into_iter().map(stackable_json).collect(),
+    )))
 }
 
 #[utoipa::path(
@@ -547,7 +557,9 @@ pub async fn get_my_entitlements(
     let items = inventory::get_entitlements(&state.db, user.id)
         .await
         .map_err(map_domain_error)?;
-    Ok(Json(Value::Array(items.into_iter().map(entitlement_json).collect())))
+    Ok(Json(Value::Array(
+        items.into_iter().map(entitlement_json).collect(),
+    )))
 }
 
 #[utoipa::path(
@@ -570,7 +582,32 @@ pub async fn get_my_active_expirables(
     let items = inventory::get_active_expirables(&state.db, user.id)
         .await
         .map_err(map_domain_error)?;
-    Ok(Json(Value::Array(items.into_iter().map(expirable_json).collect())))
+    Ok(Json(Value::Array(
+        items.into_iter().map(expirable_json).collect(),
+    )))
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/user/me/subscription/status",
+    responses(
+        (status = 200, description = "Get effective subscription tier for current user. Returns only `none`, `plus`, or `pro`. If the underlying state is inconsistent and both subscriptions are active, `pro` wins in the response.", body = SubscriptionStatusResponse),
+        (status = 401, description = "Missing bearer token."),
+        (status = 403, description = "Token invalid or user inactive.")
+    ),
+    security(("bearer_auth" = [])),
+    tag = "ownership"
+)]
+pub async fn get_my_subscription_status(
+    State(state): AppStateExtractor,
+    headers: HeaderMap,
+) -> HttpResult<Json<Value>> {
+    let state = state.read().await;
+    let user = get_user_from_headers(&headers, &state).await?;
+    let status = inventory::get_subscription_status(&state.db, user.id)
+        .await
+        .map_err(map_domain_error)?;
+    Ok(Json(subscription_status_json(status)))
 }
 
 #[utoipa::path(
@@ -593,7 +630,33 @@ pub async fn get_my_wallet(
     let wallet = wallet::get_wallet(&state.db, user.id)
         .await
         .map_err(map_domain_error)?;
-    Ok(Json(Value::Array(wallet.into_iter().map(wallet_balance_json).collect())))
+    Ok(Json(Value::Array(
+        wallet.into_iter().map(wallet_balance_json).collect(),
+    )))
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/user/me/wallet/default",
+    responses(
+        (status = 200, description = "Get current user's balance for the default currency (`coin_default`). Missing balance returns `0` if the system asset exists.", body = WalletBalanceResponse),
+        (status = 401, description = "Missing bearer token."),
+        (status = 403, description = "Token invalid or user inactive."),
+        (status = 404, description = "Default currency asset definition not found.")
+    ),
+    security(("bearer_auth" = [])),
+    tag = "wallet"
+)]
+pub async fn get_my_default_wallet_balance(
+    State(state): AppStateExtractor,
+    headers: HeaderMap,
+) -> HttpResult<Json<Value>> {
+    let state = state.read().await;
+    let user = get_user_from_headers(&headers, &state).await?;
+    let balance = wallet::get_default_wallet_balance(&state.db, user.id)
+        .await
+        .map_err(map_domain_error)?;
+    Ok(Json(wallet_balance_json(balance)))
 }
 
 #[utoipa::path(
@@ -651,7 +714,9 @@ pub async fn get_my_wallet_transactions(
     let txs = wallet::get_wallet_transactions(&state.db, user.id, &currency_key)
         .await
         .map_err(map_domain_error)?;
-    Ok(Json(Value::Array(txs.into_iter().map(wallet_transaction_json).collect())))
+    Ok(Json(Value::Array(
+        txs.into_iter().map(wallet_transaction_json).collect(),
+    )))
 }
 
 #[utoipa::path(
@@ -690,9 +755,13 @@ pub async fn check_user_inventory_presence(
 ) -> HttpResult<Json<Value>> {
     let state = state.read().await;
     require_privileged_actor(&headers, &state).await?;
-    let presence = inventory::check_presence(&state.db, parse_uuid(&user_id, "Invalid user ID")?, &asset_key)
-        .await
-        .map_err(map_domain_error)?;
+    let presence = inventory::check_presence(
+        &state.db,
+        parse_uuid(&user_id, "Invalid user ID")?,
+        &asset_key,
+    )
+    .await
+    .map_err(map_domain_error)?;
     Ok(Json(inventory_presence_json(presence)))
 }
 
@@ -706,7 +775,9 @@ pub async fn get_user_stackables(
     let items = inventory::get_stackables(&state.db, parse_uuid(&user_id, "Invalid user ID")?)
         .await
         .map_err(map_domain_error)?;
-    Ok(Json(Value::Array(items.into_iter().map(stackable_json).collect())))
+    Ok(Json(Value::Array(
+        items.into_iter().map(stackable_json).collect(),
+    )))
 }
 
 pub async fn get_user_entitlements(
@@ -719,7 +790,9 @@ pub async fn get_user_entitlements(
     let items = inventory::get_entitlements(&state.db, parse_uuid(&user_id, "Invalid user ID")?)
         .await
         .map_err(map_domain_error)?;
-    Ok(Json(Value::Array(items.into_iter().map(entitlement_json).collect())))
+    Ok(Json(Value::Array(
+        items.into_iter().map(entitlement_json).collect(),
+    )))
 }
 
 pub async fn get_user_active_expirables(
@@ -729,10 +802,13 @@ pub async fn get_user_active_expirables(
 ) -> HttpResult<Json<Value>> {
     let state = state.read().await;
     require_privileged_actor(&headers, &state).await?;
-    let items = inventory::get_active_expirables(&state.db, parse_uuid(&user_id, "Invalid user ID")?)
-        .await
-        .map_err(map_domain_error)?;
-    Ok(Json(Value::Array(items.into_iter().map(expirable_json).collect())))
+    let items =
+        inventory::get_active_expirables(&state.db, parse_uuid(&user_id, "Invalid user ID")?)
+            .await
+            .map_err(map_domain_error)?;
+    Ok(Json(Value::Array(
+        items.into_iter().map(expirable_json).collect(),
+    )))
 }
 
 #[utoipa::path(
@@ -758,10 +834,13 @@ pub async fn get_user_inventory_history(
 ) -> HttpResult<Json<Value>> {
     let state = state.read().await;
     require_privileged_actor(&headers, &state).await?;
-    let items = inventory::get_inventory_history(&state.db, parse_uuid(&user_id, "Invalid user ID")?)
-        .await
-        .map_err(map_domain_error)?;
-    Ok(Json(Value::Array(items.into_iter().map(inventory_operation_json).collect())))
+    let items =
+        inventory::get_inventory_history(&state.db, parse_uuid(&user_id, "Invalid user ID")?)
+            .await
+            .map_err(map_domain_error)?;
+    Ok(Json(Value::Array(
+        items.into_iter().map(inventory_operation_json).collect(),
+    )))
 }
 
 #[utoipa::path(
@@ -865,7 +944,10 @@ pub async fn revoke_entitlement(
         actor.actor_user_id(),
         Some(parsed_user_id),
         body.reason_text.clone(),
-        Some(with_actor_metadata(json!({ "assetKey": asset_key }), &actor)),
+        Some(with_actor_metadata(
+            json!({ "assetKey": asset_key }),
+            &actor,
+        )),
     )
     .await
     .map_err(|error| HttpError::internal_error(format!("Failed to write audit log: {error}")))?;
@@ -907,7 +989,9 @@ pub async fn add_stackable(
         StackableMutation {
             user_id: parsed_user_id,
             asset_key,
-            amount: body.amount.ok_or_else(|| HttpError::bad_request("amount is required"))?,
+            amount: body
+                .amount
+                .ok_or_else(|| HttpError::bad_request("amount is required"))?,
             actor: ownership_actor_from_privileged(&actor),
             context: context_from_body(&body),
         },
@@ -962,7 +1046,9 @@ pub async fn remove_stackable(
         StackableMutation {
             user_id: parsed_user_id,
             asset_key,
-            amount: body.amount.ok_or_else(|| HttpError::bad_request("amount is required"))?,
+            amount: body
+                .amount
+                .ok_or_else(|| HttpError::bad_request("amount is required"))?,
             actor: ownership_actor_from_privileged(&actor),
             context: context_from_body(&body),
         },
@@ -1016,7 +1102,9 @@ pub async fn set_stackable(
         StackableMutation {
             user_id: parsed_user_id,
             asset_key,
-            amount: body.amount.ok_or_else(|| HttpError::bad_request("amount is required"))?,
+            amount: body
+                .amount
+                .ok_or_else(|| HttpError::bad_request("amount is required"))?,
             actor: ownership_actor_from_privileged(&actor),
             context: context_from_body(&body),
         },
@@ -1070,7 +1158,9 @@ pub async fn prolong_expirable(
         ProlongExpirableMutation {
             user_id: parsed_user_id,
             asset_key,
-            duration_seconds: body.duration_seconds.ok_or_else(|| HttpError::bad_request("durationSeconds is required"))?,
+            duration_seconds: body
+                .duration_seconds
+                .ok_or_else(|| HttpError::bad_request("durationSeconds is required"))?,
             actor: ownership_actor_from_privileged(&actor),
             context: context_from_body(&body),
         },
@@ -1124,7 +1214,9 @@ pub async fn set_expiration(
         SetExpirationMutation {
             user_id: parsed_user_id,
             asset_key,
-            expires_at: body.expires_at.ok_or_else(|| HttpError::bad_request("expiresAt is required"))?,
+            expires_at: body
+                .expires_at
+                .ok_or_else(|| HttpError::bad_request("expiresAt is required"))?,
             actor: ownership_actor_from_privileged(&actor),
             context: context_from_body(&body),
         },
@@ -1190,11 +1282,152 @@ pub async fn revoke_expirable(
         actor.actor_user_id(),
         Some(parsed_user_id),
         body.reason_text.clone(),
-        Some(with_actor_metadata(json!({ "assetKey": asset_key }), &actor)),
+        Some(with_actor_metadata(
+            json!({ "assetKey": asset_key }),
+            &actor,
+        )),
     )
     .await
     .map_err(|error| HttpError::internal_error(format!("Failed to write audit log: {error}")))?;
     Ok(Json(json!({ "ok": true })))
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/admin/users/{user_id}/subscription/status",
+    params(
+        ("user_id" = String, Path, description = "Target user UUID.")
+    ),
+    responses(
+        (status = 200, description = "Get effective subscription tier for a target user. Returns only `none`, `plus`, or `pro`. If raw state contains both active subscriptions, the result is still `pro`.", body = SubscriptionStatusResponse),
+        (status = 400, description = "Invalid user ID."),
+        (status = 401, description = "Missing bearer token."),
+        (status = 403, description = "Superuser permissions required."),
+        (status = 404, description = "User not found.")
+    ),
+    security(("bearer_auth" = [])),
+    tag = "ownership-admin"
+)]
+pub async fn get_user_subscription_status(
+    State(state): AppStateExtractor,
+    headers: HeaderMap,
+    Path(user_id): Path<String>,
+) -> HttpResult<Json<Value>> {
+    let state = state.read().await;
+    require_privileged_actor(&headers, &state).await?;
+    let status =
+        inventory::get_subscription_status(&state.db, parse_uuid(&user_id, "Invalid user ID")?)
+            .await
+            .map_err(map_domain_error)?;
+    Ok(Json(subscription_status_json(status)))
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/admin/users/{user_id}/subscriptions/plus/prolong",
+    params(
+        ("user_id" = String, Path, description = "Target user UUID.")
+    ),
+    request_body(
+        content = MutationBody,
+        description = "Prolong or issue the default Plus subscription. `durationSeconds` must be positive. This convenience endpoint enforces the tier model and refuses to activate Plus while Pro is active."
+    ),
+    responses(
+        (status = 200, description = "Plus subscription prolonged.", body = ExpirableResponse),
+        (status = 400, description = "Invalid input, missing `durationSeconds`, or Pro is already active."),
+        (status = 401, description = "Missing bearer token."),
+        (status = 403, description = "Superuser permissions required."),
+        (status = 404, description = "User not found.")
+    ),
+    security(("bearer_auth" = [])),
+    tag = "ownership-admin"
+)]
+pub async fn prolong_plus_subscription(
+    State(state): AppStateExtractor,
+    headers: HeaderMap,
+    Path(user_id): Path<String>,
+    Json(body): Json<MutationBody>,
+) -> HttpResult<Json<Value>> {
+    let state = state.read().await;
+    let actor = require_privileged_actor(&headers, &state).await?;
+    let parsed_user_id = parse_uuid(&user_id, "Invalid user ID")?;
+    let result = inventory::prolong_plus_subscription(
+        &state.db,
+        SubscriptionMutation {
+            user_id: parsed_user_id,
+            duration_seconds: body
+                .duration_seconds
+                .ok_or_else(|| HttpError::bad_request("durationSeconds is required"))?,
+            actor: ownership_actor_from_privileged(&actor),
+            context: context_from_body(&body),
+        },
+    )
+    .await
+    .map_err(map_domain_error)?;
+    write_admin_audit(
+        &state.db,
+        ACTION_ADMIN_INVENTORY_EXPIRABLE_PROLONGED,
+        &actor,
+        result.asset_key.clone(),
+        parsed_user_id,
+        result.asset_definition_id,
+    )
+    .await?;
+    Ok(Json(expirable_json(result)))
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/admin/users/{user_id}/subscriptions/pro/prolong",
+    params(
+        ("user_id" = String, Path, description = "Target user UUID.")
+    ),
+    request_body(
+        content = MutationBody,
+        description = "Prolong or issue the default Pro subscription. `durationSeconds` must be positive. Unlike the low-level raw inventory endpoint, this convenience endpoint refuses to activate Pro while Plus is still active."
+    ),
+    responses(
+        (status = 200, description = "Pro subscription prolonged.", body = ExpirableResponse),
+        (status = 400, description = "Invalid input, missing `durationSeconds`, or Plus is still active."),
+        (status = 401, description = "Missing bearer token."),
+        (status = 403, description = "Superuser permissions required."),
+        (status = 404, description = "User not found.")
+    ),
+    security(("bearer_auth" = [])),
+    tag = "ownership-admin"
+)]
+pub async fn prolong_pro_subscription(
+    State(state): AppStateExtractor,
+    headers: HeaderMap,
+    Path(user_id): Path<String>,
+    Json(body): Json<MutationBody>,
+) -> HttpResult<Json<Value>> {
+    let state = state.read().await;
+    let actor = require_privileged_actor(&headers, &state).await?;
+    let parsed_user_id = parse_uuid(&user_id, "Invalid user ID")?;
+    let result = inventory::prolong_pro_subscription(
+        &state.db,
+        SubscriptionMutation {
+            user_id: parsed_user_id,
+            duration_seconds: body
+                .duration_seconds
+                .ok_or_else(|| HttpError::bad_request("durationSeconds is required"))?,
+            actor: ownership_actor_from_privileged(&actor),
+            context: context_from_body(&body),
+        },
+    )
+    .await
+    .map_err(map_domain_error)?;
+    write_admin_audit(
+        &state.db,
+        ACTION_ADMIN_INVENTORY_EXPIRABLE_PROLONGED,
+        &actor,
+        result.asset_key.clone(),
+        parsed_user_id,
+        result.asset_definition_id,
+    )
+    .await?;
+    Ok(Json(expirable_json(result)))
 }
 
 pub async fn get_user_wallet(
@@ -1207,7 +1440,205 @@ pub async fn get_user_wallet(
     let items = wallet::get_wallet(&state.db, parse_uuid(&user_id, "Invalid user ID")?)
         .await
         .map_err(map_domain_error)?;
-    Ok(Json(Value::Array(items.into_iter().map(wallet_balance_json).collect())))
+    Ok(Json(Value::Array(
+        items.into_iter().map(wallet_balance_json).collect(),
+    )))
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/admin/users/{user_id}/wallet/default",
+    params(
+        ("user_id" = String, Path, description = "Target user UUID.")
+    ),
+    responses(
+        (status = 200, description = "Get a target user's balance for the default currency (`coin_default`). Missing balance returns `0` if the system asset exists.", body = WalletBalanceResponse),
+        (status = 400, description = "Invalid user ID."),
+        (status = 401, description = "Missing bearer token."),
+        (status = 403, description = "Superuser permissions required."),
+        (status = 404, description = "User or default currency asset not found.")
+    ),
+    security(("bearer_auth" = [])),
+    tag = "wallet-admin"
+)]
+pub async fn get_user_default_wallet_balance(
+    State(state): AppStateExtractor,
+    headers: HeaderMap,
+    Path(user_id): Path<String>,
+) -> HttpResult<Json<Value>> {
+    let state = state.read().await;
+    require_privileged_actor(&headers, &state).await?;
+    let balance =
+        wallet::get_default_wallet_balance(&state.db, parse_uuid(&user_id, "Invalid user ID")?)
+            .await
+            .map_err(map_domain_error)?;
+    Ok(Json(wallet_balance_json(balance)))
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/admin/users/{user_id}/wallet/default/credit",
+    params(
+        ("user_id" = String, Path, description = "Target user UUID.")
+    ),
+    request_body(
+        content = MutationBody,
+        description = "Credit the default currency (`coin_default`). This is a convenience alias over the regular wallet credit flow."
+    ),
+    responses(
+        (status = 200, description = "Default currency credited.", body = WalletBalanceResponse),
+        (status = 400, description = "Invalid input, missing `amount`, non-positive amount, or invalid user ID."),
+        (status = 401, description = "Missing bearer token."),
+        (status = 403, description = "Superuser permissions required."),
+        (status = 404, description = "User or default currency asset not found.")
+    ),
+    security(("bearer_auth" = [])),
+    tag = "wallet-admin"
+)]
+pub async fn credit_default_wallet(
+    State(state): AppStateExtractor,
+    headers: HeaderMap,
+    Path(user_id): Path<String>,
+    Json(body): Json<MutationBody>,
+) -> HttpResult<Json<Value>> {
+    let state = state.read().await;
+    let actor = require_privileged_actor(&headers, &state).await?;
+    let parsed_user_id = parse_uuid(&user_id, "Invalid user ID")?;
+    let result = wallet::credit_default_wallet(
+        &state.db,
+        WalletMutation {
+            user_id: parsed_user_id,
+            currency_key: String::new(),
+            amount: body
+                .amount
+                .ok_or_else(|| HttpError::bad_request("amount is required"))?,
+            actor: ownership_actor_from_privileged(&actor),
+            context: context_from_body(&body),
+        },
+    )
+    .await
+    .map_err(map_domain_error)?;
+    write_admin_audit(
+        &state.db,
+        ACTION_ADMIN_WALLET_CREDITED,
+        &actor,
+        result.currency_key.clone(),
+        parsed_user_id,
+        result.currency_asset_definition_id,
+    )
+    .await?;
+    Ok(Json(wallet_balance_json(result)))
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/admin/users/{user_id}/wallet/default/debit",
+    params(
+        ("user_id" = String, Path, description = "Target user UUID.")
+    ),
+    request_body(
+        content = MutationBody,
+        description = "Debit the default currency (`coin_default`). Balance cannot become negative."
+    ),
+    responses(
+        (status = 200, description = "Default currency debited.", body = WalletBalanceResponse),
+        (status = 400, description = "Invalid input, missing `amount`, non-positive amount, or invalid user ID."),
+        (status = 401, description = "Missing bearer token."),
+        (status = 403, description = "Superuser permissions required."),
+        (status = 404, description = "User or default currency asset not found."),
+        (status = 422, description = "Insufficient wallet balance.")
+    ),
+    security(("bearer_auth" = [])),
+    tag = "wallet-admin"
+)]
+pub async fn debit_default_wallet(
+    State(state): AppStateExtractor,
+    headers: HeaderMap,
+    Path(user_id): Path<String>,
+    Json(body): Json<MutationBody>,
+) -> HttpResult<Json<Value>> {
+    let state = state.read().await;
+    let actor = require_privileged_actor(&headers, &state).await?;
+    let parsed_user_id = parse_uuid(&user_id, "Invalid user ID")?;
+    let result = wallet::debit_default_wallet(
+        &state.db,
+        WalletMutation {
+            user_id: parsed_user_id,
+            currency_key: String::new(),
+            amount: body
+                .amount
+                .ok_or_else(|| HttpError::bad_request("amount is required"))?,
+            actor: ownership_actor_from_privileged(&actor),
+            context: context_from_body(&body),
+        },
+    )
+    .await
+    .map_err(map_domain_error)?;
+    write_admin_audit(
+        &state.db,
+        ACTION_ADMIN_WALLET_DEBITED,
+        &actor,
+        result.currency_key.clone(),
+        parsed_user_id,
+        result.currency_asset_definition_id,
+    )
+    .await?;
+    Ok(Json(wallet_balance_json(result)))
+}
+
+#[utoipa::path(
+    put,
+    path = "/api/admin/users/{user_id}/wallet/default",
+    params(
+        ("user_id" = String, Path, description = "Target user UUID.")
+    ),
+    request_body(
+        content = MutationBody,
+        description = "Set the exact default currency balance (`coin_default`). `amount` must be non-negative. This is a convenience alias over the regular wallet adjustment flow."
+    ),
+    responses(
+        (status = 200, description = "Default currency balance adjusted.", body = WalletBalanceResponse),
+        (status = 400, description = "Invalid input, missing `amount`, negative target balance, or invalid user ID."),
+        (status = 401, description = "Missing bearer token."),
+        (status = 403, description = "Superuser permissions required."),
+        (status = 404, description = "User or default currency asset not found.")
+    ),
+    security(("bearer_auth" = [])),
+    tag = "wallet-admin"
+)]
+pub async fn adjust_default_wallet_balance(
+    State(state): AppStateExtractor,
+    headers: HeaderMap,
+    Path(user_id): Path<String>,
+    Json(body): Json<MutationBody>,
+) -> HttpResult<Json<Value>> {
+    let state = state.read().await;
+    let actor = require_privileged_actor(&headers, &state).await?;
+    let parsed_user_id = parse_uuid(&user_id, "Invalid user ID")?;
+    let result = wallet::adjust_default_wallet_balance(
+        &state.db,
+        WalletMutation {
+            user_id: parsed_user_id,
+            currency_key: String::new(),
+            amount: body
+                .amount
+                .ok_or_else(|| HttpError::bad_request("amount is required"))?,
+            actor: ownership_actor_from_privileged(&actor),
+            context: context_from_body(&body),
+        },
+    )
+    .await
+    .map_err(map_domain_error)?;
+    write_admin_audit(
+        &state.db,
+        ACTION_ADMIN_WALLET_ADJUSTED,
+        &actor,
+        result.currency_key.clone(),
+        parsed_user_id,
+        result.currency_asset_definition_id,
+    )
+    .await?;
+    Ok(Json(wallet_balance_json(result)))
 }
 
 pub async fn get_user_wallet_balance(
@@ -1217,9 +1648,13 @@ pub async fn get_user_wallet_balance(
 ) -> HttpResult<Json<Value>> {
     let state = state.read().await;
     require_privileged_actor(&headers, &state).await?;
-    let balance = wallet::get_wallet_balance(&state.db, parse_uuid(&user_id, "Invalid user ID")?, &currency_key)
-        .await
-        .map_err(map_domain_error)?;
+    let balance = wallet::get_wallet_balance(
+        &state.db,
+        parse_uuid(&user_id, "Invalid user ID")?,
+        &currency_key,
+    )
+    .await
+    .map_err(map_domain_error)?;
     Ok(Json(wallet_balance_json(balance)))
 }
 
@@ -1247,10 +1682,16 @@ pub async fn get_user_wallet_transactions(
 ) -> HttpResult<Json<Value>> {
     let state = state.read().await;
     require_privileged_actor(&headers, &state).await?;
-    let items = wallet::get_wallet_transactions(&state.db, parse_uuid(&user_id, "Invalid user ID")?, &currency_key)
-        .await
-        .map_err(map_domain_error)?;
-    Ok(Json(Value::Array(items.into_iter().map(wallet_transaction_json).collect())))
+    let items = wallet::get_wallet_transactions(
+        &state.db,
+        parse_uuid(&user_id, "Invalid user ID")?,
+        &currency_key,
+    )
+    .await
+    .map_err(map_domain_error)?;
+    Ok(Json(Value::Array(
+        items.into_iter().map(wallet_transaction_json).collect(),
+    )))
 }
 
 #[utoipa::path(
@@ -1288,7 +1729,9 @@ pub async fn credit_wallet(
         WalletMutation {
             user_id: parsed_user_id,
             currency_key,
-            amount: body.amount.ok_or_else(|| HttpError::bad_request("amount is required"))?,
+            amount: body
+                .amount
+                .ok_or_else(|| HttpError::bad_request("amount is required"))?,
             actor: ownership_actor_from_privileged(&actor),
             context: context_from_body(&body),
         },
@@ -1343,7 +1786,9 @@ pub async fn debit_wallet(
         WalletMutation {
             user_id: parsed_user_id,
             currency_key,
-            amount: body.amount.ok_or_else(|| HttpError::bad_request("amount is required"))?,
+            amount: body
+                .amount
+                .ok_or_else(|| HttpError::bad_request("amount is required"))?,
             actor: ownership_actor_from_privileged(&actor),
             context: context_from_body(&body),
         },
@@ -1397,7 +1842,9 @@ pub async fn adjust_wallet_balance(
         WalletMutation {
             user_id: parsed_user_id,
             currency_key,
-            amount: body.amount.ok_or_else(|| HttpError::bad_request("amount is required"))?,
+            amount: body
+                .amount
+                .ok_or_else(|| HttpError::bad_request("amount is required"))?,
             actor: ownership_actor_from_privileged(&actor),
             context: context_from_body(&body),
         },
@@ -1458,7 +1905,10 @@ fn with_actor_metadata(metadata: Value, actor: &PrivilegedActor) -> Value {
     };
 
     if let Some(service_name) = actor.actor_service_name() {
-        metadata.insert("actorServiceName".to_string(), Value::String(service_name.to_string()));
+        metadata.insert(
+            "actorServiceName".to_string(),
+            Value::String(service_name.to_string()),
+        );
     }
 
     Value::Object(metadata)
@@ -1625,5 +2075,16 @@ fn wallet_transaction_json(item: wallet::WalletTransactionView) -> Value {
         "reasonText": item.reason_text,
         "metadata": item.metadata,
         "createdAt": item.created_at
+    })
+}
+
+fn subscription_status_json(item: inventory::SubscriptionStatusView) -> Value {
+    json!({
+        "userId": item.user_id,
+        "status": match item.status {
+            SubscriptionStatus::None => "none",
+            SubscriptionStatus::Plus => "plus",
+            SubscriptionStatus::Pro => "pro",
+        }
     })
 }

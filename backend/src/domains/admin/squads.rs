@@ -1,10 +1,10 @@
+use aws_sdk_s3::primitives::ByteStream;
+use axum::Json;
 use axum::body::Bytes;
 use axum::extract::{Multipart, Path, Query, State};
-use axum::Json;
-use aws_sdk_s3::primitives::ByteStream;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, Condition, EntityTrait, PaginatorTrait, QueryFilter,
-    QueryOrder, Set, TransactionTrait,
+    ActiveModelTrait, ColumnTrait, Condition, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder,
+    Set, TransactionTrait,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -19,11 +19,13 @@ use crate::entities::{
     UserColumn,
 };
 use crate::services::audit::{
-    write_audit_log, ACTION_ADMIN_SQUAD_DELETED, ACTION_ADMIN_SQUAD_IMAGE_DELETED,
-    ACTION_ADMIN_SQUAD_IMAGE_UPDATED, ACTION_ADMIN_SQUAD_MEMBER_KICKED,
-    ACTION_ADMIN_SQUAD_RESTRICTED, ACTION_ADMIN_SQUAD_UNRESTRICTED, ACTION_ADMIN_SQUAD_UPDATED,
+    ACTION_ADMIN_SQUAD_DELETED, ACTION_ADMIN_SQUAD_IMAGE_DELETED, ACTION_ADMIN_SQUAD_IMAGE_UPDATED,
+    ACTION_ADMIN_SQUAD_MEMBER_KICKED, ACTION_ADMIN_SQUAD_RESTRICTED,
+    ACTION_ADMIN_SQUAD_UNRESTRICTED, ACTION_ADMIN_SQUAD_UPDATED, write_audit_log,
 };
-use crate::services::squads::{process_squad_image, squad_image_key, validate_squad_name, SQUAD_MAX_MEMBERS};
+use crate::services::squads::{
+    SQUAD_MAX_MEMBERS, process_squad_image, squad_image_key, validate_squad_name,
+};
 
 #[derive(Deserialize, IntoParams, ToSchema)]
 pub struct ListSquadsQuery {
@@ -107,7 +109,12 @@ pub async fn list_squads(
     let per_page = query.per_page.unwrap_or(20).clamp(1, 100);
     let mut squad_query = Squad::find().order_by_desc(SquadColumn::CreatedAt);
 
-    if let Some(q) = query.q.as_ref().map(|it| it.trim()).filter(|it| !it.is_empty()) {
+    if let Some(q) = query
+        .q
+        .as_ref()
+        .map(|it| it.trim())
+        .filter(|it| !it.is_empty())
+    {
         let mut condition = Condition::any().add(SquadColumn::Name.contains(q));
         if let Ok(uuid) = Uuid::parse_str(q) {
             condition = condition
@@ -196,7 +203,8 @@ pub async fn patch_squad(
     let mut active_squad: SquadActiveModel = squad.into();
 
     if let Some(name) = body.name {
-        active_squad.name = Set(validate_squad_name(&name).map_err(|e| HttpError::bad_request(e.to_string()))?);
+        active_squad.name =
+            Set(validate_squad_name(&name).map_err(|e| HttpError::bad_request(e.to_string()))?);
     }
     if let Some(is_restricted) = body.is_restricted {
         active_squad.is_restricted = Set(is_restricted);
@@ -250,7 +258,15 @@ pub async fn restrict_squad(
 ) -> HttpResult<Json<AdminSquadResponse>> {
     let state = state.read().await;
     let admin = require_human_superuser(&headers, &state).await?;
-    update_squad_restricted_flag(&state, admin.id, squad_id, true, body.reason, ACTION_ADMIN_SQUAD_RESTRICTED).await
+    update_squad_restricted_flag(
+        &state,
+        admin.id,
+        squad_id,
+        true,
+        body.reason,
+        ACTION_ADMIN_SQUAD_RESTRICTED,
+    )
+    .await
 }
 
 #[utoipa::path(
@@ -278,7 +294,15 @@ pub async fn unrestrict_squad(
 ) -> HttpResult<Json<AdminSquadResponse>> {
     let state = state.read().await;
     let admin = require_human_superuser(&headers, &state).await?;
-    update_squad_restricted_flag(&state, admin.id, squad_id, false, body.reason, ACTION_ADMIN_SQUAD_UNRESTRICTED).await
+    update_squad_restricted_flag(
+        &state,
+        admin.id,
+        squad_id,
+        false,
+        body.reason,
+        ACTION_ADMIN_SQUAD_UNRESTRICTED,
+    )
+    .await
 }
 
 #[utoipa::path(
@@ -313,7 +337,10 @@ pub async fn delete_squad(
         .map_err(|e| HttpError::internal_error(format!("Failed to start transaction: {e}")))?;
 
     User::update_many()
-        .col_expr(UserColumn::SquadId, sea_orm::sea_query::Expr::value(Option::<Uuid>::None))
+        .col_expr(
+            UserColumn::SquadId,
+            sea_orm::sea_query::Expr::value(Option::<Uuid>::None),
+        )
         .filter(UserColumn::SquadId.eq(squad.id))
         .exec(&tx)
         .await
@@ -445,7 +472,8 @@ pub async fn upload_squad_image(
     let admin = require_human_superuser(&headers, &state).await?;
     let squad = get_squad_model(&state, &squad_id).await?;
     let data = read_first_image(&mut multipart).await?;
-    let processed = process_squad_image(&data).map_err(|e| HttpError::bad_request(e.to_string()))?;
+    let processed =
+        process_squad_image(&data).map_err(|e| HttpError::bad_request(e.to_string()))?;
     let key = squad_image_key(squad.id);
 
     state
@@ -547,10 +575,9 @@ async fn update_squad_restricted_flag(
     active_squad.restriction_reason = Set(reason.clone());
     active_squad.updated_at = Set(chrono::Utc::now());
 
-    let updated_squad = active_squad
-        .update(&state.db)
-        .await
-        .map_err(|e| HttpError::internal_error(format!("Failed to update squad restriction: {e}")))?;
+    let updated_squad = active_squad.update(&state.db).await.map_err(|e| {
+        HttpError::internal_error(format!("Failed to update squad restriction: {e}"))
+    })?;
 
     write_audit_log(
         &state.db,
@@ -566,7 +593,10 @@ async fn update_squad_restricted_flag(
     Ok(Json(to_squad_response(&state, updated_squad).await?))
 }
 
-async fn get_squad_model(state: &AppState, squad_id: &str) -> HttpResult<crate::entities::SquadModel> {
+async fn get_squad_model(
+    state: &AppState,
+    squad_id: &str,
+) -> HttpResult<crate::entities::SquadModel> {
     let squad_id = parse_uuid(squad_id, "Invalid squad ID")?;
     Squad::find_by_id(squad_id)
         .one(&state.db)
@@ -592,7 +622,9 @@ async fn to_squad_response(
         leader_user_id: squad.leader_user_id.to_string(),
         member_count,
         max_members: SQUAD_MAX_MEMBERS,
-        image_url: squad.image_key.map(|_| format!("/api/squads/{}/image", squad_id)),
+        image_url: squad
+            .image_key
+            .map(|_| format!("/api/squads/{}/image", squad_id)),
         is_restricted: squad.is_restricted,
         restriction_reason: squad.restriction_reason,
         created_at: squad.created_at,
@@ -608,7 +640,8 @@ async fn read_first_image(multipart: &mut Multipart) -> HttpResult<Bytes> {
     while let Some(field) = multipart
         .next_field()
         .await
-        .map_err(|e| HttpError::bad_request(format!("Invalid multipart body: {e}")))? {
+        .map_err(|e| HttpError::bad_request(format!("Invalid multipart body: {e}")))?
+    {
         let content_type = field
             .content_type()
             .ok_or_else(|| HttpError::bad_request("Missing content type"))?;

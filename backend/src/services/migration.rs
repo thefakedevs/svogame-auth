@@ -27,7 +27,11 @@ impl MigrationTrait for CreateAuthRayTable {
                             .primary_key(),
                     )
                     .col(ColumnDef::new(AuthRay::PowPrefix).string().not_null())
-                    .col(ColumnDef::new(AuthRay::PowComplexity).tiny_unsigned().not_null())
+                    .col(
+                        ColumnDef::new(AuthRay::PowComplexity)
+                            .tiny_unsigned()
+                            .not_null(),
+                    )
                     .col(ColumnDef::new(AuthRay::DeliveryMethod).string().not_null())
                     .col(ColumnDef::new(AuthRay::DeliveryTarget).string().not_null())
                     .col(
@@ -75,13 +79,13 @@ impl MigrationTrait for CreateUserTable {
                 Table::create()
                     .table(User::Table)
                     .if_not_exists()
+                    .col(ColumnDef::new(User::Id).uuid().not_null().primary_key())
                     .col(
-                        ColumnDef::new(User::Id)
-                            .uuid()
+                        ColumnDef::new(User::DiscordId)
+                            .string()
                             .not_null()
-                            .primary_key(),
+                            .unique_key(),
                     )
-                    .col(ColumnDef::new(User::DiscordId).string().not_null().unique_key())
                     .col(ColumnDef::new(User::Username).string().not_null())
                     .col(ColumnDef::new(User::AvatarUrl).string().null())
                     .col(ColumnDef::new(User::Email).string().null())
@@ -244,12 +248,8 @@ impl MigrationName for AddUserSquadIdColumn {
 impl MigrationTrait for AddUserSquadIdColumn {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         let sql = match manager.get_database_backend() {
-            DatabaseBackend::Postgres => {
-                r#"ALTER TABLE "user" ADD COLUMN "squad_id" uuid NULL"#
-            }
-            DatabaseBackend::Sqlite => {
-                r#"ALTER TABLE "user" ADD COLUMN "squad_id" uuid NULL"#
-            }
+            DatabaseBackend::Postgres => r#"ALTER TABLE "user" ADD COLUMN "squad_id" uuid NULL"#,
+            DatabaseBackend::Sqlite => r#"ALTER TABLE "user" ADD COLUMN "squad_id" uuid NULL"#,
             _ => return Ok(()),
         };
 
@@ -346,12 +346,7 @@ impl MigrationTrait for CreateSquadTable {
                 Table::create()
                     .table(Squad::Table)
                     .if_not_exists()
-                    .col(
-                        ColumnDef::new(Squad::Id)
-                            .uuid()
-                            .not_null()
-                            .primary_key(),
-                    )
+                    .col(ColumnDef::new(Squad::Id).uuid().not_null().primary_key())
                     .col(ColumnDef::new(Squad::LeaderUserId).uuid().not_null())
                     .col(ColumnDef::new(Squad::Name).string().not_null())
                     .col(ColumnDef::new(Squad::ImageKey).string().null())
@@ -484,7 +479,11 @@ impl MigrationTrait for CreateUserRestrictionTable {
                             .primary_key(),
                     )
                     .col(ColumnDef::new(UserRestriction::UserId).uuid().not_null())
-                    .col(ColumnDef::new(UserRestriction::RestrictionKey).string().not_null())
+                    .col(
+                        ColumnDef::new(UserRestriction::RestrictionKey)
+                            .string()
+                            .not_null(),
+                    )
                     .col(ColumnDef::new(UserRestriction::Reason).string().null())
                     .col(
                         ColumnDef::new(UserRestriction::CreatedAt)
@@ -530,12 +529,34 @@ impl MigrationTrait for CreateAssetDefinitionTable {
                 Table::create()
                     .table(AssetDefinition::Table)
                     .if_not_exists()
-                    .col(ColumnDef::new(AssetDefinition::Id).uuid().not_null().primary_key())
-                    .col(ColumnDef::new(AssetDefinition::Key).string().not_null().unique_key())
-                    .col(ColumnDef::new(AssetDefinition::DisplayName).string().not_null())
+                    .col(
+                        ColumnDef::new(AssetDefinition::Id)
+                            .uuid()
+                            .not_null()
+                            .primary_key(),
+                    )
+                    .col(
+                        ColumnDef::new(AssetDefinition::Key)
+                            .string()
+                            .not_null()
+                            .unique_key(),
+                    )
+                    .col(
+                        ColumnDef::new(AssetDefinition::DisplayName)
+                            .string()
+                            .not_null(),
+                    )
                     .col(ColumnDef::new(AssetDefinition::Description).string().null())
-                    .col(ColumnDef::new(AssetDefinition::AssetKind).string().not_null())
-                    .col(ColumnDef::new(AssetDefinition::OwnershipModel).string().not_null())
+                    .col(
+                        ColumnDef::new(AssetDefinition::AssetKind)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(AssetDefinition::OwnershipModel)
+                            .string()
+                            .not_null(),
+                    )
                     .col(
                         ColumnDef::new(AssetDefinition::IsCurrency)
                             .boolean()
@@ -620,8 +641,16 @@ impl MigrationTrait for CreateUserStackableAssetTable {
                     .table(UserStackableAsset::Table)
                     .if_not_exists()
                     .col(ColumnDef::new(UserStackableAsset::UserId).uuid().not_null())
-                    .col(ColumnDef::new(UserStackableAsset::AssetDefinitionId).uuid().not_null())
-                    .col(ColumnDef::new(UserStackableAsset::Amount).big_integer().not_null())
+                    .col(
+                        ColumnDef::new(UserStackableAsset::AssetDefinitionId)
+                            .uuid()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(UserStackableAsset::Amount)
+                            .big_integer()
+                            .not_null(),
+                    )
                     .col(
                         ColumnDef::new(UserStackableAsset::UpdatedAt)
                             .timestamp_with_time_zone()
@@ -671,13 +700,21 @@ impl MigrationTrait for CreateUserEntitlementTable {
                     .table(UserEntitlement::Table)
                     .if_not_exists()
                     .col(ColumnDef::new(UserEntitlement::UserId).uuid().not_null())
-                    .col(ColumnDef::new(UserEntitlement::AssetDefinitionId).uuid().not_null())
+                    .col(
+                        ColumnDef::new(UserEntitlement::AssetDefinitionId)
+                            .uuid()
+                            .not_null(),
+                    )
                     .col(
                         ColumnDef::new(UserEntitlement::GrantedAt)
                             .timestamp_with_time_zone()
                             .not_null(),
                     )
-                    .col(ColumnDef::new(UserEntitlement::GrantedByActor).text().not_null())
+                    .col(
+                        ColumnDef::new(UserEntitlement::GrantedByActor)
+                            .text()
+                            .not_null(),
+                    )
                     .col(
                         ColumnDef::new(UserEntitlement::UpdatedAt)
                             .timestamp_with_time_zone()
@@ -728,7 +765,11 @@ impl MigrationTrait for CreateUserExpirableAssetTable {
                     .table(UserExpirableAsset::Table)
                     .if_not_exists()
                     .col(ColumnDef::new(UserExpirableAsset::UserId).uuid().not_null())
-                    .col(ColumnDef::new(UserExpirableAsset::AssetDefinitionId).uuid().not_null())
+                    .col(
+                        ColumnDef::new(UserExpirableAsset::AssetDefinitionId)
+                            .uuid()
+                            .not_null(),
+                    )
                     .col(
                         ColumnDef::new(UserExpirableAsset::ExpiresAt)
                             .timestamp_with_time_zone()
@@ -744,7 +785,11 @@ impl MigrationTrait for CreateUserExpirableAssetTable {
                             .timestamp_with_time_zone()
                             .null(),
                     )
-                    .col(ColumnDef::new(UserExpirableAsset::GrantedByActor).text().not_null())
+                    .col(
+                        ColumnDef::new(UserExpirableAsset::GrantedByActor)
+                            .text()
+                            .not_null(),
+                    )
                     .col(
                         ColumnDef::new(UserExpirableAsset::UpdatedAt)
                             .timestamp_with_time_zone()
@@ -809,13 +854,41 @@ impl MigrationTrait for CreateInventoryOperationTable {
                             .uuid()
                             .not_null(),
                     )
-                    .col(ColumnDef::new(InventoryOperation::OwnershipModel).string().not_null())
-                    .col(ColumnDef::new(InventoryOperation::OperationType).string().not_null())
-                    .col(ColumnDef::new(InventoryOperation::ActorKind).string().not_null())
-                    .col(ColumnDef::new(InventoryOperation::ActorUserId).uuid().null())
-                    .col(ColumnDef::new(InventoryOperation::ActorServiceName).string().null())
-                    .col(ColumnDef::new(InventoryOperation::DeltaAmount).big_integer().null())
-                    .col(ColumnDef::new(InventoryOperation::NewAmount).big_integer().null())
+                    .col(
+                        ColumnDef::new(InventoryOperation::OwnershipModel)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(InventoryOperation::OperationType)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(InventoryOperation::ActorKind)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(InventoryOperation::ActorUserId)
+                            .uuid()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(InventoryOperation::ActorServiceName)
+                            .string()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(InventoryOperation::DeltaAmount)
+                            .big_integer()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(InventoryOperation::NewAmount)
+                            .big_integer()
+                            .null(),
+                    )
                     .col(
                         ColumnDef::new(InventoryOperation::PreviousExpiresAt)
                             .timestamp_with_time_zone()
@@ -826,9 +899,21 @@ impl MigrationTrait for CreateInventoryOperationTable {
                             .timestamp_with_time_zone()
                             .null(),
                     )
-                    .col(ColumnDef::new(InventoryOperation::ReasonCode).string().null())
-                    .col(ColumnDef::new(InventoryOperation::ReasonText).string().null())
-                    .col(ColumnDef::new(InventoryOperation::Metadata).text().not_null())
+                    .col(
+                        ColumnDef::new(InventoryOperation::ReasonCode)
+                            .string()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(InventoryOperation::ReasonText)
+                            .string()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(InventoryOperation::Metadata)
+                            .text()
+                            .not_null(),
+                    )
                     .col(
                         ColumnDef::new(InventoryOperation::CreatedAt)
                             .timestamp_with_time_zone()
@@ -890,7 +975,11 @@ impl MigrationTrait for CreateWalletBalanceTable {
                             .uuid()
                             .not_null(),
                     )
-                    .col(ColumnDef::new(WalletBalance::Balance).big_integer().not_null())
+                    .col(
+                        ColumnDef::new(WalletBalance::Balance)
+                            .big_integer()
+                            .not_null(),
+                    )
                     .col(
                         ColumnDef::new(WalletBalance::UpdatedAt)
                             .timestamp_with_time_zone()
@@ -952,15 +1041,47 @@ impl MigrationTrait for CreateWalletTransactionTable {
                             .uuid()
                             .not_null(),
                     )
-                    .col(ColumnDef::new(WalletTransaction::OperationType).string().not_null())
-                    .col(ColumnDef::new(WalletTransaction::ActorKind).string().not_null())
+                    .col(
+                        ColumnDef::new(WalletTransaction::OperationType)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(WalletTransaction::ActorKind)
+                            .string()
+                            .not_null(),
+                    )
                     .col(ColumnDef::new(WalletTransaction::ActorUserId).uuid().null())
-                    .col(ColumnDef::new(WalletTransaction::ActorServiceName).string().null())
-                    .col(ColumnDef::new(WalletTransaction::Delta).big_integer().not_null())
-                    .col(ColumnDef::new(WalletTransaction::BalanceAfter).big_integer().not_null())
-                    .col(ColumnDef::new(WalletTransaction::ReasonCode).string().null())
-                    .col(ColumnDef::new(WalletTransaction::ReasonText).string().null())
-                    .col(ColumnDef::new(WalletTransaction::Metadata).text().not_null())
+                    .col(
+                        ColumnDef::new(WalletTransaction::ActorServiceName)
+                            .string()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(WalletTransaction::Delta)
+                            .big_integer()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(WalletTransaction::BalanceAfter)
+                            .big_integer()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(WalletTransaction::ReasonCode)
+                            .string()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(WalletTransaction::ReasonText)
+                            .string()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(WalletTransaction::Metadata)
+                            .text()
+                            .not_null(),
+                    )
                     .col(
                         ColumnDef::new(WalletTransaction::CreatedAt)
                             .timestamp_with_time_zone()
@@ -1066,12 +1187,13 @@ impl MigrationTrait for CreateServiceTokenTable {
                 Table::create()
                     .table(ServiceToken::Table)
                     .if_not_exists()
-                    .col(ColumnDef::new(ServiceToken::Id).uuid().not_null().primary_key())
                     .col(
-                        ColumnDef::new(ServiceToken::SystemName)
-                            .string()
-                            .not_null(),
+                        ColumnDef::new(ServiceToken::Id)
+                            .uuid()
+                            .not_null()
+                            .primary_key(),
                     )
+                    .col(ColumnDef::new(ServiceToken::SystemName).string().not_null())
                     .col(
                         ColumnDef::new(ServiceToken::TokenPrefix)
                             .string()
@@ -1085,10 +1207,22 @@ impl MigrationTrait for CreateServiceTokenTable {
                             .not_null()
                             .default(true),
                     )
-                    .col(ColumnDef::new(ServiceToken::ExpiresAt).timestamp_with_time_zone().null())
-                    .col(ColumnDef::new(ServiceToken::LastUsedAt).timestamp_with_time_zone().null())
+                    .col(
+                        ColumnDef::new(ServiceToken::ExpiresAt)
+                            .timestamp_with_time_zone()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(ServiceToken::LastUsedAt)
+                            .timestamp_with_time_zone()
+                            .null(),
+                    )
                     .col(ColumnDef::new(ServiceToken::Description).string().null())
-                    .col(ColumnDef::new(ServiceToken::CreatedByUserId).uuid().not_null())
+                    .col(
+                        ColumnDef::new(ServiceToken::CreatedByUserId)
+                            .uuid()
+                            .not_null(),
+                    )
                     .col(ColumnDef::new(ServiceToken::RotatedFromId).uuid().null())
                     .col(
                         ColumnDef::new(ServiceToken::CreatedAt)
@@ -1154,9 +1288,21 @@ impl MigrationTrait for CreateServiceTokenAuditTable {
                             .auto_increment()
                             .primary_key(),
                     )
-                    .col(ColumnDef::new(ServiceTokenAudit::ServiceTokenId).uuid().not_null())
-                    .col(ColumnDef::new(ServiceTokenAudit::Action).string().not_null())
-                    .col(ColumnDef::new(ServiceTokenAudit::ActorUserId).uuid().not_null())
+                    .col(
+                        ColumnDef::new(ServiceTokenAudit::ServiceTokenId)
+                            .uuid()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(ServiceTokenAudit::Action)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(ServiceTokenAudit::ActorUserId)
+                            .uuid()
+                            .not_null(),
+                    )
                     .col(ColumnDef::new(ServiceTokenAudit::Reason).string().null())
                     .col(ColumnDef::new(ServiceTokenAudit::Metadata).text().null())
                     .col(
@@ -1188,4 +1334,3 @@ enum ServiceTokenAudit {
     Metadata,
     CreatedAt,
 }
-

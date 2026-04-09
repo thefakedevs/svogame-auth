@@ -1,6 +1,6 @@
+use axum::Json;
 use axum::extract::{Path, State};
 use axum::http::HeaderMap;
-use axum::Json;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use utoipa::ToSchema;
@@ -92,7 +92,12 @@ pub async fn list_service_tokens(
     let items = service_tokens::list_service_tokens(&state.db)
         .await
         .map_err(map_domain_error)?;
-    Ok(Json(items.into_iter().map(|item| map_service_token(item, None)).collect()))
+    Ok(Json(
+        items
+            .into_iter()
+            .map(|item| map_service_token(item, None))
+            .collect(),
+    ))
 }
 
 #[utoipa::path(
@@ -131,7 +136,10 @@ pub async fn create_service_token(
     .await
     .map_err(map_domain_error)?;
 
-    Ok(Json(map_service_token(created.model, Some(created.plaintext_token))))
+    Ok(Json(map_service_token(
+        created.model,
+        Some(created.plaintext_token),
+    )))
 }
 
 #[utoipa::path(
@@ -190,7 +198,9 @@ pub async fn get_service_token_audit(
     let items = service_tokens::get_service_token_audit(&state.db, token_id)
         .await
         .map_err(map_domain_error)?;
-    Ok(Json(items.into_iter().map(map_service_token_audit).collect()))
+    Ok(Json(
+        items.into_iter().map(map_service_token_audit).collect(),
+    ))
 }
 
 #[utoipa::path(
@@ -234,7 +244,10 @@ pub async fn rotate_service_token(
     .await
     .map_err(map_domain_error)?;
 
-    Ok(Json(map_service_token(rotated.model, Some(rotated.plaintext_token))))
+    Ok(Json(map_service_token(
+        rotated.model,
+        Some(rotated.plaintext_token),
+    )))
 }
 
 #[utoipa::path(

@@ -1,4 +1,3 @@
-use utoipa::OpenApi;
 use crate::domains::admin::handlers as admin_handlers;
 use crate::domains::admin::service_tokens as admin_service_tokens;
 use crate::domains::admin::squads as admin_squads;
@@ -8,13 +7,14 @@ use crate::domains::auth::verification as auth_verification;
 use crate::domains::compat::gamervii as compat_gamervii;
 use crate::domains::meta::handlers as meta_handlers;
 use crate::domains::ownership::handlers as ownership_handlers;
-use crate::domains::squads::handlers as squads_handlers;
 use crate::domains::skins::handlers as skins_handlers;
 use crate::domains::skins::types as skins_types;
+use crate::domains::squads::handlers as squads_handlers;
 use crate::domains::system::health as system_health;
 use crate::domains::users::handlers;
 use crate::services::ownership::catalog as ownership_catalog;
 use crate::services::ownership::types as ownership_types;
+use utoipa::OpenApi;
 
 #[derive(OpenApi)]
 #[openapi(
@@ -69,10 +69,13 @@ use crate::services::ownership::types as ownership_types;
         ownership_handlers::get_my_stackables,
         ownership_handlers::get_my_entitlements,
         ownership_handlers::get_my_active_expirables,
+        ownership_handlers::get_my_subscription_status,
         ownership_handlers::get_my_wallet,
+        ownership_handlers::get_my_default_wallet_balance,
         ownership_handlers::get_my_wallet_balance,
         ownership_handlers::get_my_wallet_transactions,
         ownership_handlers::get_user_inventory,
+        ownership_handlers::get_user_subscription_status,
         ownership_handlers::get_user_inventory_history,
         ownership_handlers::grant_entitlement,
         ownership_handlers::revoke_entitlement,
@@ -80,15 +83,22 @@ use crate::services::ownership::types as ownership_types;
         ownership_handlers::remove_stackable,
         ownership_handlers::set_stackable,
         ownership_handlers::prolong_expirable,
+        ownership_handlers::prolong_plus_subscription,
+        ownership_handlers::prolong_pro_subscription,
         ownership_handlers::set_expiration,
         ownership_handlers::revoke_expirable,
+        ownership_handlers::get_user_default_wallet_balance,
         ownership_handlers::get_user_wallet_transactions,
+        ownership_handlers::credit_default_wallet,
+        ownership_handlers::debit_default_wallet,
+        ownership_handlers::adjust_default_wallet_balance,
         ownership_handlers::credit_wallet,
         ownership_handlers::debit_wallet,
         ownership_handlers::adjust_wallet_balance,
         squads_handlers::create_squad,
         squads_handlers::get_squad,
         squads_handlers::get_squad_members,
+        squads_handlers::get_squad_image,
         squads_handlers::patch_squad,
         squads_handlers::upload_squad_image,
         squads_handlers::delete_squad_image,
@@ -158,6 +168,7 @@ use crate::services::ownership::types as ownership_types;
             ownership_handlers::InventoryOperationResponse,
             ownership_handlers::WalletBalanceResponse,
             ownership_handlers::WalletTransactionResponse,
+            ownership_handlers::SubscriptionStatusResponse,
             ownership_handlers::OkResponse,
             ownership_catalog::CreateAssetDefinitionInput,
             ownership_catalog::UpdateAssetDefinitionInput,
@@ -215,4 +226,3 @@ impl Modify for SecurityAddon {
         );
     }
 }
-

@@ -54,7 +54,9 @@ pub async fn get_actor_from_headers(
         .map_err(|_| HttpError::unauthorized("Invalid Authorization header"))?;
 
     if !auth_header.starts_with("Bearer ") {
-        return Err(HttpError::unauthorized("Invalid Authorization header format"));
+        return Err(HttpError::unauthorized(
+            "Invalid Authorization header format",
+        ));
     }
 
     let token = &auth_header[7..];
@@ -79,13 +81,20 @@ pub async fn get_actor_from_headers(
         return Ok(AuthenticatedActor::User(user));
     }
 
-    let service = crate::services::service_tokens::authenticate_service_token(&state.db, &state.config, token)
-        .await
-        .map_err(|_| HttpError::forbidden("Invalid or expired token"))?;
+    let service = crate::services::service_tokens::authenticate_service_token(
+        &state.db,
+        &state.config,
+        token,
+    )
+    .await
+    .map_err(|_| HttpError::forbidden("Invalid or expired token"))?;
     Ok(AuthenticatedActor::Service(service))
 }
 
-pub async fn require_human_superuser(headers: &HeaderMap, state: &AppState) -> HttpResult<UserModel> {
+pub async fn require_human_superuser(
+    headers: &HeaderMap,
+    state: &AppState,
+) -> HttpResult<UserModel> {
     let user = get_user_from_headers(headers, state).await?;
 
     if !user.is_superuser {

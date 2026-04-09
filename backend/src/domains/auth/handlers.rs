@@ -1,17 +1,17 @@
-use crate::entities::{AuthRay, auth_ray::TokenDeliveryMethod};
 use crate::app::http::{HttpError, HttpResult};
 use crate::app::state::AppStateExtractor;
 use crate::domains::auth::runtime::AuthPollResult;
-use axum::extract::State;
+use crate::entities::{AuthRay, auth_ray::TokenDeliveryMethod};
+use crate::services::audit::{ACTION_USER_REGISTERED, write_audit_log};
+use crate::services::discord::exchange_code;
+use crate::services::token::sign_token;
 use axum::Json;
+use axum::extract::State;
 use sea_orm::ModelTrait;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tracing::error;
 use utoipa::ToSchema;
-use crate::services::discord::exchange_code;
-use crate::services::audit::{write_audit_log, ACTION_USER_REGISTERED};
-use crate::services::token::sign_token;
 use uuid::Uuid;
 
 #[derive(Serialize, ToSchema)]
@@ -63,10 +63,12 @@ pub async fn prepare_auth(
         _ => return Err(HttpError::bad_request("Invalid delivery method")),
     };
     let delivery_target = match delivery_method {
-        TokenDeliveryMethod::Redirect => {
-            match body.redirect_url {
-                Some(url) => url,
-                None => return Err(HttpError::bad_request("redirectUrl is required for redirect delivery method")),
+        TokenDeliveryMethod::Redirect => match body.redirect_url {
+            Some(url) => url,
+            None => {
+                return Err(HttpError::bad_request(
+                    "redirectUrl is required for redirect delivery method",
+                ));
             }
         },
         TokenDeliveryMethod::Polling => Uuid::new_v4().to_string(),
@@ -77,7 +79,9 @@ pub async fn prepare_auth(
         state.config.pow_complexity,
         delivery_method,
         delivery_target,
-    ).await.map_err(|e| {
+    )
+    .await
+    .map_err(|e| {
         error!("Failed to create auth ray: {:?}", e);
         HttpError::internal_error("Failed to create auth ray")
     })?;
@@ -169,12 +173,19 @@ pub async fn authorize(
         if is_polling {
             state.auth.notify_complete(
                 delivery_target.clone(),
-                AuthPollResult::Error { message: msg.to_string() },
+                AuthPollResult::Error {
+                    message: msg.to_string(),
+                },
             );
         }
     };
 
-    if !crate::services::pow::verify_pow(&body.pow_solution, &pow_prefix, pow_complexity, &pow_creation) {
+    if !crate::services::pow::verify_pow(
+        &body.pow_solution,
+        &pow_prefix,
+        pow_complexity,
+        &pow_creation,
+    ) {
         notify_error("Invalid PoW solution");
         return Err(HttpError::forbidden("Invalid PoW solution"));
     }
@@ -189,14 +200,29 @@ pub async fn authorize(
     };
 
     {
-        let scopes = discord_creds.scope.split(" ").map(|it| it.to_string()).collect::<Vec<String>>();
-        if state.config.discord.required_scopes.iter().any(|scope| !scopes.contains(scope)) {
+        let scopes = discord_creds
+            .scope
+            .split(" ")
+            .map(|it| it.to_string())
+            .collect::<Vec<String>>();
+        if state
+            .config
+            .discord
+            .required_scopes
+            .iter()
+            .any(|scope| !scopes.contains(scope))
+        {
             notify_error("Missing required Discord scopes");
             return Err(HttpError::forbidden("Missing required Discord scopes"));
         }
     }
 
-    let user_info = match crate::services::discord::get_user_info(&state.config.discord, &discord_creds.access_token).await {
+    let user_info = match crate::services::discord::get_user_info(
+        &state.config.discord,
+        &discord_creds.access_token,
+    )
+    .await
+    {
         Ok(info) => info,
         Err(e) => {
             error!("Failed to fetch Discord user info: {:?}", e);
@@ -216,7 +242,9 @@ pub async fn authorize(
         user_info.username.clone(),
         discord_creds.build_avatar_url(&user_info),
         user_info.email.clone(),
-    ).await {
+    )
+    .await
+    {
         Ok(user) => user,
         Err(e) => {
             error!("Failed to register user: {:?}", e);

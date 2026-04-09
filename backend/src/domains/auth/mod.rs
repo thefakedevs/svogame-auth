@@ -3,8 +3,8 @@ pub mod polling;
 pub mod runtime;
 pub mod verification;
 
-use axum::routing::{get, post};
 use axum::Router;
+use axum::routing::{get, post};
 
 pub fn router() -> Router<crate::app::state::SharedAppState> {
     Router::new()
