@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - production
+      - stage
   workflow_dispatch:
 
 concurrency:
@@ -75,6 +76,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: build-and-push
     if: success()
+    env:
+      DEPLOY_WEBHOOK_TOKEN: ${{ github.ref_name == 'stage' && secrets.DEPLOY_WEBHOOK_TOKEN_STAGE || secrets.DEPLOY_WEBHOOK_TOKEN }}
 
     steps:
       - name: Call deploy webhook
@@ -82,7 +85,7 @@ jobs:
           curl --fail --show-error --silent \
             -X POST \
             -H "Content-Type: application/json" \
-            -H "X-Deploy-Token: ${{ secrets.DEPLOY_WEBHOOK_TOKEN }}" \
+            -H "X-Deploy-Token: $DEPLOY_WEBHOOK_TOKEN" \
             -H "X-Deploy-Ref: ${{ github.ref }}" \
             -d '{}' \
             "${{ secrets.DEPLOY_WEBHOOK_URL }}"
