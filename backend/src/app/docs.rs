@@ -1,5 +1,6 @@
 use utoipa::OpenApi;
 use crate::domains::admin::handlers as admin_handlers;
+use crate::domains::admin::service_tokens as admin_service_tokens;
 use crate::domains::admin::squads as admin_squads;
 use crate::domains::auth::handlers as auth_handlers;
 use crate::domains::auth::polling as auth_polling;
@@ -31,6 +32,12 @@ use crate::services::ownership::types as ownership_types;
         admin_handlers::get_user_restrictions,
         admin_handlers::grant_user_restriction,
         admin_handlers::revoke_user_restriction,
+        admin_service_tokens::list_service_tokens,
+        admin_service_tokens::create_service_token,
+        admin_service_tokens::get_service_token,
+        admin_service_tokens::get_service_token_audit,
+        admin_service_tokens::rotate_service_token,
+        admin_service_tokens::revoke_service_token,
         admin_squads::list_squads,
         admin_squads::get_squad,
         admin_squads::patch_squad,
@@ -45,6 +52,7 @@ use crate::services::ownership::types as ownership_types;
         auth_polling::poll_auth_status,
         auth_verification::verify,
         handlers::get_me,
+        handlers::search_users,
         handlers::update_nickname,
         handlers::get_my_restrictions,
         compat_gamervii::gamervii_auth,
@@ -94,7 +102,10 @@ use crate::services::ownership::types as ownership_types;
         squads_handlers::kick_member,
         squads_handlers::get_my_squad,
         skins_handlers::upload_my_skin,
+        skins_handlers::get_default_skin,
         skins_handlers::get_skin,
+        skins_handlers::get_default_skin_admin,
+        skins_handlers::upload_default_skin_admin,
         system_health::health
     ),
     components(
@@ -107,6 +118,11 @@ use crate::services::ownership::types as ownership_types;
             admin_handlers::DeactivateAdminUserRequest,
             admin_handlers::RestrictionReasonRequest,
             admin_handlers::AdminUserRestrictionResponse,
+            admin_service_tokens::CreateServiceTokenRequest,
+            admin_service_tokens::RotateServiceTokenRequest,
+            admin_service_tokens::RevokeServiceTokenRequest,
+            admin_service_tokens::ServiceTokenResponse,
+            admin_service_tokens::ServiceTokenAuditResponse,
             admin_squads::ListSquadsQuery,
             admin_squads::PatchAdminSquadRequest,
             admin_squads::ReasonRequest,
@@ -121,6 +137,7 @@ use crate::services::ownership::types as ownership_types;
             auth_verification::VerifyQuery,
             auth_verification::VerifyResponse,
             handlers::UserResponse,
+            handlers::UserSearchItemResponse,
             handlers::UserRestrictionResponse,
             handlers::UpdateNicknameRequest,
             compat_gamervii::GamerViiAuthRequest,
@@ -153,6 +170,7 @@ use crate::services::ownership::types as ownership_types;
             squads_handlers::SquadResponse,
             squads_handlers::SquadInviteResponse,
             squads_handlers::SquadActionResponse,
+            skins_handlers::DefaultSkinResponse,
             skins_types::ModelParam,
             skins_types::SkinModel,
             skins_types::UploadSkinResponse,

@@ -6,7 +6,7 @@ use serde_json::{Value, json};
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 
-use crate::app::auth::{get_user_from_headers, require_superuser};
+use crate::app::auth::{get_user_from_headers, require_privileged_actor, PrivilegedActor};
 use crate::app::http::{HttpError, HttpResult};
 use crate::app::state::AppStateExtractor;
 use crate::services::audit::{
@@ -324,7 +324,7 @@ pub async fn list_admin_assets(
     Query(query): Query<AssetListQuery>,
 ) -> HttpResult<Json<Value>> {
     let state = state.read().await;
-    require_superuser(&headers, &state).await?;
+    require_privileged_actor(&headers, &state).await?;
     let assets = catalog::list_asset_definitions(&state.db, map_asset_query(query), true)
         .await
         .map_err(map_domain_error)?;
@@ -353,7 +353,7 @@ pub async fn get_admin_asset(
     Path(asset_id): Path<String>,
 ) -> HttpResult<Json<Value>> {
     let state = state.read().await;
-    require_superuser(&headers, &state).await?;
+    require_privileged_actor(&headers, &state).await?;
     let asset_id = parse_uuid(&asset_id, "Invalid asset ID")?;
     let asset = catalog::get_asset_definition_by_id(&state.db, asset_id)
         .await
@@ -384,17 +384,20 @@ pub async fn create_asset(
     Json(body): Json<CreateAssetDefinitionInput>,
 ) -> HttpResult<Json<Value>> {
     let state = state.read().await;
-    let admin = require_superuser(&headers, &state).await?;
+    let actor = require_privileged_actor(&headers, &state).await?;
     let asset = catalog::create_asset_definition(&state.db, body)
         .await
         .map_err(map_domain_error)?;
     write_audit_log(
         &state.db,
         ACTION_ADMIN_ASSET_CREATED,
-        Some(admin.id),
+        actor.actor_user_id(),
         None,
         None,
-        Some(json!({ "assetId": asset.id, "assetKey": asset.key })),
+        Some(with_actor_metadata(
+            json!({ "assetId": asset.id, "assetKey": asset.key }),
+            &actor,
+        )),
     )
     .await
     .map_err(|error| HttpError::internal_error(format!("Failed to write audit log: {error}")))?;
@@ -428,7 +431,7 @@ pub async fn patch_asset(
     Json(body): Json<UpdateAssetDefinitionInput>,
 ) -> HttpResult<Json<Value>> {
     let state = state.read().await;
-    let admin = require_superuser(&headers, &state).await?;
+    let actor = require_privileged_actor(&headers, &state).await?;
     let asset_id = parse_uuid(&asset_id, "Invalid asset ID")?;
     let asset = catalog::update_asset_definition(&state.db, asset_id, body)
         .await
@@ -436,10 +439,13 @@ pub async fn patch_asset(
     write_audit_log(
         &state.db,
         ACTION_ADMIN_ASSET_UPDATED,
-        Some(admin.id),
+        actor.actor_user_id(),
         None,
         None,
-        Some(json!({ "assetId": asset.id, "assetKey": asset.key })),
+        Some(with_actor_metadata(
+            json!({ "assetId": asset.id, "assetKey": asset.key }),
+            &actor,
+        )),
     )
     .await
     .map_err(|error| HttpError::internal_error(format!("Failed to write audit log: {error}")))?;
@@ -670,7 +676,7 @@ pub async fn get_user_inventory(
     Path(user_id): Path<String>,
 ) -> HttpResult<Json<Value>> {
     let state = state.read().await;
-    require_superuser(&headers, &state).await?;
+    require_privileged_actor(&headers, &state).await?;
     let inventory = inventory::get_inventory(&state.db, parse_uuid(&user_id, "Invalid user ID")?)
         .await
         .map_err(map_domain_error)?;
@@ -683,7 +689,7 @@ pub async fn check_user_inventory_presence(
     Path((user_id, asset_key)): Path<(String, String)>,
 ) -> HttpResult<Json<Value>> {
     let state = state.read().await;
-    require_superuser(&headers, &state).await?;
+    require_privileged_actor(&headers, &state).await?;
     let presence = inventory::check_presence(&state.db, parse_uuid(&user_id, "Invalid user ID")?, &asset_key)
         .await
         .map_err(map_domain_error)?;
@@ -696,7 +702,7 @@ pub async fn get_user_stackables(
     Path(user_id): Path<String>,
 ) -> HttpResult<Json<Value>> {
     let state = state.read().await;
-    require_superuser(&headers, &state).await?;
+    require_privileged_actor(&headers, &state).await?;
     let items = inventory::get_stackables(&state.db, parse_uuid(&user_id, "Invalid user ID")?)
         .await
         .map_err(map_domain_error)?;
@@ -709,7 +715,7 @@ pub async fn get_user_entitlements(
     Path(user_id): Path<String>,
 ) -> HttpResult<Json<Value>> {
     let state = state.read().await;
-    require_superuser(&headers, &state).await?;
+    require_privileged_actor(&headers, &state).await?;
     let items = inventory::get_entitlements(&state.db, parse_uuid(&user_id, "Invalid user ID")?)
         .await
         .map_err(map_domain_error)?;
@@ -722,7 +728,7 @@ pub async fn get_user_active_expirables(
     Path(user_id): Path<String>,
 ) -> HttpResult<Json<Value>> {
     let state = state.read().await;
-    require_superuser(&headers, &state).await?;
+    require_privileged_actor(&headers, &state).await?;
     let items = inventory::get_active_expirables(&state.db, parse_uuid(&user_id, "Invalid user ID")?)
         .await
         .map_err(map_domain_error)?;
@@ -751,7 +757,7 @@ pub async fn get_user_inventory_history(
     Path(user_id): Path<String>,
 ) -> HttpResult<Json<Value>> {
     let state = state.read().await;
-    require_superuser(&headers, &state).await?;
+    require_privileged_actor(&headers, &state).await?;
     let items = inventory::get_inventory_history(&state.db, parse_uuid(&user_id, "Invalid user ID")?)
         .await
         .map_err(map_domain_error)?;
@@ -786,13 +792,15 @@ pub async fn grant_entitlement(
     Json(body): Json<MutationBody>,
 ) -> HttpResult<Json<Value>> {
     let state = state.read().await;
-    let admin = require_superuser(&headers, &state).await?;
+    let actor = require_privileged_actor(&headers, &state).await?;
+    let ownership_actor = ownership_actor_from_privileged(&actor);
+    let parsed_user_id = parse_uuid(&user_id, "Invalid user ID")?;
     let result = inventory::grant_entitlement(
         &state.db,
         EntitlementMutation {
-            user_id: parse_uuid(&user_id, "Invalid user ID")?,
+            user_id: parsed_user_id,
             asset_key,
-            actor: OwnershipActor::admin(admin.id),
+            actor: ownership_actor,
             context: context_from_body(&body),
         },
     )
@@ -801,9 +809,9 @@ pub async fn grant_entitlement(
     write_admin_audit(
         &state.db,
         ACTION_ADMIN_INVENTORY_ENTITLEMENT_GRANTED,
-        admin.id,
+        &actor,
         result.asset_key.clone(),
-        parse_uuid(&user_id, "Invalid user ID")?,
+        parsed_user_id,
         result.asset_definition_id,
     )
     .await?;
@@ -838,14 +846,14 @@ pub async fn revoke_entitlement(
     Json(body): Json<MutationBody>,
 ) -> HttpResult<Json<Value>> {
     let state = state.read().await;
-    let admin = require_superuser(&headers, &state).await?;
+    let actor = require_privileged_actor(&headers, &state).await?;
     let parsed_user_id = parse_uuid(&user_id, "Invalid user ID")?;
     inventory::revoke_entitlement(
         &state.db,
         EntitlementMutation {
             user_id: parsed_user_id,
             asset_key: asset_key.clone(),
-            actor: OwnershipActor::admin(admin.id),
+            actor: ownership_actor_from_privileged(&actor),
             context: context_from_body(&body),
         },
     )
@@ -854,10 +862,10 @@ pub async fn revoke_entitlement(
     write_audit_log(
         &state.db,
         ACTION_ADMIN_INVENTORY_ENTITLEMENT_REVOKED,
-        Some(admin.id),
+        actor.actor_user_id(),
         Some(parsed_user_id),
         body.reason_text.clone(),
-        Some(json!({ "assetKey": asset_key })),
+        Some(with_actor_metadata(json!({ "assetKey": asset_key }), &actor)),
     )
     .await
     .map_err(|error| HttpError::internal_error(format!("Failed to write audit log: {error}")))?;
@@ -892,7 +900,7 @@ pub async fn add_stackable(
     Json(body): Json<MutationBody>,
 ) -> HttpResult<Json<Value>> {
     let state = state.read().await;
-    let admin = require_superuser(&headers, &state).await?;
+    let actor = require_privileged_actor(&headers, &state).await?;
     let parsed_user_id = parse_uuid(&user_id, "Invalid user ID")?;
     let result = inventory::add_stackable(
         &state.db,
@@ -900,7 +908,7 @@ pub async fn add_stackable(
             user_id: parsed_user_id,
             asset_key,
             amount: body.amount.ok_or_else(|| HttpError::bad_request("amount is required"))?,
-            actor: OwnershipActor::admin(admin.id),
+            actor: ownership_actor_from_privileged(&actor),
             context: context_from_body(&body),
         },
     )
@@ -909,7 +917,7 @@ pub async fn add_stackable(
     write_admin_audit(
         &state.db,
         ACTION_ADMIN_INVENTORY_STACKABLE_ADDED,
-        admin.id,
+        &actor,
         result.asset_key.clone(),
         parsed_user_id,
         result.asset_definition_id,
@@ -947,7 +955,7 @@ pub async fn remove_stackable(
     Json(body): Json<MutationBody>,
 ) -> HttpResult<Json<Value>> {
     let state = state.read().await;
-    let admin = require_superuser(&headers, &state).await?;
+    let actor = require_privileged_actor(&headers, &state).await?;
     let parsed_user_id = parse_uuid(&user_id, "Invalid user ID")?;
     let result = inventory::remove_stackable(
         &state.db,
@@ -955,7 +963,7 @@ pub async fn remove_stackable(
             user_id: parsed_user_id,
             asset_key,
             amount: body.amount.ok_or_else(|| HttpError::bad_request("amount is required"))?,
-            actor: OwnershipActor::admin(admin.id),
+            actor: ownership_actor_from_privileged(&actor),
             context: context_from_body(&body),
         },
     )
@@ -964,7 +972,7 @@ pub async fn remove_stackable(
     write_admin_audit(
         &state.db,
         ACTION_ADMIN_INVENTORY_STACKABLE_REMOVED,
-        admin.id,
+        &actor,
         result.asset_key.clone(),
         parsed_user_id,
         result.asset_definition_id,
@@ -1001,7 +1009,7 @@ pub async fn set_stackable(
     Json(body): Json<MutationBody>,
 ) -> HttpResult<Json<Value>> {
     let state = state.read().await;
-    let admin = require_superuser(&headers, &state).await?;
+    let actor = require_privileged_actor(&headers, &state).await?;
     let parsed_user_id = parse_uuid(&user_id, "Invalid user ID")?;
     let result = inventory::set_stackable(
         &state.db,
@@ -1009,7 +1017,7 @@ pub async fn set_stackable(
             user_id: parsed_user_id,
             asset_key,
             amount: body.amount.ok_or_else(|| HttpError::bad_request("amount is required"))?,
-            actor: OwnershipActor::admin(admin.id),
+            actor: ownership_actor_from_privileged(&actor),
             context: context_from_body(&body),
         },
     )
@@ -1018,7 +1026,7 @@ pub async fn set_stackable(
     write_admin_audit(
         &state.db,
         ACTION_ADMIN_INVENTORY_STACKABLE_SET,
-        admin.id,
+        &actor,
         result.asset_key.clone(),
         parsed_user_id,
         result.asset_definition_id,
@@ -1055,20 +1063,29 @@ pub async fn prolong_expirable(
     Json(body): Json<MutationBody>,
 ) -> HttpResult<Json<Value>> {
     let state = state.read().await;
-    let admin = require_superuser(&headers, &state).await?;
+    let actor = require_privileged_actor(&headers, &state).await?;
+    let parsed_user_id = parse_uuid(&user_id, "Invalid user ID")?;
     let result = inventory::prolong_expirable(
         &state.db,
         ProlongExpirableMutation {
-            user_id: parse_uuid(&user_id, "Invalid user ID")?,
+            user_id: parsed_user_id,
             asset_key,
             duration_seconds: body.duration_seconds.ok_or_else(|| HttpError::bad_request("durationSeconds is required"))?,
-            actor: OwnershipActor::admin(admin.id),
+            actor: ownership_actor_from_privileged(&actor),
             context: context_from_body(&body),
         },
     )
     .await
     .map_err(map_domain_error)?;
-    write_admin_audit(&state.db, ACTION_ADMIN_INVENTORY_EXPIRABLE_PROLONGED, admin.id, result.asset_key.clone(), parse_uuid(&user_id, "Invalid user ID")?, result.asset_definition_id).await?;
+    write_admin_audit(
+        &state.db,
+        ACTION_ADMIN_INVENTORY_EXPIRABLE_PROLONGED,
+        &actor,
+        result.asset_key.clone(),
+        parsed_user_id,
+        result.asset_definition_id,
+    )
+    .await?;
     Ok(Json(expirable_json(result)))
 }
 
@@ -1100,7 +1117,7 @@ pub async fn set_expiration(
     Json(body): Json<MutationBody>,
 ) -> HttpResult<Json<Value>> {
     let state = state.read().await;
-    let admin = require_superuser(&headers, &state).await?;
+    let actor = require_privileged_actor(&headers, &state).await?;
     let parsed_user_id = parse_uuid(&user_id, "Invalid user ID")?;
     let result = inventory::set_expiration(
         &state.db,
@@ -1108,13 +1125,21 @@ pub async fn set_expiration(
             user_id: parsed_user_id,
             asset_key,
             expires_at: body.expires_at.ok_or_else(|| HttpError::bad_request("expiresAt is required"))?,
-            actor: OwnershipActor::admin(admin.id),
+            actor: ownership_actor_from_privileged(&actor),
             context: context_from_body(&body),
         },
     )
     .await
     .map_err(map_domain_error)?;
-    write_admin_audit(&state.db, ACTION_ADMIN_INVENTORY_EXPIRABLE_EXPIRATION_SET, admin.id, result.asset_key.clone(), parsed_user_id, result.asset_definition_id).await?;
+    write_admin_audit(
+        &state.db,
+        ACTION_ADMIN_INVENTORY_EXPIRABLE_EXPIRATION_SET,
+        &actor,
+        result.asset_key.clone(),
+        parsed_user_id,
+        result.asset_definition_id,
+    )
+    .await?;
     Ok(Json(expirable_json(result)))
 }
 
@@ -1146,14 +1171,14 @@ pub async fn revoke_expirable(
     Json(body): Json<MutationBody>,
 ) -> HttpResult<Json<Value>> {
     let state = state.read().await;
-    let admin = require_superuser(&headers, &state).await?;
+    let actor = require_privileged_actor(&headers, &state).await?;
     let parsed_user_id = parse_uuid(&user_id, "Invalid user ID")?;
     inventory::revoke_expirable(
         &state.db,
         EntitlementMutation {
             user_id: parsed_user_id,
             asset_key: asset_key.clone(),
-            actor: OwnershipActor::admin(admin.id),
+            actor: ownership_actor_from_privileged(&actor),
             context: context_from_body(&body),
         },
     )
@@ -1162,10 +1187,10 @@ pub async fn revoke_expirable(
     write_audit_log(
         &state.db,
         ACTION_ADMIN_INVENTORY_EXPIRABLE_REVOKED,
-        Some(admin.id),
+        actor.actor_user_id(),
         Some(parsed_user_id),
         body.reason_text.clone(),
-        Some(json!({ "assetKey": asset_key })),
+        Some(with_actor_metadata(json!({ "assetKey": asset_key }), &actor)),
     )
     .await
     .map_err(|error| HttpError::internal_error(format!("Failed to write audit log: {error}")))?;
@@ -1178,7 +1203,7 @@ pub async fn get_user_wallet(
     Path(user_id): Path<String>,
 ) -> HttpResult<Json<Value>> {
     let state = state.read().await;
-    require_superuser(&headers, &state).await?;
+    require_privileged_actor(&headers, &state).await?;
     let items = wallet::get_wallet(&state.db, parse_uuid(&user_id, "Invalid user ID")?)
         .await
         .map_err(map_domain_error)?;
@@ -1191,7 +1216,7 @@ pub async fn get_user_wallet_balance(
     Path((user_id, currency_key)): Path<(String, String)>,
 ) -> HttpResult<Json<Value>> {
     let state = state.read().await;
-    require_superuser(&headers, &state).await?;
+    require_privileged_actor(&headers, &state).await?;
     let balance = wallet::get_wallet_balance(&state.db, parse_uuid(&user_id, "Invalid user ID")?, &currency_key)
         .await
         .map_err(map_domain_error)?;
@@ -1221,7 +1246,7 @@ pub async fn get_user_wallet_transactions(
     Path((user_id, currency_key)): Path<(String, String)>,
 ) -> HttpResult<Json<Value>> {
     let state = state.read().await;
-    require_superuser(&headers, &state).await?;
+    require_privileged_actor(&headers, &state).await?;
     let items = wallet::get_wallet_transactions(&state.db, parse_uuid(&user_id, "Invalid user ID")?, &currency_key)
         .await
         .map_err(map_domain_error)?;
@@ -1256,7 +1281,7 @@ pub async fn credit_wallet(
     Json(body): Json<MutationBody>,
 ) -> HttpResult<Json<Value>> {
     let state = state.read().await;
-    let admin = require_superuser(&headers, &state).await?;
+    let actor = require_privileged_actor(&headers, &state).await?;
     let parsed_user_id = parse_uuid(&user_id, "Invalid user ID")?;
     let result = wallet::credit(
         &state.db,
@@ -1264,7 +1289,7 @@ pub async fn credit_wallet(
             user_id: parsed_user_id,
             currency_key,
             amount: body.amount.ok_or_else(|| HttpError::bad_request("amount is required"))?,
-            actor: OwnershipActor::admin(admin.id),
+            actor: ownership_actor_from_privileged(&actor),
             context: context_from_body(&body),
         },
     )
@@ -1273,7 +1298,7 @@ pub async fn credit_wallet(
     write_admin_audit(
         &state.db,
         ACTION_ADMIN_WALLET_CREDITED,
-        admin.id,
+        &actor,
         result.currency_key.clone(),
         parsed_user_id,
         result.currency_asset_definition_id,
@@ -1311,7 +1336,7 @@ pub async fn debit_wallet(
     Json(body): Json<MutationBody>,
 ) -> HttpResult<Json<Value>> {
     let state = state.read().await;
-    let admin = require_superuser(&headers, &state).await?;
+    let actor = require_privileged_actor(&headers, &state).await?;
     let parsed_user_id = parse_uuid(&user_id, "Invalid user ID")?;
     let result = wallet::debit(
         &state.db,
@@ -1319,7 +1344,7 @@ pub async fn debit_wallet(
             user_id: parsed_user_id,
             currency_key,
             amount: body.amount.ok_or_else(|| HttpError::bad_request("amount is required"))?,
-            actor: OwnershipActor::admin(admin.id),
+            actor: ownership_actor_from_privileged(&actor),
             context: context_from_body(&body),
         },
     )
@@ -1328,7 +1353,7 @@ pub async fn debit_wallet(
     write_admin_audit(
         &state.db,
         ACTION_ADMIN_WALLET_DEBITED,
-        admin.id,
+        &actor,
         result.currency_key.clone(),
         parsed_user_id,
         result.currency_asset_definition_id,
@@ -1365,7 +1390,7 @@ pub async fn adjust_wallet_balance(
     Json(body): Json<MutationBody>,
 ) -> HttpResult<Json<Value>> {
     let state = state.read().await;
-    let admin = require_superuser(&headers, &state).await?;
+    let actor = require_privileged_actor(&headers, &state).await?;
     let parsed_user_id = parse_uuid(&user_id, "Invalid user ID")?;
     let result = wallet::adjust_balance(
         &state.db,
@@ -1373,7 +1398,7 @@ pub async fn adjust_wallet_balance(
             user_id: parsed_user_id,
             currency_key,
             amount: body.amount.ok_or_else(|| HttpError::bad_request("amount is required"))?,
-            actor: OwnershipActor::admin(admin.id),
+            actor: ownership_actor_from_privileged(&actor),
             context: context_from_body(&body),
         },
     )
@@ -1382,7 +1407,7 @@ pub async fn adjust_wallet_balance(
     write_admin_audit(
         &state.db,
         ACTION_ADMIN_WALLET_ADJUSTED,
-        admin.id,
+        &actor,
         result.currency_key.clone(),
         parsed_user_id,
         result.currency_asset_definition_id,
@@ -1394,7 +1419,7 @@ pub async fn adjust_wallet_balance(
 async fn write_admin_audit(
     db: &sea_orm::DatabaseConnection,
     action: &str,
-    actor_user_id: Uuid,
+    actor: &PrivilegedActor,
     asset_key: String,
     target_user_id: Uuid,
     asset_definition_id: Uuid,
@@ -1402,14 +1427,41 @@ async fn write_admin_audit(
     write_audit_log(
         db,
         action,
-        Some(actor_user_id),
+        actor.actor_user_id(),
         Some(target_user_id),
         None,
-        Some(json!({ "assetKey": asset_key, "assetDefinitionId": asset_definition_id })),
+        Some(with_actor_metadata(
+            json!({ "assetKey": asset_key, "assetDefinitionId": asset_definition_id }),
+            actor,
+        )),
     )
     .await
     .map_err(|error| HttpError::internal_error(format!("Failed to write audit log: {error}")))?;
     Ok(())
+}
+
+fn ownership_actor_from_privileged(actor: &PrivilegedActor) -> OwnershipActor {
+    match actor {
+        PrivilegedActor::User(user) => OwnershipActor::admin(user.id),
+        PrivilegedActor::Service(service) => OwnershipActor::system(service.system_name.clone()),
+    }
+}
+
+fn with_actor_metadata(metadata: Value, actor: &PrivilegedActor) -> Value {
+    let mut metadata = match metadata {
+        Value::Object(map) => map,
+        other => {
+            let mut map = serde_json::Map::new();
+            map.insert("value".to_string(), other);
+            map
+        }
+    };
+
+    if let Some(service_name) = actor.actor_service_name() {
+        metadata.insert("actorServiceName".to_string(), Value::String(service_name.to_string()));
+    }
+
+    Value::Object(metadata)
 }
 
 fn parse_uuid(value: &str, message: &str) -> HttpResult<Uuid> {

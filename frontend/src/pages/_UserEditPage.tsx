@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { getCurrentUser, updateNickname, type UserResponse } from '../services/userApi'
+import { ApiError, toDisplayError } from '../api/http'
+import { getCurrentUser, updateNickname, type UserResponse } from '../api/users'
+import { currentAppPath, redirectToAuth } from '../routes/auth'
 import { useAuthStore } from '../store/authStore'
 import { isAuthenticated, removeAuthToken } from '../util/tokenStorage'
 import LoadingState from '../components/LoadingState'
 import ErrorState from '../components/ErrorState'
-import UserProfileCard from '../components/UserProfileCard'
+import { paths } from '../routes/paths'
 import './UserEditPage.css'
 
 type PageState = 
@@ -20,7 +21,6 @@ export default function UserEditPage() {
     const [nickname, setNickname] = useState('')
     const [validationError, setValidationError] = useState('')
     const [authChecked, setAuthChecked] = useState(false)
-    const navigate = useNavigate()
     const { user: authUser, setUser } = useAuthStore()
 
     // Проверяем авторизацию при загрузке компонента
@@ -28,11 +28,11 @@ export default function UserEditPage() {
         if (authChecked) return // Предотвращаем повторные проверки
         
         if (!isAuthenticated()) {
-            navigate('/auth', { replace: true })
+            redirectToAuth(currentAppPath())
             return
         }
         setAuthChecked(true)
-    }, [navigate, authChecked])
+    }, [authChecked])
 
     useEffect(() => {
         // Если не авторизован или еще не проверили авторизацию, не загружаем данные
@@ -58,20 +58,14 @@ export default function UserEditPage() {
             } catch (err) {
                 if (cancelled) return
                 
-                // Если ошибка связана с авторизацией, очищаем токен и перенаправляем
-                if (err instanceof Error && (
-                    err.message.includes('токен') || 
-                    err.message.includes('авторизации') ||
-                    err.message.includes('401') ||
-                    err.message.includes('403')
-                )) {
+                if (err instanceof ApiError && err.isAuthError()) {
                     removeAuthToken()
                     setUser(null)
-                    navigate('/auth', { replace: true })
+                    redirectToAuth(currentAppPath())
                     return
                 }
                 
-                const message = err instanceof Error ? err.message : 'Ошибка при загрузке данных пользователя'
+                const message = toDisplayError(err, 'Ошибка при загрузке данных пользователя')
                 setState({ status: 'error', errorMessage: message })
             }
         }
@@ -81,7 +75,7 @@ export default function UserEditPage() {
         return () => {
             cancelled = true
         }
-    }, [authChecked, navigate, setUser]) // Добавляем необходимые зависимости
+    }, [authChecked, setUser]) // Добавляем необходимые зависимости
 
     const validateNickname = (value: string): string => {
         if (!value.trim()) {
@@ -145,7 +139,7 @@ export default function UserEditPage() {
             
             setState({ status: 'success', user: updatedUser })
         } catch (err) {
-            const message = err instanceof Error ? err.message : 'Ошибка при обновлении никнейма'
+            const message = toDisplayError(err, 'Ошибка при обновлении никнейма')
             setState({ status: 'error', errorMessage: message })
         }
     }
@@ -156,47 +150,51 @@ export default function UserEditPage() {
     }
 
     const handleBackToProfile = () => {
-        navigate('/profile')
+        window.location.assign(`${paths.profile}?tab=settings`)
     }
 
     if (state.status === 'loading') {
         return (
-            <LoadingState
-                title="Загрузка профиля"
-                message="Получаем данные вашего профиля..."
-            />
+            <div className="ui-kit-page user-edit-page">
+                <LoadingState
+                    title="Загрузка настроек"
+                    message="Получаем данные профиля для редактирования..."
+                />
+            </div>
         )
     }
 
     if (state.status === 'error') {
         return (
-            <ErrorState
-                title="Ошибка загрузки"
-                message={state.errorMessage}
-                primaryActionLabel="Повторить"
-                onPrimaryAction={handleRetry}
-            />
+            <div className="ui-kit-page user-edit-page">
+                <ErrorState
+                    title="Настройки недоступны"
+                    message={state.errorMessage}
+                    primaryActionLabel="Повторить"
+                    onPrimaryAction={handleRetry}
+                />
+            </div>
         )
     }
 
     if (state.status === 'success') {
         return (
-            <div className="user-edit-page">
-                <div className="success-container">
+            <div className="ui-kit-page user-edit-page">
+                <div className="card success-container">
                     <div className="success-icon">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                             <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
                             <polyline points="22,4 12,14.01 9,11.01"/>
                         </svg>
                     </div>
-                    <h1>Никнейм успешно обновлен!</h1>
-                    <p>Ваш новый никнейм: <strong>{state.user.username}</strong></p>
+                    <h1 className="card-title">Настройки обновлены</h1>
+                    <p>Новый никнейм сохранен: <strong>{state.user.username}</strong></p>
                     
                     <button 
                         className="btn primary"
                         onClick={handleBackToProfile}
                     >
-                        Вернуться к профилю
+                        Вернуться к настройкам
                     </button>
                 </div>
             </div>
@@ -207,30 +205,28 @@ export default function UserEditPage() {
     const isUpdating = state.status === 'updating'
 
     return (
-        <div className="user-edit-page">
-            <div className="edit-container">
-                <h1>Изменение никнейма</h1>
+        <div className="ui-kit-page user-edit-page">
+            <div className="edit-container card">
+                <h1 className="card-title">Настройки профиля</h1>
+                <p className="card-text">Сейчас здесь доступно изменение никнейма. Остальные настройки можно будет добавлять в этот же раздел.</p>
                 
                 {user && (
-                    <div className="current-profile">
-                        <UserProfileCard user={{
-                            id: user.id,
-                            username: user.username,
-                            avatarUrl: user.avatarUrl || ''
-                        }} />
+                    <div className="ui-alert ui-alert-info current-profile">
+                        <span className="ui-alert-icon" aria-hidden>ℹ</span>
+                        <span>Текущий никнейм: <strong>{user.username}</strong></span>
                     </div>
                 )}
 
                 <form onSubmit={handleSubmit} className="nickname-form">
-                    <div className="form-group">
-                        <label htmlFor="nickname">Новый никнейм</label>
+                    <div className={`ui-field form-group ${validationError ? 'ui-field-error' : ''}`}>
+                        <label className="ui-label" htmlFor="nickname">Новый никнейм</label>
                         <input
                             id="nickname"
+                            className="ui-input"
                             type="text"
                             value={nickname}
                             onChange={(e) => handleNicknameChange(e.target.value)}
                             disabled={isUpdating}
-                            className={validationError ? 'error' : ''}
                             placeholder="Введите новый никнейм"
                             maxLength={16}
                         />
@@ -239,7 +235,7 @@ export default function UserEditPage() {
                                 {validationError}
                             </div>
                         )}
-                        <div className="form-help">
+                        <div className="ui-hint form-help">
                             Никнейм должен содержать от 2 до 16 символов и может включать только буквы, цифры и подчеркивания.
                         </div>
                     </div>
@@ -247,7 +243,7 @@ export default function UserEditPage() {
                     <div className="form-actions">
                         <button
                             type="button"
-                            className="btn secondary"
+                            className="btn"
                             onClick={handleBackToProfile}
                             disabled={isUpdating}
                         >

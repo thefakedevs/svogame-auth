@@ -1,13 +1,26 @@
 /* App Root */
-#root {
+#root,
+.astro-app-root {
   width: 100%;
   max-width: 480px;
   margin: 0 auto;
   padding: 20px;
 }
 
-#root:has(.ui-kit-page) {
+#root:has(.ui-kit-page),
+.astro-app-root:has(.ui-kit-page) {
   max-width: min(1000px, 100%);
+}
+
+#root:has(.app-shell),
+.astro-app-root:has(.app-shell) {
+  max-width: min(1180px, 100%);
+}
+
+/* PoW / проверка на бота: полная ширина экрана для полоски 50vw */
+#root:has(.auth-pow-fullbleed),
+.astro-app-root:has(.auth-pow-fullbleed) {
+  max-width: none;
 }
 
 body:has(.ui-kit-page) {
@@ -165,21 +178,6 @@ progress::-moz-progress-bar {
   border-radius: 4px;
 }
 
-/* PoW Progress */
-.pow-progress {
-  width: 100%;
-  margin-top: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.pow-progress p {
-  font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.6);
-  text-align: center;
-}
-
 /* Not Found Page */
 .not-found {
   text-align: center;
@@ -236,10 +234,6 @@ progress::-moz-progress-bar {
 
   progress::-webkit-progress-bar {
     background: rgba(0, 0, 0, 0.1);
-  }
-
-  .pow-progress p {
-    color: rgba(30, 30, 46, 0.6);
   }
 
   .not-found {

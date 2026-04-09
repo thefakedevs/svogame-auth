@@ -11,7 +11,7 @@ use serde_json::json;
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 
-use crate::app::auth::require_superuser;
+use crate::app::auth::require_human_superuser;
 use crate::app::http::{HttpError, HttpResult};
 use crate::app::state::{AppState, AppStateExtractor};
 use crate::entities::{
@@ -101,7 +101,7 @@ pub async fn list_squads(
     Query(query): Query<ListSquadsQuery>,
 ) -> HttpResult<Json<AdminSquadListResponse>> {
     let state = state.read().await;
-    require_superuser(&headers, &state).await?;
+    require_human_superuser(&headers, &state).await?;
 
     let page = query.page.unwrap_or(1).max(1);
     let per_page = query.per_page.unwrap_or(20).clamp(1, 100);
@@ -162,7 +162,7 @@ pub async fn get_squad(
     Path(squad_id): Path<String>,
 ) -> HttpResult<Json<AdminSquadResponse>> {
     let state = state.read().await;
-    require_superuser(&headers, &state).await?;
+    require_human_superuser(&headers, &state).await?;
     let squad = get_squad_model(&state, &squad_id).await?;
     Ok(Json(to_squad_response(&state, squad).await?))
 }
@@ -191,7 +191,7 @@ pub async fn patch_squad(
     Json(body): Json<PatchAdminSquadRequest>,
 ) -> HttpResult<Json<AdminSquadResponse>> {
     let state = state.read().await;
-    let admin = require_superuser(&headers, &state).await?;
+    let admin = require_human_superuser(&headers, &state).await?;
     let squad = get_squad_model(&state, &squad_id).await?;
     let mut active_squad: SquadActiveModel = squad.into();
 
@@ -249,7 +249,7 @@ pub async fn restrict_squad(
     Json(body): Json<ReasonRequest>,
 ) -> HttpResult<Json<AdminSquadResponse>> {
     let state = state.read().await;
-    let admin = require_superuser(&headers, &state).await?;
+    let admin = require_human_superuser(&headers, &state).await?;
     update_squad_restricted_flag(&state, admin.id, squad_id, true, body.reason, ACTION_ADMIN_SQUAD_RESTRICTED).await
 }
 
@@ -277,7 +277,7 @@ pub async fn unrestrict_squad(
     Json(body): Json<ReasonRequest>,
 ) -> HttpResult<Json<AdminSquadResponse>> {
     let state = state.read().await;
-    let admin = require_superuser(&headers, &state).await?;
+    let admin = require_human_superuser(&headers, &state).await?;
     update_squad_restricted_flag(&state, admin.id, squad_id, false, body.reason, ACTION_ADMIN_SQUAD_UNRESTRICTED).await
 }
 
@@ -303,7 +303,7 @@ pub async fn delete_squad(
     Path(squad_id): Path<String>,
 ) -> HttpResult<Json<ActionResponse>> {
     let state = state.read().await;
-    let admin = require_superuser(&headers, &state).await?;
+    let admin = require_human_superuser(&headers, &state).await?;
     let squad = get_squad_model(&state, &squad_id).await?;
 
     let tx = state
@@ -377,7 +377,7 @@ pub async fn kick_member(
     Path((squad_id, user_id)): Path<(String, String)>,
 ) -> HttpResult<Json<ActionResponse>> {
     let state = state.read().await;
-    let admin = require_superuser(&headers, &state).await?;
+    let admin = require_human_superuser(&headers, &state).await?;
     let squad = get_squad_model(&state, &squad_id).await?;
     let target_user_id = parse_uuid(&user_id, "Invalid target user ID")?;
 
@@ -442,7 +442,7 @@ pub async fn upload_squad_image(
     mut multipart: Multipart,
 ) -> HttpResult<Json<AdminSquadResponse>> {
     let state = state.read().await;
-    let admin = require_superuser(&headers, &state).await?;
+    let admin = require_human_superuser(&headers, &state).await?;
     let squad = get_squad_model(&state, &squad_id).await?;
     let data = read_first_image(&mut multipart).await?;
     let processed = process_squad_image(&data).map_err(|e| HttpError::bad_request(e.to_string()))?;
@@ -504,7 +504,7 @@ pub async fn delete_squad_image(
     Path(squad_id): Path<String>,
 ) -> HttpResult<Json<AdminSquadResponse>> {
     let state = state.read().await;
-    let admin = require_superuser(&headers, &state).await?;
+    let admin = require_human_superuser(&headers, &state).await?;
     let squad = get_squad_model(&state, &squad_id).await?;
     if let Some(key) = squad.image_key.clone() {
         delete_image_object(&state, &key).await?;

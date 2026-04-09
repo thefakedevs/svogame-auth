@@ -1,0 +1,205 @@
+import { authHeaders, request, requestNullable } from './http'
+
+export interface UserRestrictionResponse {
+  key: string
+  createdAt: string
+  reason: string | null
+}
+
+export interface RestrictionMetaResponse {
+  key: string
+  locale: {
+    en: {
+      title: string
+      description: string
+    }
+  }
+}
+
+export interface SquadResponse {
+  id: string
+  name: string
+  leaderUserId: string
+  memberCount: number
+  maxMembers: number
+  imageUrl: string | null
+  isRestricted: boolean
+  restrictionReason: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface SquadMemberResponse {
+  id: string
+  username: string
+  avatarUrl: string | null
+  isLeader: boolean
+}
+
+export interface SquadInviteResponse {
+  id: string
+  squadId: string
+  squadName: string
+  inviterUserId: string
+  invitedUserId: string
+  expiresAt: string
+  createdAt: string
+}
+
+export interface SquadConfigResponse {
+  maxMembers: number
+  inviteTtlHours: number
+  nameMinChars: number
+  nameMaxChars: number
+  nameRegex: string
+  imageMaxBytes: number
+  imageMaxWidth: number
+  imageMaxHeight: number
+}
+
+export interface SquadActionResponse {
+  status: string
+}
+
+export interface UserSearchItemResponse {
+  id: string
+  username: string
+  avatarUrl: string | null
+}
+
+export function getMyRestrictions(token: string): Promise<UserRestrictionResponse[]> {
+  return request<UserRestrictionResponse[]>('/api/user/me/restrictions', {
+    headers: authHeaders(token, {
+      'Content-Type': 'application/json',
+    }),
+  })
+}
+
+export function getMySquad(token: string): Promise<SquadResponse | null> {
+  return requestNullable<SquadResponse>('/api/user/me/squad', {
+    headers: authHeaders(token, {
+      'Content-Type': 'application/json',
+    }),
+  })
+}
+
+export function getMySquadInvites(token: string): Promise<SquadInviteResponse[]> {
+  return request<SquadInviteResponse[]>('/api/user/me/squad-invites', {
+    headers: authHeaders(token, {
+      'Content-Type': 'application/json',
+    }),
+  })
+}
+
+export function getRestrictionMeta(): Promise<RestrictionMetaResponse[]> {
+  return request<RestrictionMetaResponse[]>('/api/meta/restrictions')
+}
+
+export function getSquadConfig(): Promise<SquadConfigResponse> {
+  return request<SquadConfigResponse>('/api/meta/squads/config')
+}
+
+export function getSquadMembers(token: string, squadId: string): Promise<SquadMemberResponse[]> {
+  return request<SquadMemberResponse[]>(`/api/squads/${squadId}/members`, {
+    headers: authHeaders(token, {
+      'Content-Type': 'application/json',
+    }),
+  })
+}
+
+export function createSquad(token: string, name: string): Promise<SquadResponse> {
+  return request<SquadResponse>('/api/squads', {
+    method: 'POST',
+    headers: authHeaders(token, {
+      'Content-Type': 'application/json',
+    }),
+    body: JSON.stringify({ name }),
+  })
+}
+
+export function patchSquad(token: string, squadId: string, name: string): Promise<SquadResponse> {
+  return request<SquadResponse>(`/api/squads/${squadId}`, {
+    method: 'PATCH',
+    headers: authHeaders(token, {
+      'Content-Type': 'application/json',
+    }),
+    body: JSON.stringify({ name }),
+  })
+}
+
+export function deleteSquad(token: string, squadId: string): Promise<SquadActionResponse> {
+  return request<SquadActionResponse>(`/api/squads/${squadId}`, {
+    method: 'DELETE',
+    headers: authHeaders(token, {
+      'Content-Type': 'application/json',
+    }),
+  })
+}
+
+export function leaveSquad(token: string, squadId: string): Promise<SquadActionResponse> {
+  return request<SquadActionResponse>(`/api/squads/${squadId}/leave`, {
+    method: 'POST',
+    headers: authHeaders(token, {
+      'Content-Type': 'application/json',
+    }),
+  })
+}
+
+export function kickSquadMember(token: string, squadId: string, userId: string): Promise<SquadActionResponse> {
+  return request<SquadActionResponse>(`/api/squads/${squadId}/members/${userId}/kick`, {
+    method: 'POST',
+    headers: authHeaders(token, {
+      'Content-Type': 'application/json',
+    }),
+  })
+}
+
+export function createSquadInvite(token: string, squadId: string, userId: string): Promise<SquadInviteResponse> {
+  return request<SquadInviteResponse>(`/api/squads/${squadId}/invites`, {
+    method: 'POST',
+    headers: authHeaders(token, {
+      'Content-Type': 'application/json',
+    }),
+    body: JSON.stringify({ userId }),
+  })
+}
+
+export function revokeSquadInvite(token: string, inviteId: string): Promise<SquadActionResponse> {
+  return request<SquadActionResponse>(`/api/squad-invites/${inviteId}`, {
+    method: 'DELETE',
+    headers: authHeaders(token, {
+      'Content-Type': 'application/json',
+    }),
+  })
+}
+
+export function acceptSquadInvite(token: string, inviteId: string): Promise<SquadActionResponse> {
+  return request<SquadActionResponse>(`/api/squad-invites/${inviteId}/accept`, {
+    method: 'POST',
+    headers: authHeaders(token, {
+      'Content-Type': 'application/json',
+    }),
+  })
+}
+
+export function declineSquadInvite(token: string, inviteId: string): Promise<SquadActionResponse> {
+  return request<SquadActionResponse>(`/api/squad-invites/${inviteId}/decline`, {
+    method: 'POST',
+    headers: authHeaders(token, {
+      'Content-Type': 'application/json',
+    }),
+  })
+}
+
+export function searchUsers(token: string, q: string, limit = 10): Promise<UserSearchItemResponse[]> {
+  const params = new URLSearchParams({
+    q,
+    limit: String(limit),
+  })
+
+  return request<UserSearchItemResponse[]>(`/api/users/search?${params.toString()}`, {
+    headers: authHeaders(token, {
+      'Content-Type': 'application/json',
+    }),
+  })
+}

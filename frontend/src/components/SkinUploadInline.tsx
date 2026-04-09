@@ -1,10 +1,25 @@
 import { useRef, useState } from 'react'
 import toast from 'react-hot-toast'
 
+import { ApiError, uploadMySkin, type SkinModel } from '../api/skins'
 import SkinViewer3D from './SkinViewer3D'
-import { uploadMySkin, type SkinModel } from '../services/skinApi'
 import { tokenManager } from '../services/tokenManager'
 import './SkinUploadInline.css'
+
+function skinUploadErrorMessage(error: unknown): string {
+  if (error instanceof ApiError) {
+    if (error.isNetworkError()) {
+      return 'Нет доступа к серверу. Проверьте подключение и попробуйте снова.'
+    }
+    return error.message
+  }
+
+  if (error instanceof Error && error.message) {
+    return error.message
+  }
+
+  return 'Не удалось загрузить скин.'
+}
 
 export default function SkinUploadInline({ onUploaded }: { onUploaded?: () => void }) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
@@ -15,15 +30,15 @@ export default function SkinUploadInline({ onUploaded }: { onUploaded?: () => vo
   const handleFileChange = (file: File) => {
     if (file.type.startsWith('image/')) {
       const reader = new FileReader()
-      reader.onload = (e) => {
-        setPreviewUrl(e.target?.result as string)
+      reader.onload = (event) => {
+        setPreviewUrl(event.target?.result as string)
       }
       reader.readAsDataURL(file)
     }
   }
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
+  const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
     if (file) handleFileChange(file)
   }
 
@@ -33,7 +48,7 @@ export default function SkinUploadInline({ onUploaded }: { onUploaded?: () => vo
 
     const token = await tokenManager.getToken()
     if (!token) {
-      toast.error('Токен авторизации не найден')
+      toast.error('Сессия не найдена. Войдите снова.')
       return
     }
 
@@ -43,8 +58,8 @@ export default function SkinUploadInline({ onUploaded }: { onUploaded?: () => vo
 
     toast.promise(uploadPromise, {
       loading: 'Загрузка скина...',
-      success: 'Скин успешно загружен!',
-      error: (err) => err.message || 'Ошибка при загрузке',
+      success: 'Скин успешно загружен.',
+      error: (error) => skinUploadErrorMessage(error),
     })
 
     try {
@@ -71,17 +86,17 @@ export default function SkinUploadInline({ onUploaded }: { onUploaded?: () => vo
             <div className="model-toggle">
               <button
                 type="button"
-                className={`model-btn ${model === 'default' ? 'active' : ''}`}
+                className={`btn btn-sm model-btn ${model === 'default' ? 'active' : ''}`}
                 onClick={() => setModel('default')}
               >
-                Обычные
+                Обычная
               </button>
               <button
                 type="button"
-                className={`model-btn ${model === 'slim' ? 'active' : ''}`}
+                className={`btn btn-sm model-btn ${model === 'slim' ? 'active' : ''}`}
                 onClick={() => setModel('slim')}
               >
-                Тонкие
+                Тонкая
               </button>
             </div>
           </>
@@ -109,15 +124,15 @@ export default function SkinUploadInline({ onUploaded }: { onUploaded?: () => vo
         <div className="upload-buttons">
           <button
             type="button"
-            className="btn-upload"
-            onClick={handleUpload}
+            className="btn btn-success"
+            onClick={() => void handleUpload()}
             disabled={isLoading}
           >
             {isLoading ? 'Загрузка...' : 'Загрузить'}
           </button>
           <button
             type="button"
-            className="btn-clear"
+            className="btn"
             onClick={() => {
               setPreviewUrl(null)
               if (fileInputRef.current) fileInputRef.current.value = ''

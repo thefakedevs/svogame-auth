@@ -1,4 +1,6 @@
 pub mod handlers;
+pub mod service_tokens;
+pub mod skins;
 pub mod squads;
 
 use axum::routing::{get, post};
@@ -15,6 +17,26 @@ pub fn router() -> Router<crate::app::state::SharedAppState> {
         .route("/api/admin/users/{user_id}/reset-auth-epoch", post(handlers::reset_auth_epoch))
         .route("/api/admin/users/{user_id}/grant-superuser", post(handlers::grant_superuser))
         .route("/api/admin/users/{user_id}/revoke-superuser", post(handlers::revoke_superuser))
+        .route(
+            "/api/admin/service-tokens",
+            get(service_tokens::list_service_tokens).post(service_tokens::create_service_token),
+        )
+        .route(
+            "/api/admin/service-tokens/{token_id}",
+            get(service_tokens::get_service_token),
+        )
+        .route(
+            "/api/admin/service-tokens/{token_id}/audit",
+            get(service_tokens::get_service_token_audit),
+        )
+        .route(
+            "/api/admin/service-tokens/{token_id}/rotate",
+            post(service_tokens::rotate_service_token),
+        )
+        .route(
+            "/api/admin/service-tokens/{token_id}/revoke",
+            post(service_tokens::revoke_service_token),
+        )
         .route("/api/admin/users/{user_id}/restrictions", get(handlers::get_user_restrictions))
         .route(
             "/api/admin/users/{user_id}/restrictions/{restriction_key}",
@@ -36,5 +58,9 @@ pub fn router() -> Router<crate::app::state::SharedAppState> {
         .route(
             "/api/admin/squads/{squad_id}/image",
             post(squads::upload_squad_image).delete(squads::delete_squad_image),
+        )
+        .route(
+            "/api/admin/skins/default",
+            get(skins::get_default_skin).post(skins::upload_default_skin),
         )
 }
