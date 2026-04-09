@@ -17,6 +17,7 @@ permissions:
 
 env:
   REGISTRY: ghcr.io
+  DEPLOY_STAGE_WEBHOOK_URL: ${{ secrets.DEPLOY_STAGE_WEBHOOK_URL }}
 
 jobs:
   build-and-push:
@@ -82,10 +83,16 @@ jobs:
     steps:
       - name: Call deploy webhook
         run: |
+          if [ "${{ github.ref }}" = "refs/heads/stage" ]; then
+            WEBHOOK_URL="$DEPLOY_STAGE_WEBHOOK_URL"
+          else
+            WEBHOOK_URL="${{ secrets.DEPLOY_WEBHOOK_URL }}"
+          fi
+
           curl --fail --show-error --silent \
             -X POST \
             -H "Content-Type: application/json" \
             -H "X-Deploy-Token: $DEPLOY_WEBHOOK_TOKEN" \
             -H "X-Deploy-Ref: ${{ github.ref }}" \
             -d '{}' \
-            "${{ secrets.DEPLOY_WEBHOOK_URL }}"
+            "$WEBHOOK_URL"
