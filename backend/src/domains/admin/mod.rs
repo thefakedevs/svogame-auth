@@ -4,7 +4,7 @@ pub mod skins;
 pub mod squads;
 
 use axum::Router;
-use axum::routing::{get, post};
+use axum::routing::{delete, get, post};
 
 pub fn router() -> Router<crate::app::state::SharedAppState> {
     Router::new()
@@ -14,6 +14,14 @@ pub fn router() -> Router<crate::app::state::SharedAppState> {
         .route(
             "/api/admin/users/{user_id}",
             get(handlers::get_user).patch(handlers::patch_user),
+        )
+        .route(
+            "/api/admin/user/{user_id}/squad",
+            get(handlers::get_user_squad),
+        )
+        .route(
+            "/api/admin/user/{user_id}/skin",
+            delete(handlers::delete_user_skin),
         )
         .route(
             "/api/admin/users/{user_id}/deactivate",
