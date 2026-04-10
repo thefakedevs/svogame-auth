@@ -19,6 +19,8 @@ export interface SquadMemberResponse {
   username: string
   avatarUrl: string | null
   isLeader: boolean
+  inviteId: string | null
+  isPendingInvite: boolean
 }
 
 export interface SquadInviteResponse {
