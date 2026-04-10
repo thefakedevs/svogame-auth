@@ -136,6 +136,7 @@ export default function NoSquadState({ authToken, data, onChanged }: SquadSectio
                 <div className="profile-stack profile-invite-card__content">
                   <strong>{invite.squadName}</strong>
                   <span className="profile-subtle">Истекает {formatDateTime(invite.expiresAt)}</span>
+                  <span className="profile-subtle">Пригласил: {invite.inviterUsername}</span>
                 </div>
                 <div className="profile-actions">
                   <button className="btn primary profile-invite-action-btn" type="button" disabled={processingInviteId === invite.id} onClick={() => void onAcceptInvite(invite.id)}>

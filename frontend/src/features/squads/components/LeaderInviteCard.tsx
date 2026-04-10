@@ -108,8 +108,8 @@ export default function LeaderInviteCard({ authToken, data, onChanged }: SquadSe
           <div className="ui-divider" />
           <div className="profile-stack">
             <div className="profile-inline-card">
-              <strong>Последний инвайт</strong>
-              <span className="profile-subtle">{latestInvite.squadName}</span>
+              <strong>Последний инвайтный игрок</strong>
+              <span className="profile-subtle">{latestInvite.invitedUsername}</span>
             </div>
             <div className="profile-inline-card">
               <strong>Истекает</strong>

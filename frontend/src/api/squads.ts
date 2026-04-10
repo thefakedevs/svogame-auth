@@ -29,6 +29,9 @@ export interface SquadInviteResponse {
   invitedUserId: string
   expiresAt: string
   createdAt: string
+  invitedUsername: string
+  inviterAvatarUrl: string | null
+  inviterUsername: string
 }
 
 export interface SquadActionResponse {
