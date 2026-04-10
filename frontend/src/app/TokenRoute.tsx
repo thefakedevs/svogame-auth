@@ -38,6 +38,7 @@ export default function TokenRoute() {
             id: userData.id,
             username: userData.username,
             avatarUrl: userData.avatarUrl || '',
+            isSuperuser: userData.isSuperuser,
           },
         })
 

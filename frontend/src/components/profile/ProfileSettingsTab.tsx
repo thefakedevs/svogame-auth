@@ -95,7 +95,12 @@ export default function ProfileSettingsTab({
 
     try {
       const user = await request
-      setAuthUser({ id: user.id, username: user.username, avatarUrl: user.avatarUrl ?? '' })
+      setAuthUser({
+        id: user.id,
+        username: user.username,
+        avatarUrl: user.avatarUrl ?? '',
+        isSuperuser: user.isSuperuser,
+      })
       setNicknameDraft(user.username)
       setHasInvalidNicknameInput(false)
       setData((current) => (current ? { ...current, user } : current))
