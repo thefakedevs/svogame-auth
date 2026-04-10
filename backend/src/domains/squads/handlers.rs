@@ -57,6 +57,10 @@ pub struct SquadMemberResponse {
     pub avatar_url: Option<String>,
     #[serde(rename = "isLeader")]
     pub is_leader: bool,
+    #[serde(rename = "isPendingInvite")]
+    pub is_pending_invite: bool,
+    #[serde(rename = "inviteId")]
+    pub invite_id: Option<String>,
 }
 
 #[derive(Serialize, ToSchema)]
@@ -213,7 +217,7 @@ pub async fn get_squad(
         ("squad_id" = String, Path, description = "Squad UUID.")
     ),
     responses(
-        (status = 200, description = "List squad members in join order, marking the leader.", body = [SquadMemberResponse]),
+        (status = 200, description = "List squad members and active pending invites in display order. Pending invite rows are marked with `isPendingInvite=true` and carry `inviteId`.", body = [SquadMemberResponse]),
         (status = 400, description = "Invalid squad ID."),
         (status = 404, description = "Squad not found.")
     ),
@@ -226,18 +230,33 @@ pub async fn get_squad_members(
     let state = state.read().await;
     let squad = get_squad_by_id(&state.db, &squad_id).await?;
     let members = load_squad_members(&state.db, squad.id).await?;
+    let pending_invites = load_squad_pending_invites(&state.db, squad.id).await?;
 
-    Ok(Json(
-        members
+    let mut response: Vec<SquadMemberResponse> = members
+        .into_iter()
+        .map(|user| SquadMemberResponse {
+            id: user.id.to_string(),
+            username: user.username,
+            avatar_url: user.avatar_url,
+            is_leader: user.id == squad.leader_user_id,
+            is_pending_invite: false,
+            invite_id: None,
+        })
+        .collect();
+    response.extend(
+        pending_invites
             .into_iter()
-            .map(|user| SquadMemberResponse {
+            .map(|(invite, user)| SquadMemberResponse {
                 id: user.id.to_string(),
                 username: user.username,
                 avatar_url: user.avatar_url,
-                is_leader: user.id == squad.leader_user_id,
-            })
-            .collect(),
-    ))
+                is_leader: false,
+                is_pending_invite: true,
+                invite_id: Some(invite.id.to_string()),
+            }),
+    );
+
+    Ok(Json(response))
 }
 
 #[utoipa::path(
@@ -1162,6 +1181,48 @@ async fn load_squad_members(
         .all(db)
         .await
         .map_err(|e| HttpError::internal_error(format!("Failed to load squad members: {e}")))
+}
+
+async fn load_squad_pending_invites(
+    db: &impl ConnectionTrait,
+    squad_id: Uuid,
+) -> HttpResult<Vec<(SquadInviteModel, UserModel)>> {
+    let invites = SquadInvite::find()
+        .filter(SquadInviteColumn::SquadId.eq(squad_id))
+        .filter(SquadInviteColumn::ExpiresAt.gt(chrono::Utc::now()))
+        .order_by_asc(SquadInviteColumn::CreatedAt)
+        .all(db)
+        .await
+        .map_err(|e| HttpError::internal_error(format!("Failed to load squad invites: {e}")))?;
+
+    if invites.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let invited_user_ids: Vec<Uuid> = invites
+        .iter()
+        .map(|invite| invite.invited_user_id)
+        .collect();
+    let invited_users = User::find()
+        .filter(UserColumn::Id.is_in(invited_user_ids))
+        .all(db)
+        .await
+        .map_err(|e| HttpError::internal_error(format!("Failed to load invited users: {e}")))?;
+    let invited_users_by_id: HashMap<Uuid, UserModel> = invited_users
+        .into_iter()
+        .map(|user| (user.id, user))
+        .collect();
+
+    let mut result = Vec::with_capacity(invites.len());
+    for invite in invites {
+        if let Some(user) = invited_users_by_id.get(&invite.invited_user_id) {
+            if user.squad_id.is_none() {
+                result.push((invite, user.clone()));
+            }
+        }
+    }
+
+    Ok(result)
 }
 
 async fn cleanup_expired_invites(db: &impl ConnectionTrait, squad_id: Uuid) -> HttpResult<()> {
