@@ -1,9 +1,9 @@
 import type {
-  SquadConfigResponse,
   SquadInviteResponse,
   SquadMemberResponse,
   SquadResponse,
-} from '../../api/profile'
+} from '../../api/squads'
+import type { SquadConfigResponse } from '../../api/meta'
 import type { UserResponse } from '../../api/users'
 
 export type ProfileTab = 'overview' | 'squads' | 'settings'

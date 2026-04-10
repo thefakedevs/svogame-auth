@@ -1,6 +1,7 @@
-import { buildAuthUrl } from '../../routes/auth'
 import ErrorState from '../ErrorState'
 import { useQuery } from '../../util/query'
+import { buildAuthUrl } from '../../routes/auth'
+import { navigateTo } from '../../shared/navigation/history'
 
 const authErrorTitles: Record<string, string> = {
   access_denied: 'Доступ не был предоставлен',
@@ -36,7 +37,7 @@ export default function AuthErrorPage() {
           title={title}
           message={resolveMessage(errorCode, errorDescription)}
           primaryActionLabel="Вернуться ко входу"
-          onPrimaryAction={() => window.location.assign(buildAuthUrl())}
+          onPrimaryAction={() => navigateTo(buildAuthUrl(), { replace: true })}
         />
       </div>
     </div>

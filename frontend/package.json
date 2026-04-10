@@ -4,16 +4,14 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "astro dev --host 0.0.0.0 --port 5173",
-    "build": "astro build",
+    "dev": "vite",
+    "build": "npm run typecheck && vite build",
     "lint": "eslint .",
-    "preview": "astro preview --host 0.0.0.0 --port 4173",
-    "sync": "astro sync"
+    "preview": "vite preview",
+    "typecheck": "tsc -p tsconfig.app.json --noEmit"
   },
   "dependencies": {
-    "@astrojs/react": "^5.0.3",
     "@tailwindcss/vite": "^4.2.2",
-    "astro": "^6.1.5",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-hot-toast": "^2.6.0",

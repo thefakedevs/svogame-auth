@@ -1,5 +1,2 @@
-@import "tailwindcss";
-@import "../index.css";
-@import "../App.css";
-@import "../pages/UiKitPage.css";
-@import "../ui/ui.css";
+@import "./base.css";
+@import "./ui-entry.css";

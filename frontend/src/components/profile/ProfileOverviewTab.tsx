@@ -10,20 +10,8 @@ const dateTimeFormatter = new Intl.DateTimeFormat('ru-RU', {
   minute: '2-digit',
 })
 
-const dateFormatter = new Intl.DateTimeFormat('ru-RU', {
-  day: '2-digit',
-  month: 'short',
-  year: 'numeric',
-})
-
 function initials(value: string) {
   return value.slice(0, 2).toUpperCase()
-}
-
-function formatDate(value?: string | null) {
-  if (!value) return 'Нет данных'
-  const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? value : dateFormatter.format(date)
 }
 
 function formatDateTime(value?: string | null) {
@@ -97,14 +85,6 @@ export default function ProfileOverviewTab({
           <div>
             <dt>Последний вход</dt>
             <dd>{formatDateTime(data.user.lastLoginAt)}</dd>
-          </div>
-          <div>
-            <dt>Создан</dt>
-            <dd>{formatDate(data.user.createdAt)}</dd>
-          </div>
-          <div>
-            <dt>Discord ID</dt>
-            <dd>{data.user.discordId}</dd>
           </div>
         </dl>
       </aside>

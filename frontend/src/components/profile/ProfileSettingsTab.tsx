@@ -1,12 +1,12 @@
-import { useEffect, useState, type Dispatch, type SetStateAction } from 'react'
+import { useState, type Dispatch, type SetStateAction } from 'react'
 import toast from 'react-hot-toast'
 import type { UserProfile } from '../../api/auth'
-import { updateNickname } from '../../api/users'
-import { toDisplayError } from '../../api/http'
 import { buildSkinUrl } from '../../api/skins'
-import type { ProfileDashboardData } from './types'
+import { toDisplayError } from '../../api/http'
+import { updateNickname } from '../../api/users'
 import SkinPreview2D from '../SkinPreview2D'
 import SkinUploadInline from '../SkinUploadInline'
+import type { ProfileDashboardData } from './types'
 
 const dateTimeFormatter = new Intl.DateTimeFormat('ru-RU', {
   day: '2-digit',
@@ -15,6 +15,18 @@ const dateTimeFormatter = new Intl.DateTimeFormat('ru-RU', {
   hour: '2-digit',
   minute: '2-digit',
 })
+
+const dateFormatter = new Intl.DateTimeFormat('ru-RU', {
+  day: '2-digit',
+  month: 'short',
+  year: 'numeric',
+})
+
+function formatDate(value?: string | null) {
+  if (!value) return 'Нет данных'
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? value : dateFormatter.format(date)
+}
 
 function formatDateTime(value?: string | null) {
   if (!value) return 'Нет данных'
@@ -33,10 +45,6 @@ function isInvalidNicknameLength(value: string) {
 export default function ProfileSettingsTab({
   data,
   authToken,
-  nicknameDraft,
-  setNicknameDraft,
-  isUpdatingNickname,
-  setIsUpdatingNickname,
   setData,
   setAuthUser,
   onLogout,
@@ -47,10 +55,6 @@ export default function ProfileSettingsTab({
 }: {
   data: ProfileDashboardData
   authToken: string | null
-  nicknameDraft: string
-  setNicknameDraft: (value: string) => void
-  isUpdatingNickname: boolean
-  setIsUpdatingNickname: (value: boolean) => void
   setData: Dispatch<SetStateAction<ProfileDashboardData | null>>
   setAuthUser: (user: UserProfile | null) => void
   onLogout: () => void
@@ -59,11 +63,9 @@ export default function ProfileSettingsTab({
   skinVersion: number
   setSkinVersion: (value: number) => void
 }) {
+  const [nicknameDraft, setNicknameDraft] = useState(data.user.username)
+  const [isUpdatingNickname, setIsUpdatingNickname] = useState(false)
   const [hasInvalidNicknameInput, setHasInvalidNicknameInput] = useState(false)
-
-  useEffect(() => {
-    setHasInvalidNicknameInput(false)
-  }, [data.user.username])
 
   const onNicknameChange = (value: string) => {
     const sanitizedValue = sanitizeNickname(value)
@@ -79,6 +81,7 @@ export default function ProfileSettingsTab({
       setHasInvalidNicknameInput(true)
       return
     }
+
     if (!nickname || nickname === data.user.username) return
 
     setIsUpdatingNickname(true)
@@ -121,7 +124,7 @@ export default function ProfileSettingsTab({
               disabled={isUpdatingNickname}
             />
             <div className={`ui-hint ${hasInvalidNicknameInput ? 'ui-hint-error' : ''}`}>
-              Никнейм: 2–16 символов. Разрешены только латинские буквы, цифры и `_`. Кириллица запрещена.
+              Никнейм: 2-16 символов. Разрешены только латинские буквы, цифры и `_`.
             </div>
           </div>
           <div className="profile-actions">
@@ -133,6 +136,7 @@ export default function ProfileSettingsTab({
         <dl className="profile-kv profile-kv--wide">
           <div><dt>E-mail</dt><dd>{data.user.email ?? 'Не указан'}</dd></div>
           <div><dt>Discord</dt><dd>{data.user.discordId}</dd></div>
+          <div><dt>Дата регистрации</dt><dd>{formatDate(data.user.createdAt)}</dd></div>
           <div><dt>Последний вход</dt><dd>{formatDateTime(data.user.lastLoginAt)}</dd></div>
         </dl>
       </section>

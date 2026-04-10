@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { toDisplayError } from '../../api/http'
 import { buildAuthUrl } from '../../routes/auth'
 import { paths } from '../../routes/paths'
-import { tokenManager } from '../../services/tokenManager'
+import { navigateTo } from '../../shared/navigation/history'
+import { clearAuthSession, getAuthToken } from '../../shared/session/auth-session'
+import { validateTokenFormat } from '../../shared/session/token'
 import { useAuthStore } from '../../store/authStore'
 import './AppHeader.css'
 
@@ -14,16 +15,9 @@ type Props = {
 export default function AppHeader({ pageTitle }: Props) {
   const authHydrated = useAuthStore((store) => store.hydrated)
   const authUser = useAuthStore((store) => store.user)
-  const setAuthUser = useAuthStore((store) => store.setUser)
-  const setAuthToken = useAuthStore((store) => store.setToken)
-
   const [isMenuOpen, setIsMenuOpen] = useState(false)
-  const [sessionWarning, setSessionWarning] = useState<string | null>(null)
   const triggerRef = useRef<HTMLDivElement | null>(null)
   const menuPanelRef = useRef<HTMLDivElement | null>(null)
-
-  const portalTarget =
-    typeof document !== 'undefined' ? document.querySelector('.ui-kit-page.app-shell') ?? document.body : null
 
   useEffect(() => {
     const onPointerDown = (event: PointerEvent) => {
@@ -64,36 +58,24 @@ export default function AppHeader({ pageTitle }: Props) {
     }
   }, [isMenuOpen])
 
-  useEffect(() => {
-    async function validateSession() {
-      const token = await tokenManager.getToken()
-      if (!token) {
-        setSessionWarning(null)
-        return
-      }
-
-      if (!tokenManager.validateTokenFormat(token)) {
-        setSessionWarning('Сохраненная сессия выглядит поврежденной. Лучше войти заново.')
-        return
-      }
-
-      setSessionWarning(null)
+  const sessionWarning = useMemo(() => {
+    const token = getAuthToken()
+    if (!authHydrated || !token) {
+      return null
     }
 
-    void validateSession()
+    return validateTokenFormat(token) ? null : 'Сохраненная сессия выглядит поврежденной. Лучше войти заново.'
   }, [authHydrated])
 
   const avatarFallback = authUser?.username ? authUser.username.slice(0, 2).toUpperCase() : 'SV'
   const hasSession = authHydrated && Boolean(authUser)
 
-  const onLogout = async () => {
+  const onLogout = () => {
     try {
-      await tokenManager.clearToken()
-      setAuthToken(null)
-      setAuthUser(null)
-      window.location.assign(paths.home)
+      clearAuthSession()
+      navigateTo(paths.home, { replace: true })
     } catch (error) {
-      setSessionWarning(toDisplayError(error, 'Не удалось завершить сессию на этом устройстве.'))
+      console.error(toDisplayError(error, 'Не удалось завершить сессию на этом устройстве.'))
     }
   }
 
@@ -132,66 +114,63 @@ export default function AppHeader({ pageTitle }: Props) {
               </span>
             </button>
 
-            {isMenuOpen && portalTarget
-              ? createPortal(
-                  <div
-                    id="app-header-menu"
-                    ref={menuPanelRef}
-                    className="app-header__menu"
-                    role="dialog"
-                    aria-modal="true"
-                    aria-label="Навигация"
+            {isMenuOpen ? (
+              <div
+                id="app-header-menu"
+                ref={menuPanelRef}
+                className="app-header__menu"
+                role="dialog"
+                aria-modal="true"
+                aria-label="Навигация"
+              >
+                <div className="app-header__menu-topbar">
+                  <span className="app-header__menu-kicker">Меню</span>
+                  <button
+                    className="app-header__menu-close"
+                    type="button"
+                    aria-label="Закрыть меню"
+                    onClick={() => setIsMenuOpen(false)}
                   >
-                    <div className="app-header__menu-topbar">
-                      <span className="app-header__menu-kicker">Меню</span>
-                      <button
-                        className="app-header__menu-close"
-                        type="button"
-                        aria-label="Закрыть меню"
-                        onClick={() => setIsMenuOpen(false)}
-                      >
-                        ×
-                      </button>
+                    ×
+                  </button>
+                </div>
+
+                <div className="app-header__menu-body">
+                  <div className="app-header__menu-head">
+                    {authUser?.avatarUrl ? (
+                      <img src={authUser.avatarUrl} alt={authUser.username} className="app-header__menu-avatar" />
+                    ) : (
+                      <span className="app-header__menu-avatar app-header__avatar--fallback">{avatarFallback}</span>
+                    )}
+                    <div>
+                      <strong>{authUser?.username ?? 'Игрок'}</strong>
+                      <div className="app-header__menu-meta">Discord подключен</div>
                     </div>
+                  </div>
 
-                    <div className="app-header__menu-body">
-                      <div className="app-header__menu-head">
-                        {authUser?.avatarUrl ? (
-                          <img src={authUser.avatarUrl} alt={authUser.username} className="app-header__menu-avatar" />
-                        ) : (
-                          <span className="app-header__menu-avatar app-header__avatar--fallback">{avatarFallback}</span>
-                        )}
-                        <div>
-                          <strong>{authUser?.username ?? 'Игрок'}</strong>
-                          <div className="app-header__menu-meta">Discord подключен</div>
-                        </div>
-                      </div>
-
-                      {sessionWarning ? (
-                        <div className="ui-alert ui-alert-warning">
-                          <span className="ui-alert-icon" aria-hidden>
-                            !
-                          </span>
-                          <span>{sessionWarning}</span>
-                        </div>
-                      ) : null}
-
-                      <div className="app-header__menu-section">
-                        <a href={paths.profile}>Профиль</a>
-                        <a href={`${paths.profile}?tab=squads`}>Сквад</a>
-                        <a href={`${paths.profile}?tab=settings`}>Настройки</a>
-                      </div>
-
-                      <div className="app-header__menu-section app-header__menu-section--danger">
-                        <button type="button" onClick={() => void onLogout()}>
-                          Выйти
-                        </button>
-                      </div>
+                  {sessionWarning ? (
+                    <div className="ui-alert ui-alert-warning">
+                      <span className="ui-alert-icon" aria-hidden>
+                        !
+                      </span>
+                      <span>{sessionWarning}</span>
                     </div>
-                  </div>,
-                  portalTarget,
-                )
-              : null}
+                  ) : null}
+
+                  <div className="app-header__menu-section">
+                    <a href={paths.profile}>Профиль</a>
+                    <a href={`${paths.profile}?tab=squads`}>Сквад</a>
+                    <a href={`${paths.profile}?tab=settings`}>Настройки</a>
+                  </div>
+
+                  <div className="app-header__menu-section app-header__menu-section--danger">
+                    <button type="button" onClick={onLogout}>
+                      Выйти
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : null}
           </>
         ) : (
           <a href={buildAuthUrl()} className="btn primary app-header__login">

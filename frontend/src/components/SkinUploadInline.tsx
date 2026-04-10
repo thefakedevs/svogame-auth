@@ -1,10 +1,10 @@
-import { useRef, useState } from 'react'
+import { Suspense, lazy, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
-
 import { ApiError, uploadMySkin, type SkinModel } from '../api/skins'
-import SkinViewer3D from './SkinViewer3D'
-import { tokenManager } from '../services/tokenManager'
+import { getAuthToken } from '../shared/session/auth-session'
 import './SkinUploadInline.css'
+
+const SkinViewer3D = lazy(() => import('./SkinViewer3D'))
 
 function skinUploadErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
@@ -46,7 +46,7 @@ export default function SkinUploadInline({ onUploaded }: { onUploaded?: () => vo
     const file = fileInputRef.current?.files?.[0]
     if (!file) return
 
-    const token = await tokenManager.getToken()
+    const token = getAuthToken()
     if (!token) {
       toast.error('Сессия не найдена. Войдите снова.')
       return
@@ -77,12 +77,9 @@ export default function SkinUploadInline({ onUploaded }: { onUploaded?: () => vo
       <div className="upload-preview-3d">
         {previewUrl ? (
           <>
-            <SkinViewer3D
-              skinUrl={previewUrl}
-              model={model}
-              width={300}
-              height={400}
-            />
+            <Suspense fallback={<div className="upload-placeholder">Загружаем предпросмотр...</div>}>
+              <SkinViewer3D skinUrl={previewUrl} model={model} width={300} height={400} />
+            </Suspense>
             <div className="model-toggle">
               <button
                 type="button"
@@ -112,22 +109,11 @@ export default function SkinUploadInline({ onUploaded }: { onUploaded?: () => vo
         )}
       </div>
 
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        onChange={handleInputChange}
-        style={{ display: 'none' }}
-      />
+      <input ref={fileInputRef} type="file" accept="image/*" onChange={handleInputChange} style={{ display: 'none' }} />
 
-      {previewUrl && (
+      {previewUrl ? (
         <div className="upload-buttons">
-          <button
-            type="button"
-            className="btn btn-success"
-            onClick={() => void handleUpload()}
-            disabled={isLoading}
-          >
+          <button type="button" className="btn btn-success" onClick={() => void handleUpload()} disabled={isLoading}>
             {isLoading ? 'Загрузка...' : 'Загрузить'}
           </button>
           <button
@@ -142,7 +128,7 @@ export default function SkinUploadInline({ onUploaded }: { onUploaded?: () => vo
             Очистить
           </button>
         </div>
-      )}
+      ) : null}
     </div>
   )
 }

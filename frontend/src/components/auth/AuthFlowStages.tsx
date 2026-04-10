@@ -114,6 +114,7 @@ export interface AuthFlowStagesProps {
 export default function AuthFlowStages({ stage, onRetryError }: AuthFlowStagesProps) {
   const { status } = stage
   const busy = status === 'loading' || status === 'solving_pow'
+  const redirectUrl = status === 'redirecting' ? stage.oauthUrl ?? '' : ''
 
   const title =
     status === 'loading'
@@ -186,8 +187,8 @@ export default function AuthFlowStages({ stage, onRetryError }: AuthFlowStagesPr
           </div>
 
           <div className="vt-slot-actions">
-            {status === 'redirecting' && stage.oauthUrl && (
-              <button className="btn primary" type="button" onClick={() => (window.location.href = stage.oauthUrl)}>
+            {status === 'redirecting' && redirectUrl && (
+              <button className="btn primary" type="button" onClick={() => (window.location.href = redirectUrl)}>
                 Открыть Discord
               </button>
             )}
