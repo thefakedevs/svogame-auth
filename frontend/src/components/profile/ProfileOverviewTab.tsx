@@ -145,7 +145,16 @@ export default function ProfileOverviewTab({
           </div>
           {data.squad ? (
             <div className="profile-stack">
-              <strong>{data.squad.name}</strong>
+              <div className="profile-squad-head-row profile-squad-head-row--overview">
+                {data.squad.imageUrl ? (
+                  <img
+                    className="profile-squad-avatar-image profile-squad-avatar-image--overview"
+                    src={`${data.squad.imageUrl}?v=${encodeURIComponent(data.squad.updatedAt)}`}
+                    alt={`Аватар сквада ${data.squad.name}`}
+                  />
+                ) : null}
+                <strong className="profile-squad-name-inline">{data.squad.name}</strong>
+              </div>
               <span className="profile-subtle">
                 Подробная информация, состав и приглашения доступны во вкладке сквада.
               </span>
