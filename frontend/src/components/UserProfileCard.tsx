@@ -1,5 +1,5 @@
-import type { UserProfile } from '../services/authApi'
-import type { UserResponse } from '../services/userApi'
+import type { UserProfile } from '../api/auth'
+import type { UserResponse } from '../api/users'
 import './UserProfileCard.css'
 
 interface UserProfileCardProps {
@@ -12,7 +12,7 @@ export default function UserProfileCard({ user }: UserProfileCardProps) {
   }
 
   return (
-    <div className="user-profile-card">
+    <div className="card user-profile-card">
       <div className="profile-card-glow"></div>
       <div className="profile-card-content">
         <div className="avatar-container">

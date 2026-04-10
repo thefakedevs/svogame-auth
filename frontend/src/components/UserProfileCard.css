@@ -3,43 +3,12 @@
   width: 100%;
   max-width: 380px;
   margin: 0 auto;
-  border-radius: 20px;
-  background: linear-gradient(135deg, #1e1e2e 0%, #2d2d44 100%);
-  box-shadow:
-    0 4px 24px rgba(0, 0, 0, 0.3),
-    0 0 0 1px rgba(255, 255, 255, 0.05);
   overflow: hidden;
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
-}
-
-.user-profile-card:hover {
-  transform: translateY(-4px);
-  box-shadow:
-    0 12px 40px rgba(0, 0, 0, 0.4),
-    0 0 0 1px rgba(255, 255, 255, 0.1),
-    0 0 60px rgba(88, 101, 242, 0.15);
-}
-
-.profile-card-glow {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 80px;
-  background: linear-gradient(135deg, #5865f2 0%, #7289da 50%, #5865f2 100%);
-  background-size: 200% 200%;
-  animation: gradientShift 5s ease infinite;
-}
-
-@keyframes gradientShift {
-  0%, 100% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
 }
 
 .profile-card-content {
   position: relative;
   padding: 24px;
-  padding-top: 44px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -50,31 +19,20 @@
   position: relative;
   width: 100px;
   height: 100px;
+  border: 1px solid rgba(247, 164, 29, 0.45);
+  background: rgba(0, 0, 0, 0.35);
+  box-shadow: 0 0 24px rgba(247, 164, 29, 0.18);
 }
 
+.profile-card-glow,
 .avatar-ring {
-  position: absolute;
-  inset: -4px;
-  border-radius: 100%;
-  background: linear-gradient(135deg, #5865f2, #7289da, #5865f2);
-  background-size: 200% 200%;
-  animation: gradientShift 3s ease infinite;
-  padding: 3px;
+  display: none;
 }
 
 .avatar {
-  position: relative;
   width: 100%;
   height: 100%;
-  border-radius: 50%;
   object-fit: cover;
-  z-index: 1;
-  border: 4px solid #1e1e2e;
-  transition: transform 0.3s ease;
-}
-
-.user-profile-card:hover .avatar {
-  transform: scale(1.05);
 }
 
 .user-info {
@@ -82,45 +40,40 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+  min-width: 0;
 }
 
 .username {
   margin: 0;
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
+  color: var(--ui-text);
+  font-size: 1.25rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
 }
 
 .verified-badge {
-  width: 20px;
-  height: 20px;
-  color: #5865f2;
-  background: rgba(88, 101, 242, 0.15);
-  border-radius: 50%;
-  padding: 2px;
+  width: 18px;
+  height: 18px;
+  color: #f7a41d;
 }
 
 .user-id {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 0.85rem;
-  color: #a0a0b0;
-  background: rgba(255, 255, 255, 0.05);
-  padding: 6px 14px;
-  border-radius: 20px;
-  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+  max-width: 100%;
+  padding: 6px 10px;
+  border: 1px solid var(--ui-border);
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--ui-text-muted);
+  font-family: 'IBM Plex Mono', ui-monospace, 'Cascadia Code', monospace;
+  font-size: 0.75rem;
   user-select: all;
-  transition: background 0.2s ease, color 0.2s ease;
-}
-
-.user-id:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: #ffffff;
+  overflow-wrap: anywhere;
 }
 
 .id-icon {
@@ -133,35 +86,29 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-top: 8px;
-  padding: 10px 16px;
-  background: rgba(88, 101, 242, 0.1);
-  border-radius: 12px;
-  color: #a0a0b0;
-  font-size: 0.8rem;
-  transition: background 0.2s ease;
-}
-
-.discord-branding:hover {
-  background: rgba(88, 101, 242, 0.2);
+  padding: 8px 10px;
+  border: 1px solid rgba(34, 63, 255, 0.45);
+  background: rgba(34, 63, 255, 0.12);
+  color: #8ea4ff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .discord-logo {
-  width: 18px;
-  height: 18px;
-  color: #5865f2;
+  width: 16px;
+  height: 16px;
+  color: currentColor;
 }
 
-/* Адаптивность для маленьких экранов */
 @media (max-width: 480px) {
   .user-profile-card {
     max-width: 100%;
-    border-radius: 16px;
   }
 
   .profile-card-content {
     padding: 20px;
-    padding-top: 40px;
   }
 
   .avatar-container {
@@ -170,55 +117,6 @@
   }
 
   .username {
-    font-size: 1.25rem;
+    font-size: 1.1rem;
   }
 }
-
-/* Светлая тема */
-@media (prefers-color-scheme: light) {
-  .user-profile-card {
-    background: linear-gradient(135deg, #ffffff 0%, #f0f2f5 100%);
-    box-shadow:
-      0 4px 24px rgba(0, 0, 0, 0.1),
-      0 0 0 1px rgba(0, 0, 0, 0.05);
-  }
-
-  .user-profile-card:hover {
-    box-shadow:
-      0 12px 40px rgba(0, 0, 0, 0.15),
-      0 0 0 1px rgba(0, 0, 0, 0.08),
-      0 0 60px rgba(88, 101, 242, 0.1);
-  }
-
-  .avatar-ring::before,
-  .avatar {
-    border-color: #ffffff;
-  }
-
-  .avatar-ring::before {
-    background: #ffffff;
-  }
-
-  .avatar-status.online {
-    border-color: #ffffff;
-  }
-
-  .username {
-    color: #1e1e2e;
-  }
-
-  .user-id {
-    color: #5c5c6e;
-    background: rgba(0, 0, 0, 0.05);
-  }
-
-  .user-id:hover {
-    background: rgba(0, 0, 0, 0.1);
-    color: #1e1e2e;
-  }
-
-  .discord-branding {
-    color: #5c5c6e;
-  }
-}
-

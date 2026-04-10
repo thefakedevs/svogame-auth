@@ -1,17 +1,20 @@
-const TOKEN_KEY = 'auth-token'
+import { useAuthStore } from '../store/authStore'
+import { validateTokenFormat } from '../services/tokenManager'
 
 export function getAuthToken(): string | null {
-    return localStorage.getItem(TOKEN_KEY)
+    return useAuthStore.getState().token
 }
 
 export function setAuthToken(token: string): void {
-    localStorage.setItem(TOKEN_KEY, token)
+    useAuthStore.getState().setToken(token)
 }
 
 export function removeAuthToken(): void {
-    localStorage.removeItem(TOKEN_KEY)
+    useAuthStore.getState().setToken(null)
+    useAuthStore.getState().setUser(null)
 }
 
 export function isAuthenticated(): boolean {
-    return getAuthToken() !== null
+    const token = getAuthToken()
+    return token !== null && validateTokenFormat(token)
 }
