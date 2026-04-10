@@ -655,6 +655,8 @@ async fn user_can_decline_invite_and_it_disappears_from_inbox() {
     assert_eq!(invites_before[0]["squadName"], "Hotel Team");
     assert_eq!(invites_before[0]["inviterUserId"], leader.user_id);
     assert_eq!(invites_before[0]["inviterUsername"], "LeaderDecline");
+    assert_eq!(invites_before[0]["invitedUserId"], invited.user_id);
+    assert_eq!(invites_before[0]["invitedUsername"], "InviteDeclineUser");
     assert!(invites_before[0]["inviterAvatarUrl"].is_null());
 
     let decline_response = app
@@ -1100,6 +1102,53 @@ async fn user_cannot_accept_invite_when_already_in_squad() {
         app.user_squad_id(&member.user_id).await.as_deref(),
         Some(first_squad_id.as_str())
     );
+    assert_eq!(app.invite_count_for_squad(&second_squad_id).await, 0);
+}
+
+#[tokio::test]
+#[serial]
+async fn accepting_invite_clears_all_other_pending_invites_for_user() {
+    let app = TestApp::spawn().await;
+    let leader_one = app.issue_user_token("LeaderInboxOne", false, &[]).await;
+    let leader_two = app.issue_user_token("LeaderInboxTwo", false, &[]).await;
+    let member = app.issue_user_token("InviteInboxUser", false, &[]).await;
+
+    let first_squad = app.create_squad(&leader_one, "Romeo Team").await;
+    let first_squad_id = first_squad["id"]
+        .as_str()
+        .expect("first squad id")
+        .to_string();
+    let second_squad = app.create_squad(&leader_two, "Sierra Team").await;
+    let second_squad_id = second_squad["id"]
+        .as_str()
+        .expect("second squad id")
+        .to_string();
+
+    let first_invite = app
+        .issue_invite(&leader_one, &first_squad_id, &member.user_id)
+        .await;
+    let _second_invite = app
+        .issue_invite(&leader_two, &second_squad_id, &member.user_id)
+        .await;
+
+    let invites_before = app.my_invites(&member).await;
+    assert_eq!(invites_before.len(), 2);
+
+    let accept_response = app
+        .post_json(
+            &format!("/api/squad-invites/{first_invite}/accept"),
+            &member.access_token,
+            serde_json::json!({}),
+        )
+        .await;
+    assert!(accept_response.status().is_success());
+
+    assert_eq!(
+        app.user_squad_id(&member.user_id).await.as_deref(),
+        Some(first_squad_id.as_str())
+    );
+    assert!(app.my_invites(&member).await.is_empty());
+    assert_eq!(app.invite_count_for_squad(&first_squad_id).await, 0);
     assert_eq!(app.invite_count_for_squad(&second_squad_id).await, 0);
 }
 

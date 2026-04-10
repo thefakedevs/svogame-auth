@@ -96,6 +96,8 @@ pub struct SquadInviteResponse {
     pub inviter_avatar_url: Option<String>,
     #[serde(rename = "invitedUserId")]
     pub invited_user_id: String,
+    #[serde(rename = "invitedUsername")]
+    pub invited_username: String,
     #[serde(rename = "expiresAt")]
     pub expires_at: chrono::DateTime<chrono::Utc>,
     #[serde(rename = "createdAt")]
@@ -656,6 +658,7 @@ pub async fn create_invite(
             squad.name,
             user.username,
             user.avatar_url,
+            invited_user.username,
         )));
     }
 
@@ -689,6 +692,7 @@ pub async fn create_invite(
         squad.name,
         user.username,
         user.avatar_url,
+        invited_user.username,
     )))
 }
 
@@ -756,6 +760,7 @@ pub async fn list_my_invites(
                 squad.name.clone(),
                 inviter.username.clone(),
                 inviter.avatar_url.clone(),
+                user.username.clone(),
             ));
         }
     }
@@ -840,11 +845,11 @@ pub async fn accept_invite(
         .await
         .map_err(|e| HttpError::internal_error(format!("Failed to join squad: {e}")))?;
 
-    let invite_active: SquadInviteActiveModel = invite.clone().into();
-    invite_active
-        .delete(&tx)
+    SquadInvite::delete_many()
+        .filter(SquadInviteColumn::InvitedUserId.eq(user.id))
+        .exec(&tx)
         .await
-        .map_err(|e| HttpError::internal_error(format!("Failed to remove invite: {e}")))?;
+        .map_err(|e| HttpError::internal_error(format!("Failed to clear user invites: {e}")))?;
 
     write_audit_log(
         &tx,
@@ -1078,6 +1083,7 @@ fn to_invite_response(
     squad_name: String,
     inviter_username: String,
     inviter_avatar_url: Option<String>,
+    invited_username: String,
 ) -> SquadInviteResponse {
     SquadInviteResponse {
         id: invite.id.to_string(),
@@ -1087,6 +1093,7 @@ fn to_invite_response(
         inviter_username,
         inviter_avatar_url,
         invited_user_id: invite.invited_user_id.to_string(),
+        invited_username,
         expires_at: invite.expires_at,
         created_at: invite.created_at,
     }
