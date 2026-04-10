@@ -742,6 +742,113 @@ async fn squad_members_endpoint_includes_active_pending_invites() {
 
 #[tokio::test]
 #[serial]
+async fn service_endpoint_returns_squads_that_contain_any_of_requested_users() {
+    let app = TestApp::spawn().await;
+    let admin = app.issue_user_token("SquadLookupAdmin", true, &[]).await;
+    let leader_alpha = app.issue_user_token("LeaderAlpha", false, &[]).await;
+    let leader_beta = app.issue_user_token("LeaderBeta", false, &[]).await;
+    let alpha_member = app.issue_user_token("AlphaMember", false, &[]).await;
+    let beta_member = app.issue_user_token("BetaMember", false, &[]).await;
+    let outsider = app.issue_user_token("NoSquadUser", false, &[]).await;
+
+    let alpha_squad = app.create_squad(&leader_alpha, "Alpha Team").await;
+    let alpha_squad_id = alpha_squad["id"]
+        .as_str()
+        .expect("alpha squad id")
+        .to_string();
+    let alpha_invite = app
+        .issue_invite(&leader_alpha, &alpha_squad_id, &alpha_member.user_id)
+        .await;
+    let alpha_accept = app
+        .post_json(
+            &format!("/api/squad-invites/{alpha_invite}/accept"),
+            &alpha_member.access_token,
+            serde_json::json!({}),
+        )
+        .await;
+    assert!(alpha_accept.status().is_success());
+
+    let beta_squad = app.create_squad(&leader_beta, "Beta Team").await;
+    let beta_squad_id = beta_squad["id"]
+        .as_str()
+        .expect("beta squad id")
+        .to_string();
+    let beta_invite = app
+        .issue_invite(&leader_beta, &beta_squad_id, &beta_member.user_id)
+        .await;
+    let beta_accept = app
+        .post_json(
+            &format!("/api/squad-invites/{beta_invite}/accept"),
+            &beta_member.access_token,
+            serde_json::json!({}),
+        )
+        .await;
+    assert!(beta_accept.status().is_success());
+
+    let created_token = app
+        .post_json(
+            "/api/admin/service-tokens",
+            &admin.access_token,
+            serde_json::json!({ "systemName": "squad_lookup" }),
+        )
+        .await;
+    assert!(created_token.status().is_success());
+    let created_token_body: serde_json::Value =
+        created_token.json().await.expect("service token json");
+    let service_token = created_token_body["plaintextToken"]
+        .as_str()
+        .expect("plaintext token")
+        .to_string();
+
+    let response = app
+        .post_json(
+            "/api/service/squads/by-users",
+            &service_token,
+            serde_json::json!({
+                "userIds": [
+                    alpha_member.user_id,
+                    beta_member.user_id,
+                    outsider.user_id
+                ]
+            }),
+        )
+        .await;
+    assert!(
+        response.status().is_success(),
+        "{}",
+        response.text().await.unwrap_or_default()
+    );
+    let body: serde_json::Value = response.json().await.expect("service squad lookup json");
+    let items = body.as_array().expect("service squad lookup array");
+    assert_eq!(items.len(), 2);
+
+    assert_eq!(items[0]["squad"]["name"], "Alpha Team");
+    assert_eq!(items[0]["squad"]["memberCount"], 2);
+    assert_eq!(
+        items[0]["matchedUsers"]
+            .as_array()
+            .expect("alpha matched")
+            .len(),
+        1
+    );
+    assert_eq!(items[0]["matchedUsers"][0]["id"], alpha_member.user_id);
+    assert_eq!(items[0]["matchedUsers"][0]["username"], "AlphaMember");
+
+    assert_eq!(items[1]["squad"]["name"], "Beta Team");
+    assert_eq!(items[1]["squad"]["memberCount"], 2);
+    assert_eq!(
+        items[1]["matchedUsers"]
+            .as_array()
+            .expect("beta matched")
+            .len(),
+        1
+    );
+    assert_eq!(items[1]["matchedUsers"][0]["id"], beta_member.user_id);
+    assert_eq!(items[1]["matchedUsers"][0]["username"], "BetaMember");
+}
+
+#[tokio::test]
+#[serial]
 async fn squad_capacity_counts_members_and_active_invites() {
     let app = TestApp::spawn().await;
     let leader = app.issue_user_token("LeaderCapacity", false, &[]).await;
