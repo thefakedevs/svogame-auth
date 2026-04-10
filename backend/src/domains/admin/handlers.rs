@@ -14,16 +14,17 @@ use crate::app::auth::require_human_superuser;
 use crate::app::http::{HttpError, HttpResult};
 use crate::app::state::{AppState, AppStateExtractor};
 use crate::entities::{
-    NICKNAME_REGEX, User, UserActiveModel, UserColumn, UserModel, UserRestriction,
-    UserRestrictionActiveModel, UserRestrictionColumn,
+    NICKNAME_REGEX, Squad, SquadModel, User, UserActiveModel, UserColumn, UserModel,
+    UserRestriction, UserRestrictionActiveModel, UserRestrictionColumn,
 };
 use crate::services::audit::{
     ACTION_ADMIN_USER_ACTIVATED, ACTION_ADMIN_USER_AUTH_EPOCH_RESET, ACTION_ADMIN_USER_DEACTIVATED,
     ACTION_ADMIN_USER_RESTRICTION_GRANTED, ACTION_ADMIN_USER_RESTRICTION_REVOKED,
-    ACTION_ADMIN_USER_SUPERUSER_GRANTED, ACTION_ADMIN_USER_SUPERUSER_REVOKED,
-    ACTION_ADMIN_USER_UPDATED, write_audit_log,
+    ACTION_ADMIN_USER_SKIN_DELETED, ACTION_ADMIN_USER_SUPERUSER_GRANTED,
+    ACTION_ADMIN_USER_SUPERUSER_REVOKED, ACTION_ADMIN_USER_UPDATED, write_audit_log,
 };
 use crate::services::restrictions::{RestrictionKind, list_user_restrictions};
+use crate::services::squads::SQUAD_MAX_MEMBERS;
 
 const DEFAULT_PAGE: u64 = 1;
 const DEFAULT_PER_PAGE: u64 = 20;
@@ -126,6 +127,11 @@ pub struct AdminUserRestrictionResponse {
     pub reason: Option<String>,
     #[serde(rename = "createdAt")]
     pub created_at: chrono::DateTime<chrono::Utc>,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct AdminUserSkinActionResponse {
+    pub status: &'static str,
 }
 
 #[utoipa::path(
@@ -272,6 +278,46 @@ pub async fn get_user(
 }
 
 #[utoipa::path(
+    get,
+    path = "/api/admin/user/{user_id}/squad",
+    params(
+        ("user_id" = String, Path, description = "User UUID")
+    ),
+    responses(
+        (status = 200, description = "Get the squad the target user currently belongs to, or `null` when user has no squad.", body = Option<crate::domains::admin::squads::AdminSquadResponse>),
+        (status = 400, description = "Invalid user ID."),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden"),
+        (status = 404, description = "User not found")
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "admin"
+)]
+pub async fn get_user_squad(
+    State(state): AppStateExtractor,
+    headers: HeaderMap,
+    Path(user_id): Path<String>,
+) -> HttpResult<Json<Option<crate::domains::admin::squads::AdminSquadResponse>>> {
+    let state = state.read().await;
+    require_human_superuser(&headers, &state).await?;
+    let user = get_user_by_id(&state.db, &user_id).await?;
+
+    let Some(squad_id) = user.squad_id else {
+        return Ok(Json(None));
+    };
+
+    let squad = Squad::find_by_id(squad_id)
+        .one(&state.db)
+        .await
+        .map_err(|e| HttpError::internal_error(format!("Failed to load squad: {e}")))?
+        .ok_or_else(|| HttpError::not_found("Squad not found"))?;
+
+    Ok(Json(Some(to_admin_squad_response(&state.db, squad).await?)))
+}
+
+#[utoipa::path(
     patch,
     path = "/api/admin/users/{user_id}",
     request_body = PatchAdminUserRequest,
@@ -358,6 +404,57 @@ pub async fn patch_user(
         .map_err(|e| HttpError::internal_error(format!("Failed to commit transaction: {e}")))?;
 
     Ok(Json(updated_user.into()))
+}
+
+#[utoipa::path(
+    delete,
+    path = "/api/admin/user/{user_id}/skin",
+    params(
+        ("user_id" = String, Path, description = "User UUID")
+    ),
+    responses(
+        (status = 200, description = "Delete user's custom skin from object storage. Repeated delete is effectively idempotent.", body = AdminUserSkinActionResponse),
+        (status = 400, description = "Invalid user ID."),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden"),
+        (status = 404, description = "User not found")
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "admin"
+)]
+pub async fn delete_user_skin(
+    State(state): AppStateExtractor,
+    headers: HeaderMap,
+    Path(user_id): Path<String>,
+) -> HttpResult<Json<AdminUserSkinActionResponse>> {
+    let state = state.read().await;
+    let admin = require_human_superuser(&headers, &state).await?;
+    let user = get_user_by_id(&state.db, &user_id).await?;
+    let skin_key = format!("user_skins/{}.png", user.id.as_hyphenated());
+
+    state
+        .s3
+        .delete_object()
+        .bucket(&state.config.s3.bucket)
+        .key(&skin_key)
+        .send()
+        .await
+        .map_err(|e| HttpError::internal_error(format!("Failed to delete user skin: {e}")))?;
+
+    write_audit_log(
+        &state.db,
+        ACTION_ADMIN_USER_SKIN_DELETED,
+        Some(admin.id),
+        Some(user.id),
+        None,
+        Some(json!({ "skinKey": skin_key })),
+    )
+    .await
+    .map_err(|e| HttpError::internal_error(format!("Failed to write audit log: {e}")))?;
+
+    Ok(Json(AdminUserSkinActionResponse { status: "ok" }))
 }
 
 #[utoipa::path(
@@ -633,6 +730,33 @@ async fn get_user_by_uuid(db: &impl ConnectionTrait, user_id: Uuid) -> HttpResul
         .await
         .map_err(|e| HttpError::internal_error(format!("Database error: {e}")))?
         .ok_or_else(|| HttpError::not_found("User not found"))
+}
+
+async fn to_admin_squad_response(
+    db: &impl ConnectionTrait,
+    squad: SquadModel,
+) -> HttpResult<crate::domains::admin::squads::AdminSquadResponse> {
+    let member_count = User::find()
+        .filter(UserColumn::SquadId.eq(squad.id))
+        .count(db)
+        .await
+        .map_err(|e| HttpError::internal_error(format!("Failed to count squad members: {e}")))?;
+
+    let squad_id = squad.id;
+    Ok(crate::domains::admin::squads::AdminSquadResponse {
+        id: squad_id.to_string(),
+        name: squad.name,
+        leader_user_id: squad.leader_user_id.to_string(),
+        member_count,
+        max_members: SQUAD_MAX_MEMBERS,
+        image_url: squad
+            .image_key
+            .map(|_| format!("/api/squads/{}/image", squad_id)),
+        is_restricted: squad.is_restricted,
+        restriction_reason: squad.restriction_reason,
+        created_at: squad.created_at,
+        updated_at: squad.updated_at,
+    })
 }
 
 async fn validate_username(
