@@ -1,4 +1,4 @@
-import type { Dispatch, SetStateAction } from 'react'
+import { useEffect, useState, type Dispatch, type SetStateAction } from 'react'
 import toast from 'react-hot-toast'
 import type { UserProfile } from '../../api/auth'
 import { updateNickname } from '../../api/users'
@@ -20,6 +20,14 @@ function formatDateTime(value?: string | null) {
   if (!value) return 'Нет данных'
   const date = new Date(value)
   return Number.isNaN(date.getTime()) ? value : dateTimeFormatter.format(date)
+}
+
+function sanitizeNickname(value: string) {
+  return value.replace(/[^A-Za-z0-9_]/g, '')
+}
+
+function isInvalidNicknameLength(value: string) {
+  return value.length < 2 || value.length > 16
 }
 
 export default function ProfileSettingsTab({
@@ -51,10 +59,26 @@ export default function ProfileSettingsTab({
   skinVersion: number
   setSkinVersion: (value: number) => void
 }) {
+  const [hasInvalidNicknameInput, setHasInvalidNicknameInput] = useState(false)
+
+  useEffect(() => {
+    setHasInvalidNicknameInput(false)
+  }, [data.user.username])
+
+  const onNicknameChange = (value: string) => {
+    const sanitizedValue = sanitizeNickname(value)
+    setHasInvalidNicknameInput(sanitizedValue !== value || isInvalidNicknameLength(sanitizedValue.trim()))
+    setNicknameDraft(sanitizedValue)
+  }
+
   const onSaveNickname = async () => {
     if (!authToken) return
 
     const nickname = nicknameDraft.trim()
+    if (isInvalidNicknameLength(nickname)) {
+      setHasInvalidNicknameInput(true)
+      return
+    }
     if (!nickname || nickname === data.user.username) return
 
     setIsUpdatingNickname(true)
@@ -70,6 +94,7 @@ export default function ProfileSettingsTab({
       const user = await request
       setAuthUser({ id: user.id, username: user.username, avatarUrl: user.avatarUrl ?? '' })
       setNicknameDraft(user.username)
+      setHasInvalidNicknameInput(false)
       setData((current) => (current ? { ...current, user } : current))
     } finally {
       setIsUpdatingNickname(false)
@@ -81,21 +106,26 @@ export default function ProfileSettingsTab({
       <section className="card profile-panel">
         <div className="ui-card-header"><h2 className="card-title">Данные аккаунта</h2></div>
         <div className="profile-form">
-          <div className="ui-field">
+          <div className={`ui-field ${hasInvalidNicknameInput ? 'ui-field-error' : ''}`}>
             <label className="ui-label" htmlFor="profile-nickname">Никнейм</label>
             <input
               id="profile-nickname"
               className="ui-input"
               value={nicknameDraft}
-              onChange={(event) => setNicknameDraft(event.target.value)}
+              onChange={(event) => onNicknameChange(event.target.value)}
+              minLength={2}
               maxLength={16}
+              inputMode="text"
+              autoComplete="off"
               placeholder="Введите никнейм"
               disabled={isUpdatingNickname}
             />
-            <div className="ui-hint">Изменение сохранится в учетной записи после подтверждения.</div>
+            <div className={`ui-hint ${hasInvalidNicknameInput ? 'ui-hint-error' : ''}`}>
+              Никнейм: 2–16 символов. Разрешены только латинские буквы, цифры и `_`. Кириллица запрещена.
+            </div>
           </div>
           <div className="profile-actions">
-            <button className="btn primary" type="button" disabled={isUpdatingNickname} onClick={() => void onSaveNickname()}>
+            <button className="btn primary" type="button" disabled={isUpdatingNickname || hasInvalidNicknameInput} onClick={() => void onSaveNickname()}>
               {isUpdatingNickname ? 'Сохранение...' : 'Сохранить никнейм'}
             </button>
           </div>

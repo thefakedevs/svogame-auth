@@ -24,8 +24,6 @@ services:
       - GAMERVII_COMPAT_ENDPOINT=${GAMERVII_COMPAT_ENDPOINT}
       - GAMERVII_COMPAT_TOKEN=${GAMERVII_COMPAT_TOKEN}
       - DISCORD_PROXY=${DISCORD_PROXY}
-    volumes:
-      - ./db.sqlite:/app/db.sqlite
     restart: unless-stopped
     logging:
       options:
@@ -47,7 +45,7 @@ services:
   nginx:
     image: nginx:1.27-alpine
     ports:
-      - "127.0.0.1:3017:80"
+      - "127.0.0.1:${HTTP_PORT:-3017}:80"
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
@@ -62,4 +60,4 @@ services:
 networks:
   default:
     external: true
-    name: svo-server-local
+    name: svo-server-${BRANCH:-local}

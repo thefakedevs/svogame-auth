@@ -127,6 +127,17 @@ export function patchSquad(token: string, squadId: string, name: string): Promis
   })
 }
 
+export function uploadSquadImage(token: string, squadId: string, file: File): Promise<SquadResponse> {
+  const formData = new FormData()
+  formData.append('file', file)
+
+  return request<SquadResponse>(`/api/squads/${squadId}/image`, {
+    method: 'POST',
+    headers: authHeaders(token),
+    body: formData,
+  })
+}
+
 export function deleteSquad(token: string, squadId: string): Promise<SquadActionResponse> {
   return request<SquadActionResponse>(`/api/squads/${squadId}`, {
     method: 'DELETE',
