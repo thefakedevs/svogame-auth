@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
-import { Toaster } from 'react-hot-toast'
+import { useState } from 'react'
 import { useQuery } from '../../util/query'
+import { replaceUrl } from '../../util/navigation'
 import '../../pages/ProfilePage.css'
 import ProfileOverviewTab from './ProfileOverviewTab'
 import ProfileSettingsTab from './ProfileSettingsTab'
@@ -16,28 +16,22 @@ function normalizeRequestedTab(value: string | null): ProfileTab {
   return 'overview'
 }
 
-export default function ProfilePage() {
+export default function ProfilePage({ defaultTab }: { defaultTab?: ProfileTab }) {
   const query = useQuery()
   const { authToken, status, data, error, setData, setAuthUser, reload, reloadSquads, logout } = useProfileDashboard(query)
-
-  const [activeTab, setActiveTab] = useState<ProfileTab>(() => normalizeRequestedTab(query.get('tab')))
-  const [nicknameDraft, setNicknameDraft] = useState('')
-  const [isUpdatingNickname, setIsUpdatingNickname] = useState(false)
   const [skinVersion, setSkinVersion] = useState(() => Date.now())
   const [skinFailed, setSkinFailed] = useState(false)
-  const [showSkeletonOverlay, setShowSkeletonOverlay] = useState(true)
-  const [contentVisible, setContentVisible] = useState(false)
 
-  useEffect(() => {
-    setActiveTab(normalizeRequestedTab(query.get('tab')))
-  }, [query])
+  const activeTab = normalizeRequestedTab(query.get('tab') ?? defaultTab ?? null)
+  const isLoading = status === 'loading'
 
-  useEffect(() => {
-    if (data) {
-      setNicknameDraft(data.user.username)
-      setSkinFailed(false)
-    }
-  }, [data])
+  const handleTabChange = (tab: ProfileTab) => {
+    if (typeof window === 'undefined') return
+
+    const url = new URL(window.location.href)
+    url.searchParams.set('tab', tab)
+    replaceUrl(url.pathname + url.search)
+  }
 
   if (status === 'unauthorized') {
     return <ProfileUnauthorizedState />
@@ -47,48 +41,8 @@ export default function ProfilePage() {
     return <ProfileErrorState error={error} onRetry={() => void reload()} onLogout={logout} />
   }
 
-  const isLoading = status === 'loading'
-
-  useEffect(() => {
-    if (isLoading) {
-      setShowSkeletonOverlay(true)
-      setContentVisible(false)
-      return
-    }
-
-    if (!data) {
-      setShowSkeletonOverlay(false)
-      setContentVisible(false)
-      return
-    }
-
-    setShowSkeletonOverlay(true)
-    const frameId = window.requestAnimationFrame(() => setContentVisible(true))
-    const timeoutId = window.setTimeout(() => setShowSkeletonOverlay(false), 280)
-
-    return () => {
-      window.cancelAnimationFrame(frameId)
-      window.clearTimeout(timeoutId)
-    }
-  }, [data, isLoading, activeTab])
-
   return (
     <div className="ui-kit-page profile-page">
-      <Toaster
-        position="top-right"
-        containerStyle={{
-          zIndex: 1000,
-        }}
-        toastOptions={{
-          duration: 3000,
-          style: {
-            background: '#19191c',
-            color: '#fff',
-            border: '1px solid rgba(255,255,255,.08)',
-            borderRadius: '0',
-          },
-        }}
-      />
       <div className="profile-shell">
         <div className="profile-topbar">
           <nav className="profile-tabs" aria-label="Разделы профиля">
@@ -99,9 +53,9 @@ export default function ProfilePage() {
             ] as const).map(([key, label]) => (
               <button
                 key={key}
-                className={`profile-tab ${activeTab === key ? 'is-active' : ''}`}
+                className={`profile-tab ${activeTab === key ? 'is-active' : ''} ${key === 'squads' && (data?.squadInvites.length ?? 0) > 0 ? 'has-notification' : ''}`}
                 type="button"
-                onClick={() => setActiveTab(key)}
+                onClick={() => handleTabChange(key)}
               >
                 <span>{label}</span>
               </button>
@@ -111,13 +65,13 @@ export default function ProfilePage() {
 
         <div className="profile-transition-shell">
           {!isLoading && data ? (
-            <div key={activeTab} className={`profile-content-stage ${contentVisible ? 'is-visible' : ''}`}>
+            <div key={activeTab} className="profile-content-stage is-visible">
               {activeTab === 'overview' ? (
                 <ProfileOverviewTab
                   data={data}
                   skinFailed={skinFailed}
                   setSkinFailed={setSkinFailed}
-                  setActiveTab={setActiveTab}
+                  setActiveTab={handleTabChange}
                   skinVersion={skinVersion}
                 />
               ) : null}
@@ -132,12 +86,9 @@ export default function ProfilePage() {
 
               {activeTab === 'settings' ? (
                 <ProfileSettingsTab
+                  key={data.user.id}
                   data={data}
                   authToken={authToken}
-                  nicknameDraft={nicknameDraft}
-                  setNicknameDraft={setNicknameDraft}
-                  isUpdatingNickname={isUpdatingNickname}
-                  setIsUpdatingNickname={setIsUpdatingNickname}
                   setData={setData}
                   setAuthUser={setAuthUser}
                   onLogout={logout}
@@ -150,8 +101,8 @@ export default function ProfilePage() {
             </div>
           ) : null}
 
-          {showSkeletonOverlay ? (
-            <div className={`profile-loading-overlay ${!isLoading && contentVisible ? 'is-exiting' : ''}`} aria-hidden>
+          {isLoading ? (
+            <div className="profile-loading-overlay" aria-hidden>
               <ProfileSkeleton activeTab={activeTab} />
             </div>
           ) : null}

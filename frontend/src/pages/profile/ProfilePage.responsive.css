@@ -1,0 +1,108 @@
+@media (max-width: 1100px) {
+  .profile-layout,
+  .profile-split,
+  .profile-skeleton-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .profile-stats,
+  .profile-skeleton-stats,
+  .profile-inventory-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .profile-hero,
+  .profile-toolbar,
+  .profile-topbar,
+  .profile-summary-grid,
+  .profile-stats,
+  .profile-inventory-grid,
+  .profile-skeleton-stats {
+    grid-template-columns: 1fr;
+    flex-direction: column;
+  }
+
+  .profile-hero,
+  .profile-actions,
+  .profile-toolbar,
+  .profile-section-head,
+  .profile-inline-card,
+  .profile-search-item,
+  .profile-invite-card {
+    align-items: stretch;
+  }
+
+  .profile-identity-head,
+  .profile-skeleton-head {
+    grid-template-columns: 1fr;
+  }
+
+  .profile-panel .ui-card-header {
+    flex-direction: row;
+    align-items: flex-start;
+    flex-wrap: nowrap;
+    gap: 0.75rem;
+  }
+
+  .profile-panel .ui-card-header .card-title {
+    width: auto;
+    min-width: 0;
+    flex: 1 1 auto;
+    align-self: auto;
+    text-align: left;
+  }
+
+  .profile-panel .ui-card-header .btn,
+  .profile-panel .ui-card-header .btn-sm {
+    width: auto;
+    flex: 0 0 auto;
+  }
+
+  .profile-panel .ui-card-header .ui-badge {
+    flex: 0 0 auto;
+    align-self: flex-start;
+  }
+
+  .profile-title-badge-row {
+    width: auto;
+    min-width: 0;
+    flex: 1 1 auto;
+    justify-content: space-between;
+  }
+
+  .profile-inline-card {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    justify-content: flex-start;
+    gap: 0.45rem;
+  }
+
+  .profile-inline-card strong,
+  .profile-inline-card .profile-subtle {
+    width: 100%;
+  }
+
+  .profile-squad-head-row {
+    align-items: flex-start;
+  }
+
+  .profile-squad-name-inline {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: unset;
+  }
+
+  .profile-skeleton-toolbar,
+  .profile-skeleton-panel-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .profile-shimmer-tab,
+  .profile-shimmer-button,
+  .profile-shimmer-button--sm {
+    width: 100%;
+  }
+}

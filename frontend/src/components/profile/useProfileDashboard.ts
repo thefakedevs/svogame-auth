@@ -1,61 +1,48 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ApiError, toDisplayError } from '../../api/http'
-import { currentAppPath, redirectToAuth } from '../../routes/auth'
-import {
-  getMySquad,
-  getMySquadInvites,
-  getSquadConfig,
-  getSquadMembers,
-} from '../../api/profile'
-import { getCurrentUser } from '../../api/users'
-import { tokenManager } from '../../services/tokenManager'
+import { getCurrentAppPath, redirectToAuth } from '../../features/auth/lib/navigation'
+import { fetchProfileDashboard, fetchSquadDashboardSlice, toAuthUser } from '../../features/profile/lib/dashboard'
+import { navigateTo, replaceUrl } from '../../shared/navigation/history'
+import { clearAuthSession, setAuthToken, setAuthUser } from '../../shared/session/auth-session'
+import { validateTokenFormat } from '../../shared/session/token'
 import { useAuthStore } from '../../store/authStore'
 import type { ProfileDashboardData, ProfileStatus } from './types'
+
+function isUnauthorizedError(cause: unknown) {
+  return cause instanceof ApiError && cause.isAuthError()
+}
 
 export function useProfileDashboard(query: URLSearchParams) {
   const authHydrated = useAuthStore((store) => store.hydrated)
   const authToken = useAuthStore((store) => store.token)
-  const setAuthUser = useAuthStore((store) => store.setUser)
-  const setAuthToken = useAuthStore((store) => store.setToken)
   const processedUrlTokenRef = useRef<string | null>(null)
 
   const [status, setStatus] = useState<ProfileStatus>('loading')
   const [data, setData] = useState<ProfileDashboardData | null>(null)
   const [error, setError] = useState('')
 
+  const markUnauthorized = useCallback(() => {
+    clearAuthSession()
+    setStatus('unauthorized')
+  }, [])
+
   const loadDashboard = useCallback(async (token: string) => {
     try {
-      const [user, squad, squadInvites, squadConfig] = await Promise.all([
-        getCurrentUser(token),
-        getMySquad(token),
-        getMySquadInvites(token),
-        getSquadConfig(),
-      ])
-
-      const squadMembers = squad ? await getSquadMembers(token, squad.id) : []
-      setAuthUser({ id: user.id, username: user.username, avatarUrl: user.avatarUrl ?? '' })
+      const nextData = await fetchProfileDashboard(token)
+      setAuthUser(toAuthUser(nextData.user))
       setError('')
-      setData({
-        user,
-        squad,
-        squadMembers,
-        squadInvites,
-        squadConfig,
-      })
+      setData(nextData)
       setStatus('loaded')
     } catch (cause) {
-      if (cause instanceof ApiError && cause.isAuthError()) {
-        void tokenManager.clearToken()
-        setAuthToken(null)
-        setAuthUser(null)
-        setStatus('unauthorized')
+      if (isUnauthorizedError(cause)) {
+        markUnauthorized()
         return
       }
 
       setError(toDisplayError(cause, 'Не удалось загрузить профиль.'))
       setStatus('error')
     }
-  }, [setAuthToken, setAuthUser])
+  }, [markUnauthorized])
 
   const reload = useCallback(async () => {
     if (!authToken) {
@@ -79,47 +66,23 @@ export function useProfileDashboard(query: URLSearchParams) {
     }
 
     try {
-      const [squad, squadInvites, squadConfig] = await Promise.all([
-        getMySquad(authToken),
-        getMySquadInvites(authToken),
-        getSquadConfig(),
-      ])
-
-      const squadMembers = squad ? await getSquadMembers(authToken, squad.id) : []
-
-      setData((prev) => {
-        if (!prev) {
-          return prev
-        }
-
-        return {
-          ...prev,
-          squad,
-          squadMembers,
-          squadInvites,
-          squadConfig,
-        }
-      })
+      const nextSlice = await fetchSquadDashboardSlice(authToken)
+      setData((prev) => (prev ? { ...prev, ...nextSlice } : prev))
       setError('')
     } catch (cause) {
-      if (cause instanceof ApiError && cause.isAuthError()) {
-        void tokenManager.clearToken()
-        setAuthToken(null)
-        setAuthUser(null)
-        setStatus('unauthorized')
+      if (isUnauthorizedError(cause)) {
+        markUnauthorized()
         return
       }
 
       setError(toDisplayError(cause, 'Не удалось обновить данные сквада.'))
     }
-  }, [authToken, data, reload, setAuthToken, setAuthUser])
+  }, [authToken, data, markUnauthorized, reload])
 
   const logout = useCallback(() => {
-    void tokenManager.clearToken()
-    setAuthToken(null)
-    setAuthUser(null)
-    window.location.assign('/')
-  }, [setAuthToken, setAuthUser])
+    clearAuthSession()
+    navigateTo('/', { replace: true })
+  }, [])
 
   useEffect(() => {
     const run = async () => {
@@ -130,25 +93,24 @@ export function useProfileDashboard(query: URLSearchParams) {
         if (processedUrlTokenRef.current === tokenFromUrl) return
         processedUrlTokenRef.current = tokenFromUrl
 
-        if (!tokenManager.validateTokenFormat(tokenFromUrl)) {
+        if (!validateTokenFormat(tokenFromUrl)) {
           setError('Некорректный токен авторизации.')
           setStatus('error')
           return
         }
 
-        await tokenManager.storeToken(tokenFromUrl)
         setAuthToken(tokenFromUrl)
         setStatus('loading')
         await loadDashboard(tokenFromUrl)
         const url = new URL(window.location.href)
         url.searchParams.delete('token')
-        window.history.replaceState(null, '', url.pathname + url.search)
+        replaceUrl(url.pathname + url.search)
         return
       }
 
       processedUrlTokenRef.current = null
       if (!authToken) {
-        redirectToAuth(currentAppPath())
+        redirectToAuth(getCurrentAppPath())
         return
       }
 
@@ -157,7 +119,7 @@ export function useProfileDashboard(query: URLSearchParams) {
     }
 
     void run()
-  }, [authHydrated, authToken, loadDashboard, query, setAuthToken])
+  }, [authHydrated, authToken, loadDashboard, query])
 
   return {
     authToken,

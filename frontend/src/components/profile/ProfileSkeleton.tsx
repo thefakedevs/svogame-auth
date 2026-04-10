@@ -18,20 +18,9 @@ function OverviewSkeleton() {
         <div className="profile-shimmer profile-shimmer-skin" />
         <div className="profile-skeleton-meta">
           <div className="profile-shimmer profile-shimmer-meta" />
-          <div className="profile-shimmer profile-shimmer-meta" />
-          <div className="profile-shimmer profile-shimmer-meta" />
         </div>
       </div>
       <div className="profile-skeleton-main">
-        <div className="profile-skeleton-stats">
-          {Array.from({ length: 3 }, (_, index) => (
-            <div key={index} className="card profile-skeleton-stat-card">
-              <div className="profile-shimmer profile-shimmer-stat-label" />
-              <div className="profile-shimmer profile-shimmer-stat-value" />
-              <div className="profile-shimmer profile-shimmer-stat-note" />
-            </div>
-          ))}
-        </div>
         <div className="card profile-skeleton-panel">
           <div className="profile-skeleton-panel-head">
             <div className="profile-shimmer profile-shimmer-section" />
@@ -113,6 +102,8 @@ function SettingsSkeleton() {
           <div className="profile-skeleton-panel-head">
             <div className="profile-shimmer profile-shimmer-section" />
           </div>
+          <div className="profile-shimmer profile-shimmer-item" />
+          <div className="profile-shimmer profile-shimmer-item" />
           <div className="profile-shimmer profile-shimmer-item" />
           <div className="profile-shimmer profile-shimmer-item" />
           <div className="profile-shimmer profile-shimmer-button profile-shimmer-button--sm" />

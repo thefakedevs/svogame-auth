@@ -108,7 +108,7 @@ body:has(.ui-kit-page) {
   justify-content: center;
   gap: 8px;
   min-width: 140px;
-  padding: 14px 28px;
+  padding: 0.65rem 0.8rem;
   border-radius: 12px;
   font-size: 1rem;
   font-weight: 600;
