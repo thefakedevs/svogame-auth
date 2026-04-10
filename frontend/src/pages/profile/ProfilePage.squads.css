@@ -279,3 +279,56 @@
 .profile-page .profile-tab:focus-visible {
   border-color: rgba(247, 164, 29, 0.45);
 }
+
+.profile-member--pending {
+  border-color: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.profile-member--pending .profile-member-avatar {
+  border-style: dashed;
+  filter: grayscale(1) brightness(0.82);
+}
+
+.profile-member-status-badge {
+  flex: 0 0 auto;
+  opacity: 0.82;
+}
+
+.profile-member-action {
+  margin-left: auto;
+  display: flex;
+  flex: 0 0 auto;
+  justify-content: flex-end;
+}
+
+.profile-member-pending-action {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--ui-text-muted);
+}
+
+.profile-member-pending-action:hover:not(:disabled),
+.profile-member-pending-action:focus-visible {
+  border-color: rgba(237, 66, 69, 0.45);
+  background: rgba(237, 66, 69, 0.08);
+  color: #fecaca;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .profile-member--pending .profile-member-action {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateX(6px);
+    transition:
+      opacity 160ms ease,
+      transform 160ms ease;
+  }
+
+  .profile-member--pending:hover .profile-member-action,
+  .profile-member--pending:focus-within .profile-member-action {
+    opacity: 1;
+    pointer-events: auto;
+    transform: none;
+  }
+}

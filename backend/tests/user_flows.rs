@@ -711,6 +711,37 @@ async fn leader_can_revoke_invite_before_it_is_accepted() {
 
 #[tokio::test]
 #[serial]
+async fn squad_members_endpoint_includes_active_pending_invites() {
+    let app = TestApp::spawn().await;
+    let leader = app.issue_user_token("LeaderRoster", false, &[]).await;
+    let invited = app.issue_user_token("PendingRoster", false, &[]).await;
+
+    let squad = app.create_squad(&leader, "India Team").await;
+    let squad_id = squad["id"].as_str().expect("squad id");
+    let invite_id = app.issue_invite(&leader, squad_id, &invited.user_id).await;
+
+    let response = app
+        .get_json(&format!("/api/squads/{squad_id}/members"), "")
+        .await;
+    assert!(response.status().is_success());
+    let members: Vec<serde_json::Value> = response.json().await.expect("members json");
+
+    assert_eq!(members.len(), 2);
+    assert_eq!(members[0]["id"], leader.user_id);
+    assert_eq!(members[0]["username"], "LeaderRoster");
+    assert_eq!(members[0]["isLeader"], true);
+    assert_eq!(members[0]["isPendingInvite"], false);
+    assert!(members[0]["inviteId"].is_null());
+
+    assert_eq!(members[1]["id"], invited.user_id);
+    assert_eq!(members[1]["username"], "PendingRoster");
+    assert_eq!(members[1]["isLeader"], false);
+    assert_eq!(members[1]["isPendingInvite"], true);
+    assert_eq!(members[1]["inviteId"], invite_id);
+}
+
+#[tokio::test]
+#[serial]
 async fn squad_capacity_counts_members_and_active_invites() {
     let app = TestApp::spawn().await;
     let leader = app.issue_user_token("LeaderCapacity", false, &[]).await;

@@ -1,5 +1,7 @@
 .home-page {
-  max-width: 760px;
+  width: 100%;
+  max-width: none;
+  align-items: stretch;
   gap: 1.25rem;
 }
 
@@ -8,6 +10,7 @@
   flex-direction: column;
   align-items: flex-start;
   gap: 1rem;
+  max-width: none;
 }
 
 .home-hero__title {
@@ -33,6 +36,10 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1rem;
   width: 100%;
+}
+
+.home-grid > .card {
+  max-width: none;
 }
 
 @media (max-width: 640px) {

@@ -1,15 +1,14 @@
 import { useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
-import { createSquadInvite, revokeSquadInvite, type SquadInviteResponse, type UserSearchItemResponse } from '../../../api/squads'
+import { createSquadInvite, type UserSearchItemResponse } from '../../../api/squads'
 import { toDisplayError } from '../../../api/http'
 import { useSquadUserSearch } from '../hooks/useSquadUserSearch'
-import { formatDateTime, renderUserAvatar } from '../lib/format'
+import { renderUserAvatar } from '../lib/format'
 import type { SquadSectionProps } from '../types'
 
 export default function LeaderInviteCard({ authToken, data, onChanged }: SquadSectionProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedUser, setSelectedUser] = useState<UserSearchItemResponse | null>(null)
-  const [latestInvite, setLatestInvite] = useState<SquadInviteResponse | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const { items, isLoading, error } = useSquadUserSearch(authToken, searchQuery)
 
@@ -30,28 +29,13 @@ export default function LeaderInviteCard({ authToken, data, onChanged }: SquadSe
     })
 
     try {
-      const invite = await request
-      setLatestInvite(invite)
+      await request
       setSearchQuery('')
       setSelectedUser(null)
       await onChanged()
     } finally {
       setIsSubmitting(false)
     }
-  }
-
-  const onRevokeLatestInvite = async () => {
-    if (!latestInvite) return
-
-    const request = revokeSquadInvite(authToken, latestInvite.id)
-    toast.promise(request, {
-      loading: 'Отзываем инвайт...',
-      success: 'Инвайт отозван.',
-      error: (cause) => toDisplayError(cause, 'Не удалось отозвать инвайт.'),
-    })
-
-    await request
-    setLatestInvite(null)
   }
 
   return (
@@ -102,27 +86,6 @@ export default function LeaderInviteCard({ authToken, data, onChanged }: SquadSe
           </button>
         </div>
       </div>
-
-      {latestInvite ? (
-        <>
-          <div className="ui-divider" />
-          <div className="profile-stack">
-            <div className="profile-inline-card">
-              <strong>Последний инвайтный игрок</strong>
-              <span className="profile-subtle">{latestInvite.invitedUsername}</span>
-            </div>
-            <div className="profile-inline-card">
-              <strong>Истекает</strong>
-              <span className="profile-subtle">{formatDateTime(latestInvite.expiresAt)}</span>
-            </div>
-            <div className="profile-actions">
-              <button className="btn" type="button" onClick={() => void onRevokeLatestInvite()}>
-                Отозвать последний инвайт
-              </button>
-            </div>
-          </div>
-        </>
-      ) : null}
     </section>
   )
 }
