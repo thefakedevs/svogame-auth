@@ -397,23 +397,20 @@ pub async fn add_stackable(
     db: &sea_orm::DatabaseConnection,
     mutation: StackableMutation,
 ) -> Result<StackableView> {
-    mutate_stackable(db, mutation, "stackable_added", |current, amount| {
-        Ok(current + amount)
-    })
-    .await
+    let tx = db.begin().await?;
+    let result = add_stackable_in_tx(&tx, mutation).await?;
+    tx.commit().await?;
+    Ok(result)
 }
 
 pub async fn remove_stackable(
     db: &sea_orm::DatabaseConnection,
     mutation: StackableMutation,
 ) -> Result<StackableView> {
-    mutate_stackable(db, mutation, "stackable_removed", |current, amount| {
-        if current < amount {
-            bail!("Insufficient stackable amount");
-        }
-        Ok(current - amount)
-    })
-    .await
+    let tx = db.begin().await?;
+    let result = remove_stackable_in_tx(&tx, mutation).await?;
+    tx.commit().await?;
+    Ok(result)
 }
 
 pub async fn set_stackable(
@@ -471,20 +468,52 @@ pub async fn prolong_expirable(
     db: &sea_orm::DatabaseConnection,
     mutation: ProlongExpirableMutation,
 ) -> Result<ExpirableView> {
+    let tx = db.begin().await?;
+    let result = prolong_expirable_in_tx(&tx, mutation).await?;
+    tx.commit().await?;
+    Ok(result)
+}
+
+pub(crate) async fn add_stackable_in_tx(
+    db: &impl ConnectionTrait,
+    mutation: StackableMutation,
+) -> Result<StackableView> {
+    mutate_stackable_in_tx(db, mutation, "stackable_added", |current, amount| {
+        Ok(current + amount)
+    })
+    .await
+}
+
+pub(crate) async fn remove_stackable_in_tx(
+    db: &impl ConnectionTrait,
+    mutation: StackableMutation,
+) -> Result<StackableView> {
+    mutate_stackable_in_tx(db, mutation, "stackable_removed", |current, amount| {
+        if current < amount {
+            bail!("Insufficient stackable amount");
+        }
+        Ok(current - amount)
+    })
+    .await
+}
+
+pub(crate) async fn prolong_expirable_in_tx(
+    db: &impl ConnectionTrait,
+    mutation: ProlongExpirableMutation,
+) -> Result<ExpirableView> {
     mutation.actor.validate()?;
     if mutation.duration_seconds <= 0 {
         bail!("Duration must be positive");
     }
     let asset_key = validate_asset_key(&mutation.asset_key)?;
-    let tx = db.begin().await?;
-    ensure_user_exists(&tx, mutation.user_id).await?;
-    let asset = get_non_currency_asset_by_key(&tx, &asset_key).await?;
+    ensure_user_exists(db, mutation.user_id).await?;
+    let asset = get_non_currency_asset_by_key(db, &asset_key).await?;
     ensure_ownership_model(&asset, OwnershipModel::Expirable)?;
     let now = chrono::Utc::now();
     let duration = chrono::Duration::seconds(mutation.duration_seconds);
 
     handle_subscription_transition(
-        &tx,
+        db,
         mutation.user_id,
         &asset.key,
         &mutation.actor,
@@ -494,7 +523,7 @@ pub async fn prolong_expirable(
     .await?;
 
     let existing = UserExpirableAsset::find_by_id((mutation.user_id, asset.id))
-        .one(&tx)
+        .one(db)
         .await?;
     let (previous_expires_at, model) = if let Some(existing) = existing {
         let base = if existing.expires_at > now {
@@ -506,7 +535,7 @@ pub async fn prolong_expirable(
         active.expires_at = Set(base + duration);
         active.last_extended_at = Set(Some(now));
         active.updated_at = Set(now);
-        (Some(existing.expires_at), active.update(&tx).await?)
+        (Some(existing.expires_at), active.update(db).await?)
     } else {
         let expires_at = now + duration;
         let active = UserExpirableAssetActiveModel {
@@ -518,11 +547,11 @@ pub async fn prolong_expirable(
             granted_by_actor: Set(serde_json::to_string(&mutation.actor)?),
             updated_at: Set(now),
         };
-        (None, active.insert(&tx).await?)
+        (None, active.insert(db).await?)
     };
 
     write_inventory_operation(
-        &tx,
+        db,
         mutation.user_id,
         asset.id,
         OwnershipModel::Expirable,
@@ -536,7 +565,6 @@ pub async fn prolong_expirable(
     )
     .await?;
 
-    tx.commit().await?;
     Ok(ExpirableView {
         asset_key: asset.key,
         asset_definition_id: asset.id,
@@ -709,19 +737,33 @@ async fn mutate_stackable<F>(
 where
     F: Fn(i64, i64) -> Result<i64>,
 {
+    let tx = db.begin().await?;
+    let result = mutate_stackable_in_tx(&tx, mutation, operation_type, compute_new_amount).await?;
+    tx.commit().await?;
+    Ok(result)
+}
+
+async fn mutate_stackable_in_tx<F>(
+    db: &impl ConnectionTrait,
+    mutation: StackableMutation,
+    operation_type: &str,
+    compute_new_amount: F,
+) -> Result<StackableView>
+where
+    F: Fn(i64, i64) -> Result<i64>,
+{
     mutation.actor.validate()?;
     if mutation.amount <= 0 {
         bail!("Amount must be positive");
     }
     let asset_key = validate_asset_key(&mutation.asset_key)?;
-    let tx = db.begin().await?;
-    ensure_user_exists(&tx, mutation.user_id).await?;
-    let asset = get_non_currency_asset_by_key(&tx, &asset_key).await?;
+    ensure_user_exists(db, mutation.user_id).await?;
+    let asset = get_non_currency_asset_by_key(db, &asset_key).await?;
     ensure_ownership_model(&asset, OwnershipModel::Stackable)?;
     let now = chrono::Utc::now();
 
     let existing = UserStackableAsset::find_by_id((mutation.user_id, asset.id))
-        .one(&tx)
+        .one(db)
         .await?;
     let current_amount = existing.as_ref().map_or(0, |holding| holding.amount);
     let new_amount = compute_new_amount(current_amount, mutation.amount)?;
@@ -729,7 +771,7 @@ where
         bail!("Amount must not become negative");
     }
     let model =
-        write_stackable_state(&tx, mutation.user_id, asset.id, new_amount, now, existing).await?;
+        write_stackable_state(db, mutation.user_id, asset.id, new_amount, now, existing).await?;
 
     let delta = if operation_type == "stackable_removed" {
         -mutation.amount
@@ -737,7 +779,7 @@ where
         mutation.amount
     };
     write_inventory_operation(
-        &tx,
+        db,
         mutation.user_id,
         asset.id,
         OwnershipModel::Stackable,
@@ -751,7 +793,6 @@ where
     )
     .await?;
 
-    tx.commit().await?;
     Ok(StackableView {
         asset_key: asset.key,
         asset_definition_id: asset.id,

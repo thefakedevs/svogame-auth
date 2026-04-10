@@ -11,6 +11,7 @@ use sea_orm::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use std::collections::HashMap;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
@@ -89,8 +90,14 @@ pub struct SquadInviteResponse {
     pub squad_name: String,
     #[serde(rename = "inviterUserId")]
     pub inviter_user_id: String,
+    #[serde(rename = "inviterUsername")]
+    pub inviter_username: String,
+    #[serde(rename = "inviterAvatarUrl")]
+    pub inviter_avatar_url: Option<String>,
     #[serde(rename = "invitedUserId")]
     pub invited_user_id: String,
+    #[serde(rename = "invitedUsername")]
+    pub invited_username: String,
     #[serde(rename = "expiresAt")]
     pub expires_at: chrono::DateTime<chrono::Utc>,
     #[serde(rename = "createdAt")]
@@ -646,7 +653,13 @@ pub async fn create_invite(
         .await
         .map_err(|e| HttpError::internal_error(format!("Failed to check existing invite: {e}")))?
     {
-        return Ok(Json(to_invite_response(existing_invite, squad.name)));
+        return Ok(Json(to_invite_response(
+            existing_invite,
+            squad.name,
+            user.username,
+            user.avatar_url,
+            invited_user.username,
+        )));
     }
 
     let invite = SquadInviteActiveModel {
@@ -674,7 +687,13 @@ pub async fn create_invite(
     .await
     .map_err(|e| HttpError::internal_error(format!("Failed to write audit log: {e}")))?;
 
-    Ok(Json(to_invite_response(invite, squad.name)))
+    Ok(Json(to_invite_response(
+        invite,
+        squad.name,
+        user.username,
+        user.avatar_url,
+        invited_user.username,
+    )))
 }
 
 #[utoipa::path(
@@ -703,16 +722,46 @@ pub async fn list_my_invites(
         .await
         .map_err(|e| HttpError::internal_error(format!("Failed to list invites: {e}")))?;
 
+    let squad_ids: Vec<Uuid> = invites.iter().map(|invite| invite.squad_id).collect();
+    let squads = Squad::find()
+        .filter(crate::entities::SquadColumn::Id.is_in(squad_ids))
+        .all(&state.db)
+        .await
+        .map_err(|e| {
+            HttpError::internal_error(format!("Failed to load squads for invites: {e}"))
+        })?;
+    let squads_by_id: HashMap<Uuid, SquadModel> =
+        squads.into_iter().map(|squad| (squad.id, squad)).collect();
+
+    let inviter_ids: Vec<Uuid> = invites
+        .iter()
+        .map(|invite| invite.inviter_user_id)
+        .collect();
+    let inviters = User::find()
+        .filter(UserColumn::Id.is_in(inviter_ids))
+        .all(&state.db)
+        .await
+        .map_err(|e| {
+            HttpError::internal_error(format!("Failed to load inviters for invites: {e}"))
+        })?;
+    let inviters_by_id: HashMap<Uuid, UserModel> = inviters
+        .into_iter()
+        .map(|inviter| (inviter.id, inviter))
+        .collect();
+
     let mut response = Vec::with_capacity(invites.len());
     for invite in invites {
-        if let Some(squad) = Squad::find_by_id(invite.squad_id)
-            .one(&state.db)
-            .await
-            .map_err(|e| {
-                HttpError::internal_error(format!("Failed to load squad for invite: {e}"))
-            })?
-        {
-            response.push(to_invite_response(invite, squad.name));
+        if let (Some(squad), Some(inviter)) = (
+            squads_by_id.get(&invite.squad_id),
+            inviters_by_id.get(&invite.inviter_user_id),
+        ) {
+            response.push(to_invite_response(
+                invite,
+                squad.name.clone(),
+                inviter.username.clone(),
+                inviter.avatar_url.clone(),
+                user.username.clone(),
+            ));
         }
     }
 
@@ -796,11 +845,11 @@ pub async fn accept_invite(
         .await
         .map_err(|e| HttpError::internal_error(format!("Failed to join squad: {e}")))?;
 
-    let invite_active: SquadInviteActiveModel = invite.clone().into();
-    invite_active
-        .delete(&tx)
+    SquadInvite::delete_many()
+        .filter(SquadInviteColumn::InvitedUserId.eq(user.id))
+        .exec(&tx)
         .await
-        .map_err(|e| HttpError::internal_error(format!("Failed to remove invite: {e}")))?;
+        .map_err(|e| HttpError::internal_error(format!("Failed to clear user invites: {e}")))?;
 
     write_audit_log(
         &tx,
@@ -1029,13 +1078,22 @@ fn to_squad_response(squad: SquadModel, member_count: u64) -> SquadResponse {
     }
 }
 
-fn to_invite_response(invite: SquadInviteModel, squad_name: String) -> SquadInviteResponse {
+fn to_invite_response(
+    invite: SquadInviteModel,
+    squad_name: String,
+    inviter_username: String,
+    inviter_avatar_url: Option<String>,
+    invited_username: String,
+) -> SquadInviteResponse {
     SquadInviteResponse {
         id: invite.id.to_string(),
         squad_id: invite.squad_id.to_string(),
         squad_name,
         inviter_user_id: invite.inviter_user_id.to_string(),
+        inviter_username,
+        inviter_avatar_url,
         invited_user_id: invite.invited_user_id.to_string(),
+        invited_username,
         expires_at: invite.expires_at,
         created_at: invite.created_at,
     }

@@ -1334,3 +1334,327 @@ enum ServiceTokenAudit {
     Metadata,
     CreatedAt,
 }
+
+pub struct CreateLootboxDefinitionTable;
+
+impl MigrationName for CreateLootboxDefinitionTable {
+    fn name(&self) -> &str {
+        "m20260409_000020_create_lootbox_definition_table"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for CreateLootboxDefinitionTable {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .create_table(
+                Table::create()
+                    .table(LootboxDefinition::Table)
+                    .if_not_exists()
+                    .col(
+                        ColumnDef::new(LootboxDefinition::Id)
+                            .uuid()
+                            .not_null()
+                            .primary_key(),
+                    )
+                    .col(
+                        ColumnDef::new(LootboxDefinition::AssetDefinitionId)
+                            .uuid()
+                            .not_null()
+                            .unique_key(),
+                    )
+                    .col(
+                        ColumnDef::new(LootboxDefinition::IsActive)
+                            .boolean()
+                            .not_null()
+                            .default(true),
+                    )
+                    .col(
+                        ColumnDef::new(LootboxDefinition::Metadata)
+                            .text()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(LootboxDefinition::CreatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .col(
+                        ColumnDef::new(LootboxDefinition::UpdatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .to_owned(),
+            )
+            .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_table(Table::drop().table(LootboxDefinition::Table).to_owned())
+            .await
+    }
+}
+
+#[derive(DeriveIden)]
+enum LootboxDefinition {
+    Table,
+    Id,
+    AssetDefinitionId,
+    IsActive,
+    Metadata,
+    CreatedAt,
+    UpdatedAt,
+}
+
+pub struct CreateLootboxDropDefinitionTable;
+
+impl MigrationName for CreateLootboxDropDefinitionTable {
+    fn name(&self) -> &str {
+        "m20260409_000021_create_lootbox_drop_definition_table"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for CreateLootboxDropDefinitionTable {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .create_table(
+                Table::create()
+                    .table(LootboxDropDefinition::Table)
+                    .if_not_exists()
+                    .col(
+                        ColumnDef::new(LootboxDropDefinition::Id)
+                            .uuid()
+                            .not_null()
+                            .primary_key(),
+                    )
+                    .col(
+                        ColumnDef::new(LootboxDropDefinition::LootboxDefinitionId)
+                            .uuid()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(LootboxDropDefinition::RewardAssetDefinitionId)
+                            .uuid()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(LootboxDropDefinition::StackableAmount)
+                            .big_integer()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(LootboxDropDefinition::ExpirableDurationSeconds)
+                            .big_integer()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(LootboxDropDefinition::Weight)
+                            .big_integer()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(LootboxDropDefinition::TitleI18n)
+                            .text()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(LootboxDropDefinition::IsActive)
+                            .boolean()
+                            .not_null()
+                            .default(true),
+                    )
+                    .col(
+                        ColumnDef::new(LootboxDropDefinition::SortOrder)
+                            .integer()
+                            .not_null()
+                            .default(0),
+                    )
+                    .col(
+                        ColumnDef::new(LootboxDropDefinition::CreatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .col(
+                        ColumnDef::new(LootboxDropDefinition::UpdatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .to_owned(),
+            )
+            .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_table(Table::drop().table(LootboxDropDefinition::Table).to_owned())
+            .await
+    }
+}
+
+#[derive(DeriveIden)]
+enum LootboxDropDefinition {
+    Table,
+    Id,
+    LootboxDefinitionId,
+    RewardAssetDefinitionId,
+    StackableAmount,
+    ExpirableDurationSeconds,
+    Weight,
+    TitleI18n,
+    IsActive,
+    SortOrder,
+    CreatedAt,
+    UpdatedAt,
+}
+
+pub struct CreateLootboxOpenOperationTable;
+
+impl MigrationName for CreateLootboxOpenOperationTable {
+    fn name(&self) -> &str {
+        "m20260409_000022_create_lootbox_open_operation_table"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for CreateLootboxOpenOperationTable {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .create_table(
+                Table::create()
+                    .table(LootboxOpenOperation::Table)
+                    .if_not_exists()
+                    .col(
+                        ColumnDef::new(LootboxOpenOperation::Id)
+                            .big_integer()
+                            .not_null()
+                            .auto_increment()
+                            .primary_key(),
+                    )
+                    .col(
+                        ColumnDef::new(LootboxOpenOperation::UserId)
+                            .uuid()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(LootboxOpenOperation::LootboxDefinitionId)
+                            .uuid()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(LootboxOpenOperation::LootboxAssetDefinitionId)
+                            .uuid()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(LootboxOpenOperation::SelectedDropDefinitionId)
+                            .uuid()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(LootboxOpenOperation::RewardAssetDefinitionId)
+                            .uuid()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(LootboxOpenOperation::RewardOwnershipModel)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(LootboxOpenOperation::RewardAmount)
+                            .big_integer()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(LootboxOpenOperation::RewardDurationSeconds)
+                            .big_integer()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(LootboxOpenOperation::RewardExpiresAt)
+                            .timestamp_with_time_zone()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(LootboxOpenOperation::RewardTitle)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(ColumnDef::new(LootboxOpenOperation::Locale).string().null())
+                    .col(
+                        ColumnDef::new(LootboxOpenOperation::ActorKind)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(LootboxOpenOperation::ActorUserId)
+                            .uuid()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(LootboxOpenOperation::ActorServiceName)
+                            .string()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(LootboxOpenOperation::FeedLength)
+                            .integer()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(LootboxOpenOperation::WinnerIndex)
+                            .integer()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(LootboxOpenOperation::FeedJson)
+                            .text()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(LootboxOpenOperation::CreatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .to_owned(),
+            )
+            .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_table(Table::drop().table(LootboxOpenOperation::Table).to_owned())
+            .await
+    }
+}
+
+#[derive(DeriveIden)]
+enum LootboxOpenOperation {
+    Table,
+    Id,
+    UserId,
+    LootboxDefinitionId,
+    LootboxAssetDefinitionId,
+    SelectedDropDefinitionId,
+    RewardAssetDefinitionId,
+    RewardOwnershipModel,
+    RewardAmount,
+    RewardDurationSeconds,
+    RewardExpiresAt,
+    RewardTitle,
+    Locale,
+    ActorKind,
+    ActorUserId,
+    ActorServiceName,
+    FeedLength,
+    WinnerIndex,
+    FeedJson,
+    CreatedAt,
+}

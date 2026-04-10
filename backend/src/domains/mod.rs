@@ -1,6 +1,7 @@
 pub mod admin;
 pub mod auth;
 pub mod compat;
+pub mod lootboxes;
 pub mod meta;
 pub mod ownership;
 pub mod skins;

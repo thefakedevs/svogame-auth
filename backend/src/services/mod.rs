@@ -2,6 +2,7 @@ pub mod audit;
 pub mod db;
 pub mod discord;
 pub mod gml;
+pub mod lootboxes;
 pub mod migration;
 pub mod ownership;
 pub mod pow;
