@@ -58,5 +58,6 @@ export function toAuthUser(user: UserResponse): UserProfile {
     id: user.id,
     username: user.username,
     avatarUrl: user.avatarUrl ?? '',
+    isSuperuser: user.isSuperuser,
   }
 }

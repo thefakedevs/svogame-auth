@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { Toaster } from 'react-hot-toast'
+import AdminPage from '../components/admin/AdminPage'
 import AppHeader from '../components/layout/AppHeader'
 import ProfilePage from '../components/profile/ProfilePage'
 import HomePage from '../pages/_HomePage'
@@ -34,8 +35,44 @@ function HomeShell() {
   )
 }
 
+function AdminShell() {
+  return (
+    <>
+      <div className="ui-kit-vhs" aria-hidden />
+      <div className="ui-kit-page app-shell">
+        <AppHeader pageTitle="Админка" />
+        <AdminPage />
+      </div>
+    </>
+  )
+}
+
+function adminRouteForPath(pathname: string): { type: 'home' } | { type: 'user'; userId: string } | { type: 'squad'; squadId: string } | { type: 'tokenAudit'; tokenId: string } | null {
+  if (pathname === paths.admin) {
+    return { type: 'home' }
+  }
+
+  const userMatch = pathname.match(/^\/admin\/users\/([^/]+)$/)
+  if (userMatch) {
+    return { type: 'user', userId: decodeURIComponent(userMatch[1]) }
+  }
+
+  const squadMatch = pathname.match(/^\/admin\/squads\/([^/]+)$/)
+  if (squadMatch) {
+    return { type: 'squad', squadId: decodeURIComponent(squadMatch[1]) }
+  }
+
+  const tokenAuditMatch = pathname.match(/^\/admin\/tokens\/([^/]+)\/audit$/)
+  if (tokenAuditMatch) {
+    return { type: 'tokenAudit', tokenId: decodeURIComponent(tokenAuditMatch[1]) }
+  }
+
+  return null
+}
+
 export default function AccountApp() {
   const pathname = normalizePathname(usePathname() || paths.home)
+  const adminRoute = adminRouteForPath(pathname)
 
   useEffect(() => {
     if (typeof document === 'undefined') {
@@ -47,7 +84,9 @@ export default function AccountApp() {
 
   let page = <HomeShell />
 
-  switch (pathname) {
+  if (adminRoute) {
+    page = <AdminShell />
+  } else switch (pathname) {
     case paths.auth:
       page = <AuthRoute />
       break
