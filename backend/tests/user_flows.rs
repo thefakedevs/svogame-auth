@@ -652,6 +652,10 @@ async fn user_can_decline_invite_and_it_disappears_from_inbox() {
     let invites_before = app.my_invites(&invited).await;
     assert_eq!(invites_before.len(), 1);
     assert_eq!(invites_before[0]["id"], invite_id);
+    assert_eq!(invites_before[0]["squadName"], "Hotel Team");
+    assert_eq!(invites_before[0]["inviterUserId"], leader.user_id);
+    assert_eq!(invites_before[0]["inviterUsername"], "LeaderDecline");
+    assert!(invites_before[0]["inviterAvatarUrl"].is_null());
 
     let decline_response = app
         .post_json(
