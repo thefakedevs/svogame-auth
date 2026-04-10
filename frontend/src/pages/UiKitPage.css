@@ -273,3 +273,15 @@ body:has(.ui-kit-page) {
 .ui-kit-grid .card {
   max-width: none;
 }
+
+@media (max-width: 720px) {
+  body:has(.ui-kit-page) {
+    padding: 0;
+  }
+
+  .ui-kit-page {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+  }
+}

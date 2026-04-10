@@ -102,6 +102,7 @@
 }
 
 .profile-tab {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
@@ -113,6 +114,18 @@
   font: inherit;
   text-transform: uppercase;
   letter-spacing: 0.08em;
+}
+
+.profile-tab.has-notification::after {
+  content: '';
+  position: absolute;
+  top: -0.28rem;
+  right: -0.28rem;
+  width: 0.82rem;
+  height: 0.82rem;
+  border: 2px solid rgba(0, 0, 0, 0.55);
+  border-radius: 50%;
+  background: var(--ui-primary);
 }
 
 .profile-tab:hover,
@@ -188,6 +201,21 @@
 .profile-panel .ui-card-header .card-title {
   flex: 1 1 auto;
   text-align: left;
+}
+
+.profile-title-badge-row {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 0;
+}
+
+.profile-title-badge-row .card-title {
+  flex: 0 1 auto;
+}
+
+.profile-title-badge-row .ui-badge {
+  flex: 0 0 auto;
 }
 
 .profile-split .profile-panel .ui-card-header .card-title {
@@ -498,6 +526,12 @@
   align-items: stretch;
   flex-direction: column;
   flex-shrink: 0;
+}
+
+.profile-invite-action-btn {
+  padding: 0.55rem 0.8rem;
+  font-size: 0.74rem;
+  line-height: 1.1;
 }
 
 .profile-squad-head-row {
@@ -1031,6 +1065,48 @@
 
   .profile-skeleton-head {
     grid-template-columns: 1fr;
+  }
+
+  .profile-panel .ui-card-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+
+  .profile-panel .ui-card-header .btn,
+  .profile-panel .ui-card-header .btn-sm {
+    width: 100%;
+  }
+
+  .profile-panel .ui-card-header .ui-badge {
+    align-self: flex-start;
+  }
+
+  .profile-title-badge-row {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .profile-inline-card {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    justify-content: flex-start;
+    gap: 0.45rem;
+  }
+
+  .profile-inline-card strong,
+  .profile-inline-card .profile-subtle {
+    width: 100%;
+  }
+
+  .profile-squad-head-row {
+    align-items: flex-start;
+  }
+
+  .profile-squad-name-inline {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: unset;
   }
 
   .profile-skeleton-toolbar,

@@ -148,6 +148,44 @@
   transform-origin: top right;
 }
 
+.app-header__menu-topbar {
+  display: none;
+}
+
+.app-header__menu-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.app-header__menu-kicker {
+  color: #f7a41d;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.app-header__menu-close {
+  width: 42px;
+  height: 42px;
+  border: 1px solid var(--ui-border);
+  background: rgba(0, 0, 0, 0.28);
+  color: var(--ui-text);
+  font: inherit;
+  font-size: 1.4rem;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.app-header__menu-close:hover,
+.app-header__menu-close:focus-visible {
+  border-color: rgba(247, 164, 29, 0.35);
+  color: #f7a41d;
+}
+
 .app-header__menu-head {
   display: flex;
   align-items: center;
@@ -201,29 +239,172 @@
 
 @media (max-width: 720px) {
   .app-header {
-    grid-template-columns: 1fr;
-    justify-items: stretch;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: center;
+    gap: 0.75rem;
+    width: calc(100% + 40px);
+    margin: -20px -20px 1rem;
+    padding: 12px 16px;
+    border-top: 0;
+    border-right: 0;
+    border-left: 0;
+  }
+
+  .app-header__left {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    min-height: 42px;
   }
 
   .app-header__center {
-    order: 2;
-    justify-content: flex-start;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+    min-height: 42px;
+    pointer-events: none;
+    text-align: center;
   }
 
   .app-header__right {
-    order: 3;
-    justify-content: stretch;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    min-width: 0;
+    min-height: 42px;
   }
 
-  .app-header__account-trigger,
-  .app-header__login,
+  .app-header__brand {
+    min-height: 42px;
+    max-width: 100%;
+    line-height: 1;
+    font-size: 0.76rem;
+    letter-spacing: 0.1em;
+  }
+
+  .app-header__brand::before {
+    height: 18px;
+    align-self: center;
+  }
+
+  .app-header__title {
+    display: block;
+    max-width: 100%;
+    font-size: 0.68rem;
+    line-height: 1;
+    letter-spacing: 0.12em;
+    overflow-wrap: anywhere;
+    margin-inline: auto;
+    white-space: nowrap;
+  }
+
+  .app-header__account-trigger {
+    min-width: 0;
+    width: auto;
+    max-width: min(64vw, 240px);
+    height: 42px;
+    min-height: 42px;
+    padding: 6px 10px;
+  }
+
+  .app-header__login {
+    min-width: 0;
+    padding-inline: 0.9rem;
+  }
+
   .app-header__auth-placeholder {
-    width: 100%;
+    width: 132px;
+    height: 42px;
   }
 
   .app-header__menu {
-    width: 100%;
-    left: 0;
-    right: auto;
+    position: fixed;
+    inset: 0;
+    z-index: 120;
+    width: 100vw;
+    max-width: none;
+    height: 100dvh;
+    max-height: none;
+    padding: 0;
+    border: 0;
+    background:
+      linear-gradient(180deg, rgba(25, 25, 28, 0.98), rgba(12, 12, 14, 0.98)),
+      rgba(18, 18, 18, 0.98);
+    overflow: hidden;
+    transform-origin: center;
+  }
+
+  .app-header__menu-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1rem 1rem 0;
+  }
+
+  .app-header__menu-body {
+    min-height: 100%;
+    padding: 0.75rem 1rem 1.25rem;
+    overflow: auto;
+    gap: 1rem;
+  }
+
+  .app-header__menu-head {
+    align-items: flex-start;
+  }
+
+  .app-header__menu-avatar {
+    width: 48px;
+    height: 48px;
+  }
+
+  .app-header__menu-section {
+    gap: 0.6rem;
+    padding-top: 1rem;
+  }
+
+  .app-header__menu-section a,
+  .app-header__menu-section button {
+    min-height: 48px;
+    padding: 0.8rem 0.9rem;
+    border-color: var(--ui-border);
+    background: rgba(255, 255, 255, 0.02);
+  }
+}
+
+@media (max-width: 520px) {
+  .app-header__account-trigger {
+    max-width: 54vw;
+  }
+
+  .app-header__account-name {
+    max-width: 7rem;
+    font-size: 0.8rem;
+  }
+
+  .app-header__menu {
+    width: 100vw;
+  }
+}
+
+@media (max-width: 420px) {
+  .app-header__account-trigger {
+    gap: 0.45rem;
+    max-width: none;
+    padding: 6px 8px;
+  }
+
+  .app-header__account-name {
+    display: none;
+  }
+
+  .app-header__account-caret {
+    flex-basis: auto;
+  }
+
+  .app-header__login {
+    min-height: 42px;
+    padding-inline: 0.8rem;
   }
 }

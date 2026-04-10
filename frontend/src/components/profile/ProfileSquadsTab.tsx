@@ -85,6 +85,51 @@ function isInvalidSquadNameLength(value: string) {
   return value.length < 4 || value.length > 16
 }
 
+function formatImageLimit(bytes: number) {
+  const megabytes = bytes / (1024 * 1024)
+  if (Number.isInteger(megabytes)) return `${megabytes} МБ`
+  return `${megabytes.toFixed(1).replace('.', ',')} МБ`
+}
+
+function getSquadNameRegex(pattern: string) {
+  return new RegExp(pattern, 'u')
+}
+
+function hasInvalidSquadNameByConfig(value: string, config: ProfileDashboardData['squadConfig']) {
+  if (!value) return false
+
+  return (
+    value.length < config.nameMinChars ||
+    value.length > config.nameMaxChars ||
+    !getSquadNameRegex(config.nameRegex).test(value)
+  )
+}
+
+async function validateSquadImageByConfig(file: File, config: ProfileDashboardData['squadConfig']) {
+  if (file.size > config.imageMaxBytes) {
+    return `Файл должен быть не больше ${formatImageLimit(config.imageMaxBytes)}.`
+  }
+
+  const objectUrl = URL.createObjectURL(file)
+
+  try {
+    const { width, height } = await new Promise<{ width: number; height: number }>((resolve, reject) => {
+      const image = new Image()
+      image.onload = () => resolve({ width: image.naturalWidth, height: image.naturalHeight })
+      image.onerror = () => reject(new Error('Не удалось прочитать изображение.'))
+      image.src = objectUrl
+    })
+
+    if (width > config.imageMaxWidth || height > config.imageMaxHeight) {
+      return `Изображение должно быть не больше ${config.imageMaxWidth}x${config.imageMaxHeight}px.`
+    }
+
+    return null
+  } finally {
+    URL.revokeObjectURL(objectUrl)
+  }
+}
+
 function useUserSearch(authToken: string | null, query: string) {
   const [items, setItems] = useState<UserSearchItemResponse[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -154,10 +199,12 @@ function SquadInfoCard({
   const squadImageUrl = data.squad?.imageUrl ? `${data.squad.imageUrl}?v=${encodeURIComponent(data.squad.updatedAt)}` : null
   const isAvatarUploadDisabled = !isLeader || isUploadingImage
   const squadAvatarInputId = `squad-avatar-upload-${data.squad?.id ?? 'current'}`
+  const squadNamePattern = data.squadConfig.nameRegex
+  const squadImageHint = `до ${data.squadConfig.imageMaxWidth}x${data.squadConfig.imageMaxHeight} и ${formatImageLimit(data.squadConfig.imageMaxBytes)}`
   const avatarActionLabel = isUploadingImage
     ? 'Загрузка...'
     : isLeader
-      ? 'Аватар до 1024x1024 и 2 МБ'
+      ? `Аватар ${squadImageHint}`
       : 'Недоступно: только лидер'
 
   useEffect(() => {
@@ -166,14 +213,20 @@ function SquadInfoCard({
   }, [data.squad?.name])
 
   const onNameDraftChange = (value: string) => {
-    const sanitizedValue = sanitizeSquadName(value)
-    setHasInvalidNameInput(sanitizedValue !== value || hasInvalidSquadNameBoundary(sanitizedValue))
-    setNameDraft(sanitizedValue)
+    setNameDraft(value)
+    setHasInvalidNameInput(hasInvalidSquadNameByConfig(value.trim(), data.squadConfig))
   }
 
   const onImageSelected = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file || !data.squad) return
+
+    const imageValidationError = await validateSquadImageByConfig(file, data.squadConfig)
+    if (imageValidationError) {
+      toast.error(imageValidationError)
+      event.target.value = ''
+      return
+    }
 
     setIsUploadingImage(true)
     const request = uploadSquadImage(authToken, data.squad.id, file)
@@ -196,11 +249,7 @@ function SquadInfoCard({
   const onSaveName = async () => {
     if (!data.squad) return
     const trimmed = nameDraft.trim()
-    if (hasInvalidSquadNameBoundary(trimmed)) {
-      setHasInvalidNameInput(true)
-      return
-    }
-    if (isInvalidSquadNameLength(trimmed)) {
+    if (hasInvalidSquadNameByConfig(trimmed, data.squadConfig)) {
       setHasInvalidNameInput(true)
       return
     }
@@ -294,7 +343,7 @@ function SquadInfoCard({
                     <polyline points="17 8 12 3 7 8" />
                     <line x1="12" y1="3" x2="12" y2="15" />
                   </svg>
-                  <span className="profile-squad-avatar-placeholder-copy">До 1024x1024, до 2 МБ</span>
+                  <span className="profile-squad-avatar-placeholder-copy">{squadImageHint}</span>
                 </span>
               )}
               <span className="profile-squad-avatar-tooltip" role="tooltip">
@@ -360,14 +409,15 @@ function SquadInfoCard({
                     value={nameDraft}
                     onChange={(event) => onNameDraftChange(event.target.value)}
                     placeholder="Введите название сквада"
-                    minLength={4}
-                    maxLength={16}
+                    pattern={squadNamePattern}
+                    minLength={data.squadConfig.nameMinChars}
+                    maxLength={data.squadConfig.nameMaxChars}
                     inputMode="text"
                     autoComplete="off"
                     autoFocus
                   />
                   <div className={`ui-hint ${hasInvalidNameInput ? 'ui-hint-error' : ''}`}>
-                    Лимиты: 4–16 символов. Разрешены латиница, кириллица и `-`. Имя не может начинаться или заканчиваться на `-`.
+                    Лимиты: {data.squadConfig.nameMinChars}–{data.squadConfig.nameMaxChars} символов. Разрешены: латиница, кириллица и `-`. Имя не может начинаться или заканчиваться на `-`.
                   </div>
                 </div>
                 <div className="profile-actions">
@@ -462,6 +512,7 @@ function SquadMembersCard({
   onChanged: () => Promise<void>
 }) {
   const [processingMemberId, setProcessingMemberId] = useState<string | null>(null)
+  const [memberToKick, setMemberToKick] = useState<{ id: string; username: string } | null>(null)
   const orderedMembers = useMemo(() => {
     const leader = data.squadMembers.find((member) => member.isLeader)
     if (!leader) return data.squadMembers
@@ -481,6 +532,7 @@ function SquadMembersCard({
 
     try {
       await request
+      setMemberToKick(null)
       await onChanged()
     } finally {
       setProcessingMemberId(null)
@@ -508,7 +560,7 @@ function SquadMembersCard({
                 className="btn btn-sm"
                 type="button"
                 disabled={processingMemberId === member.id}
-                onClick={() => void onKick(member.id)}
+                onClick={() => setMemberToKick({ id: member.id, username: member.username })}
               >
                 {processingMemberId === member.id ? 'Исключение...' : 'Кикнуть'}
               </button>
@@ -516,6 +568,53 @@ function SquadMembersCard({
           </div>
         ))}
       </div>
+      {isLeader && memberToKick && getModalPortalTarget()
+        ? createPortal(
+            <div className="ui-modal-backdrop" role="presentation" onClick={() => !processingMemberId && setMemberToKick(null)}>
+              <div
+                className="ui-modal"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="kick-member-modal-title"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <div className="ui-modal-header">
+                  <h2 id="kick-member-modal-title" className="ui-modal-title">
+                    Исключить участника?
+                  </h2>
+                  <button
+                    className="ui-modal-close"
+                    type="button"
+                    aria-label="Закрыть"
+                    onClick={() => setMemberToKick(null)}
+                    disabled={Boolean(processingMemberId)}
+                  >
+                    ×
+                  </button>
+                </div>
+                <div className="ui-modal-body">
+                  <p>
+                    Участник <strong>{memberToKick.username}</strong> будет исключен из сквада. Подтвердите действие.
+                  </p>
+                </div>
+                <div className="ui-modal-footer">
+                  <button className="btn" type="button" onClick={() => setMemberToKick(null)} disabled={Boolean(processingMemberId)}>
+                    Отменить
+                  </button>
+                  <button
+                    className="btn danger"
+                    type="button"
+                    onClick={() => void onKick(memberToKick.id)}
+                    disabled={Boolean(processingMemberId)}
+                  >
+                    {processingMemberId ? 'Исключение...' : 'Кикнуть'}
+                  </button>
+                </div>
+              </div>
+            </div>,
+            getModalPortalTarget()!,
+          )
+        : null}
     </section>
   )
 }
@@ -664,6 +763,7 @@ function MemberActionsCard({
   onChanged: () => Promise<void>
 }) {
   const [isLeaving, setIsLeaving] = useState(false)
+  const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false)
 
   const onLeave = async () => {
     setIsLeaving(true)
@@ -676,6 +776,7 @@ function MemberActionsCard({
 
     try {
       await request
+      setIsLeaveModalOpen(false)
       await onChanged()
     } finally {
       setIsLeaving(false)
@@ -688,10 +789,50 @@ function MemberActionsCard({
         <h2 className="card-title">Действия</h2>
       </div>
       <div className="profile-actions">
-        <button className="btn danger" type="button" disabled={isLeaving} onClick={() => void onLeave()}>
+        <button className="btn danger" type="button" disabled={isLeaving} onClick={() => setIsLeaveModalOpen(true)}>
           {isLeaving ? 'Выход...' : 'Покинуть сквад'}
         </button>
       </div>
+      {isLeaveModalOpen && getModalPortalTarget()
+        ? createPortal(
+            <div className="ui-modal-backdrop" role="presentation" onClick={() => !isLeaving && setIsLeaveModalOpen(false)}>
+              <div
+                className="ui-modal"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="leave-squad-modal-title"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <div className="ui-modal-header">
+                  <h2 id="leave-squad-modal-title" className="ui-modal-title">
+                    Покинуть сквад?
+                  </h2>
+                  <button
+                    className="ui-modal-close"
+                    type="button"
+                    aria-label="Закрыть"
+                    onClick={() => setIsLeaveModalOpen(false)}
+                    disabled={isLeaving}
+                  >
+                    ×
+                  </button>
+                </div>
+                <div className="ui-modal-body">
+                  <p>Вы покинете текущий сквад. Подтвердите действие.</p>
+                </div>
+                <div className="ui-modal-footer">
+                  <button className="btn" type="button" onClick={() => setIsLeaveModalOpen(false)} disabled={isLeaving}>
+                    Отменить
+                  </button>
+                  <button className="btn danger" type="button" onClick={() => void onLeave()} disabled={isLeaving}>
+                    {isLeaving ? 'Выход...' : 'Покинуть'}
+                  </button>
+                </div>
+              </div>
+            </div>,
+            getModalPortalTarget()!,
+          )
+        : null}
     </section>
   )
 }
@@ -709,20 +850,16 @@ function NoSquadState({
   const [hasInvalidNameInput, setHasInvalidNameInput] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
   const [processingInviteId, setProcessingInviteId] = useState<string | null>(null)
+  const squadNamePattern = data.squadConfig.nameRegex
 
   const onNameDraftChange = (value: string) => {
-    const sanitizedValue = sanitizeSquadName(value)
-    setHasInvalidNameInput(sanitizedValue !== value || hasInvalidSquadNameBoundary(sanitizedValue))
-    setNameDraft(sanitizedValue)
+    setNameDraft(value)
+    setHasInvalidNameInput(hasInvalidSquadNameByConfig(value.trim(), data.squadConfig))
   }
 
   const onCreate = async () => {
     const trimmed = nameDraft.trim()
-    if (hasInvalidSquadNameBoundary(trimmed)) {
-      setHasInvalidNameInput(true)
-      return
-    }
-    if (isInvalidSquadNameLength(trimmed)) {
+    if (hasInvalidSquadNameByConfig(trimmed, data.squadConfig)) {
       setHasInvalidNameInput(true)
       return
     }
@@ -795,13 +932,14 @@ function NoSquadState({
               value={nameDraft}
               onChange={(event) => onNameDraftChange(event.target.value)}
               placeholder="Введите название сквада"
-              minLength={4}
-              maxLength={16}
+              pattern={squadNamePattern}
+              minLength={data.squadConfig.nameMinChars}
+              maxLength={data.squadConfig.nameMaxChars}
               inputMode="text"
               autoComplete="off"
             />
             <div className={`ui-hint ${hasInvalidNameInput ? 'ui-hint-error' : ''}`}>
-              Лимиты: 4–16 символов. Разрешены латиница, кириллица и `-`. Имя не может начинаться или заканчиваться на `-`. Инвайт действует {data.squadConfig.inviteTtlHours} часа.
+              Лимиты: {data.squadConfig.nameMinChars}–{data.squadConfig.nameMaxChars} символов. Разрешены: латиница, кириллица и `-`. Имя не может начинаться или заканчиваться на `-`. Инвайт действует {data.squadConfig.inviteTtlHours} часа.
             </div>
           </div>
           <div className="profile-actions">
@@ -814,8 +952,10 @@ function NoSquadState({
 
       <section className="card profile-panel">
         <div className="ui-card-header">
-          <h2 className="card-title">Мои приглашения</h2>
-          <span className="ui-badge ui-badge-warning">{data.squadInvites.length}</span>
+          <div className="profile-title-badge-row">
+            <h2 className="card-title">Мои приглашения</h2>
+            <span className="ui-badge ui-badge-warning">{data.squadInvites.length}</span>
+          </div>
         </div>
         {data.squadInvites.length ? (
           <div className="profile-stack">
@@ -827,7 +967,7 @@ function NoSquadState({
                 </div>
                 <div className="profile-actions">
                   <button
-                    className="btn primary"
+                    className="btn primary profile-invite-action-btn"
                     type="button"
                     disabled={processingInviteId === invite.id}
                     onClick={() => void onAcceptInvite(invite.id)}
@@ -835,7 +975,7 @@ function NoSquadState({
                     {processingInviteId === invite.id ? 'Обработка...' : 'Принять'}
                   </button>
                   <button
-                    className="btn"
+                    className="btn profile-invite-action-btn"
                     type="button"
                     disabled={processingInviteId === invite.id}
                     onClick={() => void onDeclineInvite(invite.id)}

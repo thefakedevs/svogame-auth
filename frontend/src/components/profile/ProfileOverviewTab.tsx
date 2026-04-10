@@ -161,7 +161,12 @@ export default function ProfileOverviewTab({
             </div>
           ) : (
             <div className="profile-empty">
-              <span className="ui-badge ui-badge-neutral">Нет сквада</span>
+              <div className="profile-chip-row">
+                <span className="ui-badge ui-badge-neutral">Нет сквада</span>
+                {data.squadInvites.length > 0 ? (
+                  <span className="ui-badge ui-badge-success">Инвайты: {data.squadInvites.length}</span>
+                ) : null}
+              </div>
               <p>Во вкладке сквадов можно создать команду, принять приглашение или посмотреть доступные действия.</p>
             </div>
           )}

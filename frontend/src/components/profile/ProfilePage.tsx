@@ -28,6 +28,16 @@ export default function ProfilePage() {
   const [showSkeletonOverlay, setShowSkeletonOverlay] = useState(true)
   const [contentVisible, setContentVisible] = useState(false)
 
+  const handleTabChange = (tab: ProfileTab) => {
+    setActiveTab(tab)
+
+    if (typeof window === 'undefined') return
+
+    const url = new URL(window.location.href)
+    url.searchParams.set('tab', tab)
+    window.history.replaceState(null, '', url.pathname + url.search)
+  }
+
   useEffect(() => {
     setActiveTab(normalizeRequestedTab(query.get('tab')))
   }, [query])
@@ -99,9 +109,9 @@ export default function ProfilePage() {
             ] as const).map(([key, label]) => (
               <button
                 key={key}
-                className={`profile-tab ${activeTab === key ? 'is-active' : ''}`}
+                className={`profile-tab ${activeTab === key ? 'is-active' : ''} ${key === 'squads' && (data?.squadInvites.length ?? 0) > 0 ? 'has-notification' : ''}`}
                 type="button"
-                onClick={() => setActiveTab(key)}
+                onClick={() => handleTabChange(key)}
               >
                 <span>{label}</span>
               </button>
@@ -117,7 +127,7 @@ export default function ProfilePage() {
                   data={data}
                   skinFailed={skinFailed}
                   setSkinFailed={setSkinFailed}
-                  setActiveTab={setActiveTab}
+                  setActiveTab={handleTabChange}
                   skinVersion={skinVersion}
                 />
               ) : null}
