@@ -1,9 +1,9 @@
-import type { AuthorizationCallbackResponse } from '../../../api/auth'
+import type { AuthorizedAuthResponse } from '../../../api/auth'
 import { paths } from '../../../routes/paths'
 import { navigateTo } from '../../../shared/navigation/history'
 import { storeAuthorizedSession } from '../../../shared/session/auth-session'
 
-export async function finishAuthDelivery(auth: AuthorizationCallbackResponse) {
+export async function finishAuthDelivery(auth: AuthorizedAuthResponse) {
   storeAuthorizedSession({
     token: auth.accessToken,
     user: auth.user,
