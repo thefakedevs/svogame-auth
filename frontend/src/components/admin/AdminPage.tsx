@@ -25,7 +25,6 @@ import {
 } from '../../api/admin'
 import type { SquadMemberResponse } from '../../api/squads'
 import { buildSkinUrl } from '../../api/skins'
-import { buildAuthUrl } from '../../routes/auth'
 import { adminSquadPath, adminTokenAuditPath, adminUserPath, paths } from '../../routes/paths'
 import { pushUrl, replaceUrl, usePathname } from '../../shared/navigation/history'
 import { getAuthToken } from '../../shared/session/auth-session'
