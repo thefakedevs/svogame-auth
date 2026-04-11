@@ -21,6 +21,12 @@ export interface AdminUserResponse {
   deactivationReason: string | null
 }
 
+export interface AdminUserRestrictionResponse {
+  key: string
+  reason: string | null
+  createdAt: string
+}
+
 export interface AdminUsersListResponse {
   items: AdminUserResponse[]
   total: number
@@ -88,6 +94,14 @@ export interface RevokeServiceTokenRequest {
   reason?: string | null
 }
 
+export interface RestrictionReasonRequest {
+  reason?: string | null
+}
+
+export interface DeactivateAdminUserRequest {
+  reason: string
+}
+
 export interface ActionResponse {
   status: string
 }
@@ -144,6 +158,70 @@ export function revokeAdminUserSuperuser(token: string, userId: string): Promise
     headers: authHeaders(token, {
       'Content-Type': 'application/json',
     }),
+  })
+}
+
+export function activateAdminUser(token: string, userId: string): Promise<AdminUserResponse> {
+  return request<AdminUserResponse>(`/api/admin/users/${userId}/activate`, {
+    method: 'POST',
+    headers: authHeaders(token, {
+      'Content-Type': 'application/json',
+    }),
+  })
+}
+
+export function deactivateAdminUser(
+  token: string,
+  userId: string,
+  payload: DeactivateAdminUserRequest,
+): Promise<AdminUserResponse> {
+  return request<AdminUserResponse>(`/api/admin/users/${userId}/deactivate`, {
+    method: 'POST',
+    headers: authHeaders(token, {
+      'Content-Type': 'application/json',
+    }),
+    body: JSON.stringify(payload),
+  })
+}
+
+export function getAdminUserRestrictions(
+  token: string,
+  userId: string,
+): Promise<AdminUserRestrictionResponse[]> {
+  return request<AdminUserRestrictionResponse[]>(`/api/admin/users/${userId}/restrictions`, {
+    headers: authHeaders(token, {
+      'Content-Type': 'application/json',
+    }),
+  })
+}
+
+export function grantAdminUserRestriction(
+  token: string,
+  userId: string,
+  restrictionKey: string,
+  payload: RestrictionReasonRequest,
+): Promise<AdminUserRestrictionResponse[]> {
+  return request<AdminUserRestrictionResponse[]>(`/api/admin/users/${userId}/restrictions/${encodeURIComponent(restrictionKey)}`, {
+    method: 'POST',
+    headers: authHeaders(token, {
+      'Content-Type': 'application/json',
+    }),
+    body: JSON.stringify(payload),
+  })
+}
+
+export function revokeAdminUserRestriction(
+  token: string,
+  userId: string,
+  restrictionKey: string,
+  payload: RestrictionReasonRequest,
+): Promise<AdminUserRestrictionResponse[]> {
+  return request<AdminUserRestrictionResponse[]>(`/api/admin/users/${userId}/restrictions/${encodeURIComponent(restrictionKey)}`, {
+    method: 'DELETE',
+    headers: authHeaders(token, {
+      'Content-Type': 'application/json',
+    }),
+    body: JSON.stringify(payload),
   })
 }
 
@@ -206,6 +284,34 @@ export function getAdminSquad(token: string, squadId: string): Promise<AdminSqua
     headers: authHeaders(token, {
       'Content-Type': 'application/json',
     }),
+  })
+}
+
+export function restrictAdminSquad(
+  token: string,
+  squadId: string,
+  payload: RestrictionReasonRequest,
+): Promise<AdminSquadResponse> {
+  return request<AdminSquadResponse>(`/api/admin/squads/${squadId}/restrict`, {
+    method: 'POST',
+    headers: authHeaders(token, {
+      'Content-Type': 'application/json',
+    }),
+    body: JSON.stringify(payload),
+  })
+}
+
+export function unrestrictAdminSquad(
+  token: string,
+  squadId: string,
+  payload: RestrictionReasonRequest,
+): Promise<AdminSquadResponse> {
+  return request<AdminSquadResponse>(`/api/admin/squads/${squadId}/unrestrict`, {
+    method: 'POST',
+    headers: authHeaders(token, {
+      'Content-Type': 'application/json',
+    }),
+    body: JSON.stringify(payload),
   })
 }
 

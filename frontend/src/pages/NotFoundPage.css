@@ -1,0 +1,32 @@
+.not-found-page {
+  width: 100%;
+  max-width: none;
+}
+
+.not-found-card {
+  display: grid;
+  gap: 12px;
+  max-width: none;
+}
+
+.not-found-code {
+  font-size: 0.78rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #f7a41d;
+}
+
+.not-found-title {
+  margin: 0;
+  text-align: left;
+}
+
+.not-found-text {
+  text-align: left;
+}
+
+.not-found-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
