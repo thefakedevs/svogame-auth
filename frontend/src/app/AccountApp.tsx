@@ -4,6 +4,7 @@ import AdminPage from '../components/admin/AdminPage'
 import AppHeader from '../components/layout/AppHeader'
 import ProfilePage from '../components/profile/ProfilePage'
 import HomePage from '../pages/_HomePage'
+import LegalPage, { isLegalPath } from '../pages/LegalPage'
 import UiKitPage from '../pages/_UiKitPage'
 import { paths } from '../routes/paths'
 import { usePathname } from '../shared/navigation/history'
@@ -42,6 +43,18 @@ function AdminShell() {
       <div className="ui-kit-page app-shell">
         <AppHeader pageTitle="Админка" />
         <AdminPage />
+      </div>
+    </>
+  )
+}
+
+function LegalShell({ pathname }: { pathname: string }) {
+  return (
+    <>
+      <div className="ui-kit-vhs" aria-hidden />
+      <div className="ui-kit-page app-shell">
+        <AppHeader />
+        <LegalPage pathname={pathname} />
       </div>
     </>
   )
@@ -86,6 +99,8 @@ export default function AccountApp() {
 
   if (adminRoute) {
     page = <AdminShell />
+  } else if (isLegalPath(pathname)) {
+    page = <LegalShell pathname={pathname} />
   } else switch (pathname) {
     case paths.auth:
       page = <AuthRoute />
