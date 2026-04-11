@@ -32,6 +32,7 @@ pub const ACTION_ADMIN_SQUAD_IMAGE_UPDATED: &str = "admin.squad.image_updated";
 pub const ACTION_ADMIN_SQUAD_IMAGE_DELETED: &str = "admin.squad.image_deleted";
 pub const ACTION_ADMIN_USER_RESTRICTION_GRANTED: &str = "admin.user.restriction_granted";
 pub const ACTION_ADMIN_USER_RESTRICTION_REVOKED: &str = "admin.user.restriction_revoked";
+pub const ACTION_ADMIN_USER_SKIN_DELETED: &str = "admin.user.skin.deleted";
 pub const ACTION_ADMIN_ASSET_CREATED: &str = "admin.asset.created";
 pub const ACTION_ADMIN_ASSET_UPDATED: &str = "admin.asset.updated";
 pub const ACTION_ADMIN_INVENTORY_ENTITLEMENT_GRANTED: &str = "admin.inventory.entitlement_granted";

@@ -242,6 +242,12 @@
   border: 1px solid rgba(247, 164, 29, 0.45);
 }
 
+.profile-page .profile-avatar-fallback.ui-avatar {
+  width: 96px;
+  height: 96px;
+  font-size: 2rem;
+}
+
 .profile-name {
   margin: 0;
   color: var(--ui-text);

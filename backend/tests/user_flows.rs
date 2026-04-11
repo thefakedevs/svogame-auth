@@ -640,6 +640,83 @@ async fn admin_can_patch_user_profile_fields() {
 
 #[tokio::test]
 #[serial]
+async fn admin_can_get_user_squad_rename_squad_and_delete_user_skin() {
+    let app = TestApp::spawn().await;
+    let admin = app.issue_user_token("AdminSquadTools", true, &[]).await;
+    let leader = app.issue_user_token("SkinLeader", false, &[]).await;
+    let member = app.issue_user_token("SkinMember", false, &[]).await;
+
+    let squad = app.create_squad(&leader, "Original Squad").await;
+    let squad_id = squad["id"].as_str().expect("squad id").to_string();
+    let invite_id = app.issue_invite(&leader, &squad_id, &member.user_id).await;
+    let accept = app
+        .post_json(
+            &format!("/api/squad-invites/{invite_id}/accept"),
+            &member.access_token,
+            serde_json::json!({}),
+        )
+        .await;
+    assert!(accept.status().is_success());
+
+    let get_user_squad = app
+        .get_json(
+            &format!("/api/admin/user/{}/squad", member.user_id),
+            &admin.access_token,
+        )
+        .await;
+    assert!(get_user_squad.status().is_success());
+    let user_squad: serde_json::Value = get_user_squad.json().await.expect("admin user squad json");
+    assert_eq!(user_squad["id"], squad_id);
+    assert_eq!(user_squad["name"], "Original Squad");
+    assert_eq!(user_squad["memberCount"], 2);
+
+    let renamed = app
+        .patch_json(
+            &format!("/api/admin/squads/{squad_id}"),
+            &admin.access_token,
+            serde_json::json!({ "name": "Renamed By Admin" }),
+        )
+        .await;
+    assert!(renamed.status().is_success());
+    let renamed_body: serde_json::Value = renamed.json().await.expect("renamed squad json");
+    assert_eq!(renamed_body["name"], "Renamed By Admin");
+
+    let png = make_skin_png([32, 180, 220, 255]);
+    let upload_skin = app
+        .post_multipart(
+            "/api/skins/me?model=default",
+            &member.access_token,
+            "member-skin.png",
+            "image/png",
+            png,
+        )
+        .await;
+    assert!(upload_skin.status().is_success());
+
+    let get_skin_before = app
+        .get_bytes_without_auth(&format!("/api/skins/{}", member.user_id))
+        .await;
+    assert!(get_skin_before.status().is_success());
+
+    let delete_skin = app
+        .delete(
+            &format!("/api/admin/user/{}/skin", member.user_id),
+            &admin.access_token,
+        )
+        .await;
+    assert!(delete_skin.status().is_success());
+
+    let get_skin_after = app
+        .get_bytes_without_auth(&format!("/api/skins/{}", member.user_id))
+        .await;
+    assert_eq!(get_skin_after.status(), reqwest::StatusCode::NOT_FOUND);
+
+    assert_eq!(app.audit_log_count("admin.squad.updated").await, 1);
+    assert_eq!(app.audit_log_count("admin.user.skin.deleted").await, 1);
+}
+
+#[tokio::test]
+#[serial]
 async fn user_can_decline_invite_and_it_disappears_from_inbox() {
     let app = TestApp::spawn().await;
     let leader = app.issue_user_token("LeaderDecline", false, &[]).await;

@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { useQuery } from '../../util/query'
 import { replaceUrl } from '../../util/navigation'
+import { useQuery } from '../../util/query'
 import '../../pages/ProfilePage.css'
 import ProfileOverviewTab from './ProfileOverviewTab'
 import ProfileSettingsTab from './ProfileSettingsTab'
@@ -27,30 +27,28 @@ export default function ProfilePage({ defaultTab }: { defaultTab?: ProfileTab })
 
   const handleTabChange = (tab: ProfileTab) => {
     if (typeof window === 'undefined') return
-
     const url = new URL(window.location.href)
     url.searchParams.set('tab', tab)
     replaceUrl(url.pathname + url.search)
   }
 
-  if (status === 'unauthorized') {
-    return <ProfileUnauthorizedState />
-  }
-
+  if (status === 'unauthorized') return <ProfileUnauthorizedState />
   if (status === 'error' || (!data && status !== 'loading')) {
     return <ProfileErrorState error={error} onRetry={() => void reload()} onLogout={logout} />
   }
+
+  const tabs = [
+    ['overview', 'Обзор'],
+    ['squads', 'Сквад'],
+    ['settings', 'Настройки'],
+  ] as const
 
   return (
     <div className="ui-kit-page profile-page">
       <div className="profile-shell">
         <div className="profile-topbar">
           <nav className="profile-tabs" aria-label="Разделы профиля">
-            {([
-              ['overview', 'Обзор'],
-              ['squads', 'Сквад'],
-              ['settings', 'Настройки'],
-            ] as const).map(([key, label]) => (
+            {tabs.map(([key, label]) => (
               <button
                 key={key}
                 className={`profile-tab ${activeTab === key ? 'is-active' : ''} ${key === 'squads' && (data?.squadInvites.length ?? 0) > 0 ? 'has-notification' : ''}`}
@@ -77,11 +75,7 @@ export default function ProfilePage({ defaultTab }: { defaultTab?: ProfileTab })
               ) : null}
 
               {activeTab === 'squads' ? (
-                <ProfileSquadsTab
-                  data={data}
-                  authToken={authToken}
-                  onChanged={reloadSquads}
-                />
+                <ProfileSquadsTab data={data} authToken={authToken} onChanged={reloadSquads} />
               ) : null}
 
               {activeTab === 'settings' ? (
