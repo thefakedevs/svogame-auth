@@ -21,5 +21,10 @@ export function pageTitleForPath(pathname: string) {
   }
   if (pathname === paths.token) return 'Завершение авторизации | SVOCraft'
   if (pathname === paths.uiKit) return 'UI Kit | SVOCraft'
-  return '404 | SVOCraft'
+  if (pathname === paths.legal) return 'Правовые документы | SVOCraft'
+  if (pathname === paths.legalPrivacyPolicy) return 'Политика конфиденциальности | SVOCraft'
+  if (pathname === paths.legalPublicOffer) return 'Публичная оферта | SVOCraft'
+  if (pathname === paths.legalRefundPolicy) return 'Политика возвратов | SVOCraft'
+  if (pathname === paths.legalUserAgreement) return 'Пользовательское соглашение | SVOCraft'
+  return 'Авторизация | SVOCraft'
 }

@@ -9,6 +9,11 @@ export const paths = {
   admin: '/admin',
   token: '/token',
   uiKit: '/ui-kit',
+  legal: '/legal',
+  legalPrivacyPolicy: '/legal/privacy_policy',
+  legalPublicOffer: '/legal/public_offer',
+  legalRefundPolicy: '/legal/refund_policy',
+  legalUserAgreement: '/legal/user_agreement',
 } as const
 
 export type AppPath = (typeof paths)[keyof typeof paths]
