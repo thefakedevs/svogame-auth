@@ -451,8 +451,8 @@ body:has(.landing-shell) .ui-kit-page.landing-shell {
 }
 
 .landing-footer {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  display: flex;
+  flex-direction: column;
   gap: 1.25rem;
   padding: 1.25rem 0 0;
   border-top: 1px solid var(--ui-border);

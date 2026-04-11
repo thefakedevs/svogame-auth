@@ -408,24 +408,26 @@ export default function HomePage() {
           </div>
           <div className="landing-testimonials">
             <blockquote className="card landing-testimonial">
-              <p>В дуэлях удобно разминаться перед ивентами: зашел, сыграл пару боев и уже в форме.</p>
+              <p>
+                Зашёл на сервер, сначала было немного непривычно, но быстро втянулся, лёг на балконе,
+                взял монитор в руки и начал управление дроном, пару дронов, и вражеская пума подбита,
+                на вырученные средства прикупил себе новые зимние ботинки, теперь питаюсь только стейками,
+                прикупил себе новенький AWM, которым отстреливаю различную перхоть на своей, немного побитой
+                терассе, попивая чашечку кофе.
+              </p>
               <footer>
-                <strong>Ravel</strong>
-                <span>игрок дуэлей</span>
+                <strong>HellRay</strong>
+                <span>Ветеран сервера</span>
               </footer>
             </blockquote>
             <blockquote className="card landing-testimonial">
-              <p>Захват флага держит в напряжении до последней минуты. Командная игра реально решает.</p>
+              <p>
+                SVOcraft — Отличный сервер для тех, кто любит PvP. Захват флага держит в напряжении до
+                последней секунды, а дуэли — лучший способ проверить свою реакцию. Заходите, не пожалеете.
+              </p>
               <footer>
-                <strong>Nika</strong>
-                <span>капитан сквада</span>
-              </footer>
-            </blockquote>
-            <blockquote className="card landing-testimonial">
-              <p>Лаунчер снимает всю рутину. Обновился, нажал «Играть» и сразу на сервер.</p>
-              <footer>
-                <strong>Tosh</strong>
-                <span>новый игрок</span>
+                <strong>Krevetka42</strong>
+                <span>Восхитительный боец</span>
               </footer>
             </blockquote>
           </div>
