@@ -67,7 +67,7 @@ export function legalPageHeading(pathname: string) {
     [paths.legalUserAgreement]: 'Пользовательское соглашение',
   }
 
-  return headings[pathname] ?? 'Правовые документы'
+  return 'Правовые документы'
 }
 
 export default function LegalPage({ pathname }: { pathname: string }) {

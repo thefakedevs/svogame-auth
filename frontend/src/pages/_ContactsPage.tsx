@@ -98,7 +98,7 @@ export default function ContactsPage() {
               <h3 className="card-title">Поддержка в Telegram</h3>
               <span className="ui-badge ui-badge-accent">Support</span>
             </div>
-            <p className="card-text">Быстрый канал для проблем с запуском, входом и техническими ошибками.</p>
+            <p className="card-text">Быстрая помощь с любыми проблемами, входом и техническими ошибками.</p>
             <div className="ui-card-footer">
               <a
                 className="btn btn-sm btn-secondary-accent"

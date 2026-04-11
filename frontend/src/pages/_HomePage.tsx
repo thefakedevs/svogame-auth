@@ -242,8 +242,8 @@ export default function HomePage() {
               height={720}
               overlay={(
                 <div className="landing-photo-overlay">
-                  <strong>Арена захвата флага</strong>
-                  <span>Две базы, открытый центр и маршруты для быстрых фланговых атак.</span>
+                  <strong>Одна из ивентовых карт</strong>
+                  <span>Карта для событий с упором на манёвры, спроектированная с вниманием к деталям, специально под режим, который на ней проводится.</span>
                 </div>
               )}
             >
@@ -263,8 +263,8 @@ export default function HomePage() {
                   alt="Игровая арена SVOCraft для режима Захват флага с двумя базами и центральным мостом"
                 />
                 <span className="landing-gallery-card__caption">
-                  <span>Арена захвата флага</span>
-                  <small>Две базы, открытый центр и маршруты для быстрых фланговых атак.</small>
+                  <span>Одна из ивентовых карт</span>
+                  <small>Карта для событий с упором на манёвры, спроектированная с вниманием к деталям, под режим, который на ней проводится.</small>
                 </span>
               </button>
             </PhotoView>
@@ -276,7 +276,7 @@ export default function HomePage() {
               overlay={(
                 <div className="landing-photo-overlay">
                   <strong>Дуэльная линия</strong>
-                  <span>Компактная карта для честных боев без лишних укрытий.</span>
+                  <span>Минималистичная арена, где исход решают точность, тайминг и хладнокровие, разработанная специально для того, чтобы позволить показать свой скилл.</span>
                 </div>
               )}
             >
@@ -297,7 +297,7 @@ export default function HomePage() {
                 />
                 <span className="landing-gallery-card__caption">
                   <span>Дуэльная линия</span>
-                  <small>Компактная карта для честных боев без лишних укрытий.</small>
+                  <small>Минималистичная арена, где исход решают точность, тайминг и хладнокровие, разработанная специально для того, чтобы позволить показать свой скилл.</small>
                 </span>
               </button>
             </PhotoView>
@@ -308,8 +308,8 @@ export default function HomePage() {
               height={720}
               overlay={(
                 <div className="landing-photo-overlay">
-                  <strong>Командный спавн</strong>
-                  <span>Безопасная точка старта, где игроки собирают отряд перед матчем.</span>
+                  <strong>Лобби</strong>
+                  <span>Безопасная точка старта, где игроки собирают отряд перед матчем, формируют отряды, готовятся к бою и выбирают дальнейший путь.</span>
                 </div>
               )}
             >
@@ -329,8 +329,8 @@ export default function HomePage() {
                   alt="Командный спавн SVOCraft с флагами, сундуками и порталом запуска матча"
                 />
                 <span className="landing-gallery-card__caption">
-                  <span>Командный спавн</span>
-                  <small>Безопасная точка старта, где игроки собирают отряд перед матчем.</small>
+                  <span>Лобби</span>
+                  <small>Безопасная точка старта, где игроки собирают отряд перед матчем, формируют отряды, готовятся к бою и выбирают дальнейший путь.</small>
                 </span>
               </button>
             </PhotoView>
@@ -342,7 +342,7 @@ export default function HomePage() {
               overlay={(
                 <div className="landing-photo-overlay">
                   <strong>Лаунчер</strong>
-                  <span>Обновления, вход и запуск игры собраны в одном окне.</span>
+                  <span>Современный центр управления игрой, через который осуществляется вход, загрузка обновлений и быстрый запуск клиента без лишних действий.</span>
                 </div>
               )}
             >
@@ -363,7 +363,7 @@ export default function HomePage() {
                 />
                 <span className="landing-gallery-card__caption">
                   <span>Лаунчер</span>
-                  <small>Обновления, вход и запуск игры собраны в одном окне.</small>
+                  <small>Современный центр управления игрой, через который осуществляется вход, загрузка обновлений и быстрый запуск клиента без лишних действий.</small>
                 </span>
               </button>
             </PhotoView>
