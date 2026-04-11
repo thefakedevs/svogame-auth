@@ -40,6 +40,7 @@ type RawAuthorizedAuthResponse = {
   id: string
   username: string
   avatarUrl: string
+  isSuperuser?: boolean
   deliveryMethod: 'redirect' | 'polling'
   deliveryTarget: string
 }
@@ -134,10 +135,10 @@ function normalizeAuthorizedResponse(data: RawAuthorizedAuthResponse): Authorize
   return {
     ...data,
     user: {
-      id: responseUser?.id ?? data.id,
-      username: responseUser?.username ?? data.username,
-      avatarUrl: responseUser?.avatarUrl ?? data.avatarUrl,
-      isSuperuser: responseUser?.isSuperuser ?? data.isSuperuser,
+      id: data.id,
+      username: data.username,
+      avatarUrl: data.avatarUrl,
+      isSuperuser: data.isSuperuser,
     },
   }
 }

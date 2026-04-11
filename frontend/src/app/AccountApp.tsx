@@ -91,8 +91,13 @@ function NotFoundShell() {
     <>
       <div className="ui-kit-vhs" aria-hidden />
       <div className="ui-kit-page app-shell">
-        <AppHeader pageTitle={legalPageHeading(pathname)} />
-        <LegalPage pathname={pathname} />
+        <AppHeader pageTitle="Страница не найдена" />
+        <div className="page">
+          <section className="card">
+            <h1 className="card-title">Страница не найдена</h1>
+            <p className="card-text">Проверьте адрес или вернитесь на главную страницу.</p>
+          </section>
+        </div>
       </div>
     </>
   )
