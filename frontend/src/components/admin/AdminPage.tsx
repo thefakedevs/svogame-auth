@@ -16,8 +16,10 @@ import {
   listAdminServiceTokens,
   listAdminUsers,
   revokeAdminUserSuperuser,
+  restrictAdminSquad,
   revokeAdminServiceToken,
   rotateAdminServiceToken,
+  unrestrictAdminSquad,
   type AdminSquadResponse,
   type AdminUserResponse,
   type ServiceTokenAuditResponse,
@@ -694,6 +696,8 @@ function AdminSquadView({
 }) {
   const activeMembers = members.filter((member) => !member.isPendingInvite)
   const outgoingInvites = members.filter((member) => member.isPendingInvite)
+  const [restrictionReason, setRestrictionReason] = useState('')
+  const [isUpdatingRestriction, setIsUpdatingRestriction] = useState(false)
 
   const deleteSquadAvatar = async () => {
     if (!squad) return
@@ -703,6 +707,38 @@ function AdminSquadView({
       toast.success('Аватарка сквада удалена.')
     } catch (cause) {
       toast.error(toDisplayError(cause, 'Не удалось удалить аватарку сквада.'))
+    }
+  }
+
+  const restrictSquad = async () => {
+    if (!squad || isUpdatingRestriction) return
+    setIsUpdatingRestriction(true)
+    try {
+      const updated = await restrictAdminSquad(token, squad.id, {
+        reason: restrictionReason.trim() || null,
+      })
+      onSquadChange(updated)
+      toast.success('Ограничение на сквад выдано.')
+    } catch (cause) {
+      toast.error(toDisplayError(cause, 'Не удалось выдать ограничение на сквад.'))
+    } finally {
+      setIsUpdatingRestriction(false)
+    }
+  }
+
+  const unrestrictSquad = async () => {
+    if (!squad || isUpdatingRestriction) return
+    setIsUpdatingRestriction(true)
+    try {
+      const updated = await unrestrictAdminSquad(token, squad.id, {
+        reason: restrictionReason.trim() || null,
+      })
+      onSquadChange(updated)
+      toast.success('Ограничение со сквада снято.')
+    } catch (cause) {
+      toast.error(toDisplayError(cause, 'Не удалось снять ограничение со сквада.'))
+    } finally {
+      setIsUpdatingRestriction(false)
     }
   }
 
@@ -734,17 +770,51 @@ function AdminSquadView({
               <div><dt>Лидер</dt><dd>{squad.leaderUserId}</dd></div>
             </dl>
 
+            <section className="admin-card-subsection">
+              <h3 className="card-title">Ограничение сквада</h3>
+              <div className="admin-restriction-status">
+                <span className={`ui-badge ${squad.isRestricted ? 'ui-badge-warning' : 'ui-badge-success'}`}>
+                  {squad.isRestricted ? 'Сквад ограничен' : 'Ограничений нет'}
+                </span>
+                {squad.restrictionReason ? <small>{squad.restrictionReason}</small> : null}
+              </div>
+              <div className="admin-restriction-toolbar">
+                <input
+                  className="ui-input"
+                  value={restrictionReason}
+                  onChange={(event) => setRestrictionReason(event.target.value)}
+                  placeholder="Причина ограничения"
+                />
+                <button
+                  type="button"
+                  className="btn btn-sm danger"
+                  disabled={isUpdatingRestriction || squad.isRestricted}
+                  onClick={() => void restrictSquad()}
+                >
+                  Выдать ограничение
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  disabled={isUpdatingRestriction || !squad.isRestricted}
+                  onClick={() => void unrestrictSquad()}
+                >
+                  Снять ограничение
+                </button>
+              </div>
+            </section>
+
             <div className="admin-squad-columns">
               <section>
                 <h3>Участники</h3>
                 <ul className="admin-member-list">
                   {activeMembers.map((member) => (
                     <li key={member.id}>
-                      <div className="admin-member-card-main">
+                      <div className="admin-member-card-main" onClick={() => pushUrl(adminUserPath(member.id))}>
                         {member.avatarUrl ? <img src={member.avatarUrl} alt={member.username} className="admin-avatar" /> : <span className="ui-avatar ui-avatar-sm">{initials(member.username)}</span>}
                         <span className="admin-member-name">{member.username}</span>
                       </div>
-                      <button type="button" className="btn btn-sm" onClick={() => pushUrl(adminUserPath(member.id))}>Профиль</button>
+                      {member.id === squad.leaderUserId && <span className="ui-badge ui-badge-secondary">Лидер</span>}
                     </li>
                   ))}
                 </ul>
@@ -755,7 +825,7 @@ function AdminSquadView({
                 <ul className="admin-member-list">
                   {outgoingInvites.map((member) => (
                     <li key={member.inviteId ?? member.id}>
-                      <div className="admin-member-card-main">
+                      <div className="admin-member-card-main" onClick={() => pushUrl(adminUserPath(member.id))}>
                         {member.avatarUrl ? <img src={member.avatarUrl} alt={member.username} className="admin-avatar" /> : <span className="ui-avatar ui-avatar-sm">{initials(member.username)}</span>}
                         <span className="admin-member-name">{member.username}</span>
                       </div>

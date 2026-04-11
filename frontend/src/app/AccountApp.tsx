@@ -4,6 +4,7 @@ import AdminPage from '../components/admin/AdminPage'
 import AppHeader from '../components/layout/AppHeader'
 import ProfilePage from '../components/profile/ProfilePage'
 import HomePage from '../pages/_HomePage'
+import NotFoundPage from '../pages/_NotFoundPage'
 import UiKitPage from '../pages/_UiKitPage'
 import { paths } from '../routes/paths'
 import { usePathname } from '../shared/navigation/history'
@@ -47,6 +48,18 @@ function AdminShell() {
   )
 }
 
+function NotFoundShell() {
+  return (
+    <>
+      <div className="ui-kit-vhs" aria-hidden />
+      <div className="ui-kit-page app-shell">
+        <AppHeader pageTitle="404" />
+        <NotFoundPage />
+      </div>
+    </>
+  )
+}
+
 function adminRouteForPath(pathname: string): { type: 'home' } | { type: 'user'; userId: string } | { type: 'squad'; squadId: string } | { type: 'tokenAudit'; tokenId: string } | null {
   if (pathname === paths.admin) {
     return { type: 'home' }
@@ -82,7 +95,7 @@ export default function AccountApp() {
     document.title = pageTitleForPath(pathname)
   }, [pathname])
 
-  let page = <HomeShell />
+  let page = <NotFoundShell />
 
   if (adminRoute) {
     page = <AdminShell />
@@ -103,8 +116,10 @@ export default function AccountApp() {
       page = <UiKitPage />
       break
     case paths.home:
-    default:
       page = <HomeShell />
+      break
+    default:
+      page = <NotFoundShell />
       break
   }
 

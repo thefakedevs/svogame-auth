@@ -62,7 +62,12 @@ export async function fetchAuthorize(
     throw new Error('Локальная сессия авторизации устарела. Начните вход заново.')
   }
 
-  const data = await request<Omit<AuthorizationCallbackResponse, 'user'>>('/api/auth/authorize', {
+  const data = await request<
+    Omit<AuthorizationCallbackResponse, 'user'> & {
+      user?: UserProfile
+      isSuperuser?: boolean
+    }
+  >('/api/auth/authorize', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -74,12 +79,15 @@ export async function fetchAuthorize(
     }),
   })
 
+  const responseUser = data.user
+
   return {
     ...data,
     user: {
-      id: data.id,
-      username: data.username,
-      avatarUrl: data.avatarUrl,
+      id: responseUser?.id ?? data.id,
+      username: responseUser?.username ?? data.username,
+      avatarUrl: responseUser?.avatarUrl ?? data.avatarUrl,
+      isSuperuser: responseUser?.isSuperuser ?? data.isSuperuser,
     },
   }
 }
