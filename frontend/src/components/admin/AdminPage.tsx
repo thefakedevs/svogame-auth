@@ -263,10 +263,7 @@ export default function AdminPage() {
     return (
       <div className="admin-page">
         <section className="card admin-state-card">
-          <span className="ui-badge ui-badge-warning">401 / 403</span>
-          <h1 className="card-title">Нет доступа к админке</h1>
-          <p className="card-text">Проверка выполнена через <code>/api/admin/me</code>.</p>
-          <a className="btn primary" href={buildAuthUrl()}>Войти другим аккаунтом</a>
+          <h1 className="card-title">Доступ запрещенн</h1>
         </section>
       </div>
     )
