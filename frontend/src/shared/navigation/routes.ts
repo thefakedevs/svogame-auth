@@ -10,6 +10,7 @@ export function normalizePathname(pathname: string) {
 
 export function pageTitleForPath(pathname: string) {
   if (pathname === paths.home) return 'SVOCraft'
+  if (pathname === paths.auth) return 'Авторизация | SVOCraft'
   if (pathname === paths.profileEdit) return 'Настройки профиля | SVOCraft'
   if (pathname === paths.profile) return 'Профиль | SVOCraft'
   if (pathname === paths.admin) return 'Админ-панель | SVOCraft'
@@ -20,5 +21,5 @@ export function pageTitleForPath(pathname: string) {
   }
   if (pathname === paths.token) return 'Завершение авторизации | SVOCraft'
   if (pathname === paths.uiKit) return 'UI Kit | SVOCraft'
-  return 'Авторизация | SVOCraft'
+  return '404 | SVOCraft'
 }

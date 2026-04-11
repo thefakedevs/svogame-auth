@@ -58,6 +58,12 @@
   min-width: 0;
 }
 
+.ui-kit-page .card-title {
+  display: grid;
+  min-width: 0;
+  text-align: left;
+}
+
 .admin-row-user-text {
   display: grid;
   min-width: 0;
@@ -271,7 +277,7 @@
 }
 
 .ui-kit-page .admin-kv {
-  margin-top: 6rem;
+  margin-top: 5rem;
   display: grid;
   gap: 30px;
   align-content: start;
@@ -333,6 +339,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  cursor: pointer;
 }
 
 .admin-member-name {
@@ -346,9 +353,82 @@
   color: var(--ui-text-muted);
 }
 
+.admin-card-subsection {
+  margin-top: 14px;
+  display: grid;
+  gap: 10px;
+}
+
+.admin-restriction-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.admin-restriction-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.admin-restriction-status small {
+  color: var(--ui-text-muted);
+}
+
+.admin-restriction-list {
+  display: grid;
+  gap: 8px;
+}
+
+.admin-restriction-item {
+  border: 1px solid var(--ui-border);
+  background: rgba(0, 0, 0, 0.2);
+  padding: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.admin-restriction-item-main {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.admin-restriction-item-main small {
+  color: var(--ui-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-restriction-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 @media (max-width: 900px) {
   .admin-user-layout,
   .admin-squad-columns {
     grid-template-columns: 1fr;
+  }
+
+  .admin-restriction-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-restriction-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .admin-restriction-item-actions {
+    width: 100%;
+    justify-content: flex-start;
   }
 }
