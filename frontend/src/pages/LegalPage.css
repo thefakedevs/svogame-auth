@@ -1,7 +1,6 @@
 .legal-page {
   width: min(100%, 980px);
   margin: 0 auto;
-  padding: clamp(24px, 4vw, 48px) 16px 64px;
 }
 
 .legal-page__card {

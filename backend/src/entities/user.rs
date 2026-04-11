@@ -1,6 +1,9 @@
 use anyhow::Result;
 use sea_orm::entity::prelude::*;
-use sea_orm::{ActiveModelBehavior, ActiveValue, DatabaseConnection, DeriveRelation, EnumIter};
+use sea_orm::{
+    ActiveModelBehavior, ActiveValue, DatabaseConnection, DeriveRelation, EntityTrait, EnumIter,
+    QueryFilter,
+};
 use uuid::Uuid;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
@@ -32,6 +35,16 @@ pub struct UpsertUserResult {
 }
 
 impl Entity {
+    pub async fn find_by_discord_id(
+        db: &DatabaseConnection,
+        discord_id: &str,
+    ) -> Result<Option<Model>> {
+        Ok(Self::find()
+            .filter(Column::DiscordId.eq(discord_id))
+            .one(db)
+            .await?)
+    }
+
     pub async fn update_or_register_by_discord_id(
         db: &DatabaseConnection,
         discord_id: String,

@@ -4,7 +4,7 @@ import AdminPage from '../components/admin/AdminPage'
 import AppHeader from '../components/layout/AppHeader'
 import ProfilePage from '../components/profile/ProfilePage'
 import HomePage from '../pages/_HomePage'
-import LegalPage, { isLegalPath } from '../pages/LegalPage'
+import LegalPage, { isLegalPath, legalPageHeading } from '../pages/LegalPage'
 import UiKitPage from '../pages/_UiKitPage'
 import { paths } from '../routes/paths'
 import { usePathname } from '../shared/navigation/history'
@@ -53,7 +53,7 @@ function LegalShell({ pathname }: { pathname: string }) {
     <>
       <div className="ui-kit-vhs" aria-hidden />
       <div className="ui-kit-page app-shell">
-        <AppHeader />
+        <AppHeader pageTitle={legalPageHeading(pathname)} />
         <LegalPage pathname={pathname} />
       </div>
     </>

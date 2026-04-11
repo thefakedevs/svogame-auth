@@ -55,6 +55,21 @@ export function isLegalPath(pathname: string) {
   return pathname === paths.legal || pathname in legalDocuments
 }
 
+export function legalPageHeading(pathname: string) {
+  if (pathname === paths.legal) {
+    return 'Правовые документы'
+  }
+
+  const headings: Record<string, string> = {
+    [paths.legalPrivacyPolicy]: 'Политика конфиденциальности',
+    [paths.legalPublicOffer]: 'Публичная оферта',
+    [paths.legalRefundPolicy]: 'Политика возвратов',
+    [paths.legalUserAgreement]: 'Пользовательское соглашение',
+  }
+
+  return headings[pathname] ?? 'Правовые документы'
+}
+
 export default function LegalPage({ pathname }: { pathname: string }) {
   if (pathname === paths.legal) {
     return (

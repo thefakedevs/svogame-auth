@@ -2,7 +2,8 @@ use crate::services::pow::generate_pow_prefix;
 use anyhow::Result;
 use chrono::Utc;
 use sea_orm::entity::prelude::*;
-use sea_orm::{ActiveValue, DatabaseConnection};
+use sea_orm::{ActiveModelTrait, ActiveValue, DatabaseConnection};
+use uuid::Uuid;
 
 /// Способ доставки токена после авторизации
 #[derive(Clone, Debug, PartialEq, Eq, EnumIter, DeriveActiveEnum)]
@@ -23,6 +24,11 @@ pub struct Model {
     pub pow_complexity: i16,
     pub delivery_method: TokenDeliveryMethod,
     pub delivery_target: String,
+    pub registration_token: Option<String>,
+    pub pending_discord_id: Option<String>,
+    pub pending_username: Option<String>,
+    pub pending_avatar_url: Option<String>,
+    pub pending_email: Option<String>,
     pub created_at: chrono::DateTime<Utc>,
 }
 
@@ -30,6 +36,14 @@ pub struct Model {
 pub enum Relation {}
 
 impl ActiveModelBehavior for ActiveModel {}
+
+#[derive(Clone, Debug)]
+pub struct PendingRegistrationProfile {
+    pub discord_id: String,
+    pub username: String,
+    pub avatar_url: Option<String>,
+    pub email: Option<String>,
+}
 
 impl Entity {
     pub async fn create_with_complexity(
@@ -62,6 +76,30 @@ impl Entity {
             .one(db)
             .await?;
         Ok(result)
+    }
+
+    pub async fn find_by_registration_token(
+        db: &DatabaseConnection,
+        registration_token: &str,
+    ) -> Result<Option<Model>> {
+        Ok(Self::find()
+            .filter(Column::RegistrationToken.eq(registration_token))
+            .one(db)
+            .await?)
+    }
+
+    pub async fn mark_pending_registration(
+        db: &DatabaseConnection,
+        auth_ray: Model,
+        profile: PendingRegistrationProfile,
+    ) -> Result<Model> {
+        let mut active: ActiveModel = auth_ray.into();
+        active.registration_token = ActiveValue::Set(Some(Uuid::new_v4().to_string()));
+        active.pending_discord_id = ActiveValue::Set(Some(profile.discord_id));
+        active.pending_username = ActiveValue::Set(Some(profile.username));
+        active.pending_avatar_url = ActiveValue::Set(profile.avatar_url);
+        active.pending_email = ActiveValue::Set(profile.email);
+        Ok(active.update(db).await?)
     }
 
     pub async fn delete_older_than(db: &DatabaseConnection, seconds: i64) -> Result<u64> {
