@@ -2,6 +2,7 @@ mod common;
 
 use common::TestApp;
 use image::{ImageBuffer, Rgba};
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use sea_orm::ActiveModelTrait;
 use sea_orm::ActiveValue::Set;
 use serial_test::serial;
@@ -83,6 +84,122 @@ async fn seeded_system_assets_keep_user_edited_display_fields() {
         .expect("subscription_plus asset after reseed");
     assert_eq!(updated.display_name, "Premium Plus");
     assert_eq!(updated.description.as_deref(), Some("Custom renamed tier"));
+}
+
+#[tokio::test]
+#[serial]
+async fn registration_requires_legal_acceptance_before_user_is_created() {
+    let app = TestApp::spawn().await;
+    let registration_token = uuid::Uuid::new_v4().to_string();
+
+    auth::entities::AuthRayActiveModel {
+        id: sea_orm::ActiveValue::NotSet,
+        pow_prefix: Set("pending-legal-pref".to_string()),
+        pow_complexity: Set(1),
+        delivery_method: Set(auth::entities::AuthRayTokenDeliveryMethod::Redirect),
+        delivery_target: Set("/profile".to_string()),
+        registration_token: Set(Some(registration_token.clone())),
+        pending_discord_id: Set(Some("discord-legal-block".to_string())),
+        pending_username: Set(Some("LegalBlockUser".to_string())),
+        pending_avatar_url: Set(Some("https://cdn.discord.test/legal.png".to_string())),
+        pending_email: Set(Some("legal-block@example.com".to_string())),
+        created_at: Set(chrono::Utc::now()),
+    }
+    .insert(&app.db)
+    .await
+    .expect("insert pending auth ray");
+
+    let response = app
+        .post_without_auth(
+            "/api/auth/register",
+            serde_json::json!({
+                "registrationToken": registration_token,
+                "acceptedUserAgreement": false,
+                "acceptedPrivacyPolicy": true
+            }),
+        )
+        .await;
+
+    assert_eq!(response.status(), reqwest::StatusCode::BAD_REQUEST);
+    let body: serde_json::Value = response.json().await.expect("register error json");
+    assert_eq!(
+        body["error"],
+        "User agreement must be accepted before registration"
+    );
+
+    let user = auth::entities::User::find()
+        .filter(auth::entities::UserColumn::DiscordId.eq("discord-legal-block"))
+        .one(&app.db)
+        .await
+        .expect("lookup user");
+    assert!(user.is_none());
+}
+
+#[tokio::test]
+#[serial]
+async fn registration_creates_user_and_audits_legal_acceptance() {
+    let app = TestApp::spawn().await;
+    let registration_token = uuid::Uuid::new_v4().to_string();
+
+    auth::entities::AuthRayActiveModel {
+        id: sea_orm::ActiveValue::NotSet,
+        pow_prefix: Set("pending-legal-ok".to_string()),
+        pow_complexity: Set(1),
+        delivery_method: Set(auth::entities::AuthRayTokenDeliveryMethod::Redirect),
+        delivery_target: Set("/profile".to_string()),
+        registration_token: Set(Some(registration_token.clone())),
+        pending_discord_id: Set(Some("discord-legal-ok".to_string())),
+        pending_username: Set(Some("LegalAgreeUser".to_string())),
+        pending_avatar_url: Set(Some("https://cdn.discord.test/ok.png".to_string())),
+        pending_email: Set(Some("legal-ok@example.com".to_string())),
+        created_at: Set(chrono::Utc::now()),
+    }
+    .insert(&app.db)
+    .await
+    .expect("insert pending auth ray");
+
+    let response = app
+        .post_without_auth(
+            "/api/auth/register",
+            serde_json::json!({
+                "registrationToken": registration_token,
+                "acceptedUserAgreement": true,
+                "acceptedPrivacyPolicy": true
+            }),
+        )
+        .await;
+
+    assert_eq!(response.status(), reqwest::StatusCode::OK);
+    let body: serde_json::Value = response.json().await.expect("register json");
+    assert_eq!(body["status"], "authorized");
+    assert!(body["accessToken"].as_str().is_some());
+    assert_eq!(body["username"], "LegalAgreeUser");
+
+    let user = auth::entities::User::find()
+        .filter(auth::entities::UserColumn::DiscordId.eq("discord-legal-ok"))
+        .one(&app.db)
+        .await
+        .expect("lookup created user")
+        .expect("created user exists");
+    assert_eq!(user.username, "LegalAgreeUser");
+
+    let pending_ray = auth::entities::AuthRay::find()
+        .filter(auth::entities::AuthRayColumn::RegistrationToken.eq(registration_token))
+        .one(&app.db)
+        .await
+        .expect("lookup pending auth ray");
+    assert!(pending_ray.is_none());
+
+    assert_eq!(
+        app.audit_log_count(auth::services::audit::ACTION_USER_REGISTERED)
+            .await,
+        1
+    );
+    assert_eq!(
+        app.audit_log_count(auth::services::audit::ACTION_USER_LEGAL_ACCEPTED)
+            .await,
+        1
+    );
 }
 
 #[tokio::test]

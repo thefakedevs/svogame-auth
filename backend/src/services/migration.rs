@@ -53,6 +53,7 @@ impl MigrationTrait for CreateAuthRayTable {
 }
 
 #[derive(DeriveIden)]
+#[allow(dead_code)]
 enum AuthRay {
     Table,
     Id,
@@ -60,7 +61,55 @@ enum AuthRay {
     PowComplexity,
     DeliveryMethod,
     DeliveryTarget,
+    RegistrationToken,
+    PendingDiscordId,
+    PendingUsername,
+    PendingAvatarUrl,
+    PendingEmail,
     CreatedAt,
+}
+
+pub struct AddAuthRayRegistrationColumns;
+
+impl MigrationName for AddAuthRayRegistrationColumns {
+    fn name(&self) -> &str {
+        "m20260412_000023_add_auth_ray_registration_columns"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for AddAuthRayRegistrationColumns {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        let backend = manager.get_database_backend();
+        let statements = match backend {
+            DatabaseBackend::Postgres | DatabaseBackend::Sqlite => vec![
+                r#"ALTER TABLE "auth_ray" ADD COLUMN "registration_token" varchar NULL"#,
+                r#"ALTER TABLE "auth_ray" ADD COLUMN "pending_discord_id" varchar NULL"#,
+                r#"ALTER TABLE "auth_ray" ADD COLUMN "pending_username" varchar NULL"#,
+                r#"ALTER TABLE "auth_ray" ADD COLUMN "pending_avatar_url" varchar NULL"#,
+                r#"ALTER TABLE "auth_ray" ADD COLUMN "pending_email" varchar NULL"#,
+            ],
+            _ => return Ok(()),
+        };
+
+        for sql in statements {
+            match manager
+                .get_connection()
+                .execute(Statement::from_string(backend, sql.to_string()))
+                .await
+            {
+                Ok(_) => {}
+                Err(error) if is_duplicate_column_error(&error) => {}
+                Err(error) => return Err(error),
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn down(&self, _manager: &SchemaManager) -> Result<(), DbErr> {
+        Ok(())
+    }
 }
 
 pub struct CreateUserTable;

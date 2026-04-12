@@ -1,6 +1,7 @@
 use crate::app::config::DatabaseConfig;
 use crate::services::migration::{
-    AddUserDeactivationReasonColumn, AddUserSquadIdColumn, AddUserSuperuserColumn,
+    AddAuthRayRegistrationColumns, AddUserDeactivationReasonColumn, AddUserSquadIdColumn,
+    AddUserSuperuserColumn,
     CreateAssetDefinitionTable, CreateAuditLogTable, CreateAuthRayTable, CreateDefaultSkinTable,
     CreateInventoryOperationTable, CreateLootboxDefinitionTable, CreateLootboxDropDefinitionTable,
     CreateLootboxOpenOperationTable, CreateServiceTokenAuditTable, CreateServiceTokenTable,
@@ -21,6 +22,7 @@ pub async fn connect_db(config: &DatabaseConfig) -> Result<DatabaseConnection> {
 pub async fn run_migrations(db: &DatabaseConnection) -> Result<()> {
     let schema_manager = SchemaManager::new(db);
     CreateAuthRayTable.up(&schema_manager).await?;
+    AddAuthRayRegistrationColumns.up(&schema_manager).await?;
     CreateUserTable.up(&schema_manager).await?;
     AddUserSuperuserColumn.up(&schema_manager).await?;
     AddUserDeactivationReasonColumn.up(&schema_manager).await?;

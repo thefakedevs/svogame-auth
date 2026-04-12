@@ -1,0 +1,80 @@
+.contacts-page {
+  width: 100%;
+  max-width: none;
+  align-items: stretch;
+  gap: 1.25rem;
+}
+
+.contacts-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.9rem;
+}
+
+.contacts-hero__title {
+  margin: 0;
+  color: #fff;
+  text-align: left;
+  font-size: 2rem;
+  line-height: 1.1;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.contacts-hero__text {
+  max-width: 48rem;
+  text-align: left;
+  line-height: 1.65;
+}
+
+.contacts-section {
+  width: 100%;
+}
+
+.contacts-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.contacts-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.contacts-card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.contacts-card__head .card-title,
+.contacts-card .card-text {
+  text-align: left;
+}
+
+.contacts-card__head .card-title {
+  margin: 0;
+  line-height: 1.15;
+}
+
+.contacts-card .ui-card-footer {
+  margin-top: auto;
+}
+
+@media (max-width: 720px) {
+  .contacts-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .contacts-card__head {
+    flex-direction: column;
+  }
+
+  .contacts-hero__title {
+    font-size: 1.55rem;
+  }
+}

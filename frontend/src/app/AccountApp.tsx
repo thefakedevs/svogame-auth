@@ -3,7 +3,10 @@ import { Toaster } from 'react-hot-toast'
 import AdminPage from '../components/admin/AdminPage'
 import AppHeader from '../components/layout/AppHeader'
 import ProfilePage from '../components/profile/ProfilePage'
+import ContactsPage from '../pages/_ContactsPage'
+import DownloadsPage from '../pages/_DownloadsPage'
 import HomePage from '../pages/_HomePage'
+import LegalPage, { isLegalPath, legalPageHeading } from '../pages/LegalPage'
 import UiKitPage from '../pages/_UiKitPage'
 import { paths } from '../routes/paths'
 import { usePathname } from '../shared/navigation/history'
@@ -27,7 +30,7 @@ function HomeShell() {
   return (
     <>
       <div className="ui-kit-vhs" aria-hidden />
-      <div className="ui-kit-page app-shell">
+      <div className="ui-kit-page app-shell landing-shell">
         <AppHeader />
         <HomePage />
       </div>
@@ -42,6 +45,59 @@ function AdminShell() {
       <div className="ui-kit-page app-shell">
         <AppHeader pageTitle="Админка" />
         <AdminPage />
+      </div>
+    </>
+  )
+}
+
+function LegalShell({ pathname }: { pathname: string }) {
+  return (
+    <>
+      <div className="ui-kit-vhs" aria-hidden />
+      <div className="ui-kit-page app-shell">
+        <AppHeader pageTitle={legalPageHeading(pathname)} />
+        <LegalPage pathname={pathname} />
+      </div>
+    </>
+  )
+}
+
+function ContactsShell() {
+  return (
+    <>
+      <div className="ui-kit-vhs" aria-hidden />
+      <div className="ui-kit-page app-shell">
+        <AppHeader pageTitle="Контакты" />
+        <ContactsPage />
+      </div>
+    </>
+  )
+}
+
+function DownloadsShell() {
+  return (
+    <>
+      <div className="ui-kit-vhs" aria-hidden />
+      <div className="ui-kit-page app-shell">
+        <AppHeader pageTitle="Скачать лаунчер" />
+        <DownloadsPage />
+      </div>
+    </>
+  )
+}
+
+function NotFoundShell() {
+  return (
+    <>
+      <div className="ui-kit-vhs" aria-hidden />
+      <div className="ui-kit-page app-shell">
+        <AppHeader pageTitle="Страница не найдена" />
+        <div className="page">
+          <section className="card">
+            <h1 className="card-title">Страница не найдена</h1>
+            <p className="card-text">Проверьте адрес или вернитесь на главную страницу.</p>
+          </section>
+        </div>
       </div>
     </>
   )
@@ -82,10 +138,12 @@ export default function AccountApp() {
     document.title = pageTitleForPath(pathname)
   }, [pathname])
 
-  let page = <HomeShell />
+  let page = <NotFoundShell />
 
   if (adminRoute) {
     page = <AdminShell />
+  } else if (isLegalPath(pathname)) {
+    page = <LegalShell pathname={pathname} />
   } else switch (pathname) {
     case paths.auth:
       page = <AuthRoute />
@@ -96,6 +154,12 @@ export default function AccountApp() {
     case paths.profileEdit:
       page = <ProfileShell pageTitle="Настройки профиля" defaultTab="settings" />
       break
+    case paths.contacts:
+      page = <ContactsShell />
+      break
+    case paths.downloads:
+      page = <DownloadsShell />
+      break
     case paths.token:
       page = <TokenRoute />
       break
@@ -103,8 +167,10 @@ export default function AccountApp() {
       page = <UiKitPage />
       break
     case paths.home:
-    default:
       page = <HomeShell />
+      break
+    default:
+      page = <NotFoundShell />
       break
   }
 

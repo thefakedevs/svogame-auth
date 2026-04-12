@@ -3,6 +3,7 @@ import toast from 'react-hot-toast'
 import { ApiError, toDisplayError } from '../../api/http'
 import {
   createAdminServiceToken,
+  deleteAdminSquad,
   deleteAdminUserSkin,
   deleteAdminSquadImage,
   getAdminMe,
@@ -15,9 +16,12 @@ import {
   listAdminSquads,
   listAdminServiceTokens,
   listAdminUsers,
+  patchAdminSquad,
   revokeAdminUserSuperuser,
+  restrictAdminSquad,
   revokeAdminServiceToken,
   rotateAdminServiceToken,
+  unrestrictAdminSquad,
   type AdminSquadResponse,
   type AdminUserResponse,
   type ServiceTokenAuditResponse,
@@ -29,6 +33,7 @@ import { adminSquadPath, adminTokenAuditPath, adminUserPath, paths } from '../..
 import { pushUrl, replaceUrl, usePathname } from '../../shared/navigation/history'
 import { getAuthToken } from '../../shared/session/auth-session'
 import { useQuery } from '../../util/query'
+import AdminSquadProfile from './AdminSquadProfile'
 import AdminUserProfile from './AdminUserProfile'
 import ErrorState from '../ErrorState'
 import LoadingState from '../LoadingState'
@@ -300,7 +305,7 @@ export default function AdminPage() {
   }
 
   return (
-    <AdminSquadView token={token!} squad={squad} members={squadMembers} onSquadChange={setSquad} />
+    <AdminSquadProfile token={token!} squad={squad} members={squadMembers} onSquadChange={setSquad} />
   )
 }
 
@@ -694,6 +699,16 @@ function AdminSquadView({
 }) {
   const activeMembers = members.filter((member) => !member.isPendingInvite)
   const outgoingInvites = members.filter((member) => member.isPendingInvite)
+  const [restrictionReason, setRestrictionReason] = useState('')
+  const [isUpdatingRestriction, setIsUpdatingRestriction] = useState(false)
+  const [squadName, setSquadName] = useState('')
+  const [isEditingName, setIsEditingName] = useState(false)
+  const [isUpdatingName, setIsUpdatingName] = useState(false)
+  const [isDeletingSquad, setIsDeletingSquad] = useState(false)
+
+  useEffect(() => {
+    setSquadName(squad?.name ?? '')
+  }, [squad?.id, squad?.name])
 
   const deleteSquadAvatar = async () => {
     if (!squad) return
@@ -703,6 +718,83 @@ function AdminSquadView({
       toast.success('Аватарка сквада удалена.')
     } catch (cause) {
       toast.error(toDisplayError(cause, 'Не удалось удалить аватарку сквада.'))
+    }
+  }
+
+  const restrictSquad = async () => {
+    if (!squad || isUpdatingRestriction) return
+    setIsUpdatingRestriction(true)
+    try {
+      const updated = await restrictAdminSquad(token, squad.id, {
+        reason: restrictionReason.trim() || null,
+      })
+      onSquadChange(updated)
+      toast.success('Ограничение на сквад выдано.')
+    } catch (cause) {
+      toast.error(toDisplayError(cause, 'Не удалось выдать ограничение на сквад.'))
+    } finally {
+      setIsUpdatingRestriction(false)
+    }
+  }
+
+  const unrestrictSquad = async () => {
+    if (!squad || isUpdatingRestriction) return
+    setIsUpdatingRestriction(true)
+    try {
+      const updated = await unrestrictAdminSquad(token, squad.id, {
+        reason: restrictionReason.trim() || null,
+      })
+      onSquadChange(updated)
+      toast.success('Ограничение со сквада снято.')
+    } catch (cause) {
+      toast.error(toDisplayError(cause, 'Не удалось снять ограничение со сквада.'))
+    } finally {
+      setIsUpdatingRestriction(false)
+    }
+  }
+
+  const updateSquadName = async () => {
+    if (!squad || isUpdatingName) return
+    const normalizedName = squadName.trim()
+    if (!normalizedName) {
+      toast.error('Укажите название сквада.')
+      return
+    }
+    if (normalizedName === squad.name) return
+
+    setIsUpdatingName(true)
+    try {
+      const updated = await patchAdminSquad(token, squad.id, { name: normalizedName })
+      onSquadChange(updated)
+      setSquadName(updated.name)
+      setIsEditingName(false)
+      toast.success('Название сквада обновлено.')
+    } catch (cause) {
+      toast.error(toDisplayError(cause, 'Не удалось обновить название сквада.'))
+    } finally {
+      setIsUpdatingName(false)
+    }
+  }
+
+  const cancelSquadNameEdit = () => {
+    setSquadName(squad?.name ?? '')
+    setIsEditingName(false)
+  }
+
+  const removeSquad = async () => {
+    if (!squad || isDeletingSquad) return
+    const approved = window.confirm(`Удалить сквад "${squad.name}"? Это действие нельзя отменить.`)
+    if (!approved) return
+
+    setIsDeletingSquad(true)
+    try {
+      await deleteAdminSquad(token, squad.id)
+      toast.success('Сквад удален.')
+      pushUrl(`${paths.admin}?tab=squads`)
+    } catch (cause) {
+      toast.error(toDisplayError(cause, 'Не удалось удалить сквад.'))
+    } finally {
+      setIsDeletingSquad(false)
     }
   }
 
@@ -720,7 +812,47 @@ function AdminSquadView({
             <div className="admin-squad-head">
               {squad.imageUrl ? <img src={squad.imageUrl} alt={squad.name} className="admin-avatar admin-avatar-lg" /> : <span className="ui-avatar">{initials(squad.name)}</span>}
               <div className="admin-row-user-text">
-                <h2 className="card-title">{squad.name}</h2>
+                {!isEditingName ? (
+                  <div className="admin-squad-name-row">
+                    <h2 className="card-title">{squad.name}</h2>
+                    <button
+                      type="button"
+                      className="btn btn-sm"
+                      disabled={isUpdatingName || isDeletingSquad}
+                      onClick={() => setIsEditingName(true)}
+                    >
+                      Редактировать
+                    </button>
+                  </div>
+                ) : (
+                  <div className="admin-squad-name-edit">
+                    <input
+                      className="ui-input"
+                      value={squadName}
+                      onChange={(event) => setSquadName(event.target.value)}
+                      placeholder="Название сквада"
+                      autoFocus
+                    />
+                    <div className="admin-squad-name-edit-actions">
+                      <button
+                        type="button"
+                        className="btn btn-sm"
+                        disabled={isUpdatingName || !squadName.trim() || squadName.trim() === squad.name}
+                        onClick={() => void updateSquadName()}
+                      >
+                        {isUpdatingName ? 'Сохраняем...' : 'Сохранить'}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-sm"
+                        disabled={isUpdatingName}
+                        onClick={cancelSquadNameEdit}
+                      >
+                        Отмена
+                      </button>
+                    </div>
+                  </div>
+                )}
                 <small>{squad.id}</small>
               </div>
               <button className="btn danger" type="button" disabled={!squad.imageUrl} onClick={() => void deleteSquadAvatar()}>
@@ -734,17 +866,79 @@ function AdminSquadView({
               <div><dt>Лидер</dt><dd>{squad.leaderUserId}</dd></div>
             </dl>
 
+            <section className="admin-card-subsection">
+              <h3 className="card-title">Ограничение сквада</h3>
+              <div className="admin-restriction-status">
+                <span className={`ui-badge ${squad.isRestricted ? 'ui-badge-warning' : 'ui-badge-success'}`}>
+                  {squad.isRestricted ? 'Сквад ограничен' : 'Ограничений нет'}
+                </span>
+                {squad.restrictionReason ? <small>{squad.restrictionReason}</small> : null}
+              </div>
+              <div className="admin-restriction-toolbar">
+                <input
+                  className="ui-input"
+                  value={restrictionReason}
+                  onChange={(event) => setRestrictionReason(event.target.value)}
+                  placeholder="Причина ограничения"
+                />
+                <button
+                  type="button"
+                  className="btn btn-sm danger"
+                  disabled={isUpdatingRestriction || squad.isRestricted}
+                  onClick={() => void restrictSquad()}
+                >
+                  Выдать ограничение
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  disabled={isUpdatingRestriction || !squad.isRestricted}
+                  onClick={() => void unrestrictSquad()}
+                >
+                  Снять ограничение
+                </button>
+              </div>
+            </section>
+
+            <section className="admin-card-subsection">
+              <h3 className="card-title">Управление сквадом</h3>
+              <div className="admin-squad-manage-row">
+                <input
+                  className="ui-input"
+                  value={squadName}
+                  onChange={(event) => setSquadName(event.target.value)}
+                  placeholder="Название сквада"
+                />
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  disabled={isUpdatingName || !squadName.trim() || squadName.trim() === squad.name}
+                  onClick={() => void updateSquadName()}
+                >
+                  {isUpdatingName ? 'Сохраняем...' : 'Сохранить название'}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-sm danger"
+                  disabled={isDeletingSquad}
+                  onClick={() => void removeSquad()}
+                >
+                  {isDeletingSquad ? 'Удаляем...' : 'Удалить сквад'}
+                </button>
+              </div>
+            </section>
+
             <div className="admin-squad-columns">
               <section>
                 <h3>Участники</h3>
                 <ul className="admin-member-list">
                   {activeMembers.map((member) => (
                     <li key={member.id}>
-                      <div className="admin-member-card-main">
+                      <div className="admin-member-card-main" onClick={() => pushUrl(adminUserPath(member.id))}>
                         {member.avatarUrl ? <img src={member.avatarUrl} alt={member.username} className="admin-avatar" /> : <span className="ui-avatar ui-avatar-sm">{initials(member.username)}</span>}
                         <span className="admin-member-name">{member.username}</span>
                       </div>
-                      <button type="button" className="btn btn-sm" onClick={() => pushUrl(adminUserPath(member.id))}>Профиль</button>
+                      {member.id === squad.leaderUserId && <span className="ui-badge ui-badge-secondary">Лидер</span>}
                     </li>
                   ))}
                 </ul>
@@ -755,7 +949,7 @@ function AdminSquadView({
                 <ul className="admin-member-list">
                   {outgoingInvites.map((member) => (
                     <li key={member.inviteId ?? member.id}>
-                      <div className="admin-member-card-main">
+                      <div className="admin-member-card-main" onClick={() => pushUrl(adminUserPath(member.id))}>
                         {member.avatarUrl ? <img src={member.avatarUrl} alt={member.username} className="admin-avatar" /> : <span className="ui-avatar ui-avatar-sm">{initials(member.username)}</span>}
                         <span className="admin-member-name">{member.username}</span>
                       </div>
@@ -772,3 +966,5 @@ function AdminSquadView({
     </div>
   )
 }
+
+void AdminSquadView
