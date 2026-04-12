@@ -333,7 +333,7 @@ export default function HomePage() {
             </PhotoView>
 
             <PhotoView
-              src="/landing/gallery-launcher.svg"
+              src="/landing/launcher.png"
               width={1280}
               height={720}
               overlay={(
@@ -351,7 +351,7 @@ export default function HomePage() {
                 aria-label="Открыть изображение: Лаунчер"
               >
                 <img
-                  src="/landing/gallery-launcher.svg"
+                  src="/landing/launcher.png"
                   width={1280}
                   height={720}
                   loading="lazy"

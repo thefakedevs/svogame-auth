@@ -28,13 +28,13 @@ export function initials(value: string) {
 export function formatDate(value?: string | null) {
   if (!value) return 'Нет данных'
   const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? value : dateFormatter.format(date)
+  return Number.isNaN(date.getTime()) ? value : dateFormatter.format(date).replace(', ', ' ')
 }
 
 export function formatDateTime(value?: string | null) {
   if (!value) return 'Нет данных'
   const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? value : dateTimeFormatter.format(date)
+  return Number.isNaN(date.getTime()) ? value : dateTimeFormatter.format(date).replace(', ', ' ')
 }
 
 export function renderUserAvatar(user: { username: string; avatarUrl?: string | null }): ReactNode {

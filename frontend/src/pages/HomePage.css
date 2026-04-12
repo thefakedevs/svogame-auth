@@ -306,6 +306,12 @@ body:has(.landing-shell) .ui-kit-page.landing-shell {
   object-fit: cover;
   display: block;
   background: #0b0b0c;
+  opacity: 60%;
+  transition: 0.2s;
+}
+
+.landing-gallery-card:hover img {
+  opacity: 100%;
 }
 
 .landing-gallery-card__caption {
@@ -572,6 +578,10 @@ body:has(.landing-shell) .ui-kit-page.landing-shell {
   .landing-final-cta__actions {
     justify-content: flex-start;
   }
+
+  .landing-gallery-card img {
+    opacity: 100%;
+  }
 }
 
 @media (max-width: 720px) {
@@ -623,6 +633,10 @@ body:has(.landing-shell) .ui-kit-page.landing-shell {
   .landing-footer__nav {
     grid-template-columns: 1fr;
   }
+
+  .landing-gallery-card img {
+    opacity: 100%;
+  }
 }
 
 @media (max-width: 480px) {
@@ -643,6 +657,10 @@ body:has(.landing-shell) .ui-kit-page.landing-shell {
 
   .landing-trust li {
     width: 100%;
+  }
+
+  .landing-gallery-card img {
+    opacity: 100%;
   }
 
 }
