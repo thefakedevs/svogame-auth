@@ -304,54 +304,10 @@ pub async fn grant_entitlement(
     db: &sea_orm::DatabaseConnection,
     mutation: EntitlementMutation,
 ) -> Result<EntitlementView> {
-    mutation.actor.validate()?;
-    let asset_key = validate_asset_key(&mutation.asset_key)?;
     let tx = db.begin().await?;
-    ensure_user_exists(&tx, mutation.user_id).await?;
-    let asset = get_non_currency_asset_by_key(&tx, &asset_key).await?;
-    ensure_ownership_model(&asset, OwnershipModel::Entitlement)?;
-    let now = chrono::Utc::now();
-
-    let entitlement = if let Some(existing) =
-        UserEntitlement::find_by_id((mutation.user_id, asset.id))
-            .one(&tx)
-            .await?
-    {
-        existing
-    } else {
-        let created = UserEntitlementActiveModel {
-            user_id: Set(mutation.user_id),
-            asset_definition_id: Set(asset.id),
-            granted_at: Set(now),
-            granted_by_actor: Set(serde_json::to_string(&mutation.actor)?),
-            updated_at: Set(now),
-        }
-        .insert(&tx)
-        .await?;
-        write_inventory_operation(
-            &tx,
-            mutation.user_id,
-            asset.id,
-            OwnershipModel::Entitlement,
-            "entitlement_granted",
-            &mutation.actor,
-            &mutation.context,
-            None,
-            None,
-            None,
-            None,
-        )
-        .await?;
-        created
-    };
-
+    let entitlement = grant_entitlement_in_tx(&tx, mutation).await?;
     tx.commit().await?;
-    Ok(EntitlementView {
-        asset_key: asset.key,
-        asset_definition_id: asset.id,
-        granted_at: entitlement.granted_at,
-        updated_at: entitlement.updated_at,
-    })
+    Ok(entitlement)
 }
 
 pub async fn revoke_entitlement(
@@ -472,6 +428,58 @@ pub async fn prolong_expirable(
     let result = prolong_expirable_in_tx(&tx, mutation).await?;
     tx.commit().await?;
     Ok(result)
+}
+
+pub(crate) async fn grant_entitlement_in_tx(
+    db: &impl ConnectionTrait,
+    mutation: EntitlementMutation,
+) -> Result<EntitlementView> {
+    mutation.actor.validate()?;
+    let asset_key = validate_asset_key(&mutation.asset_key)?;
+    ensure_user_exists(db, mutation.user_id).await?;
+    let asset = get_non_currency_asset_by_key(db, &asset_key).await?;
+    ensure_ownership_model(&asset, OwnershipModel::Entitlement)?;
+    let now = chrono::Utc::now();
+
+    let entitlement = if let Some(existing) =
+        UserEntitlement::find_by_id((mutation.user_id, asset.id))
+            .one(db)
+            .await?
+    {
+        existing
+    } else {
+        let created = UserEntitlementActiveModel {
+            user_id: Set(mutation.user_id),
+            asset_definition_id: Set(asset.id),
+            granted_at: Set(now),
+            granted_by_actor: Set(serde_json::to_string(&mutation.actor)?),
+            updated_at: Set(now),
+        }
+        .insert(db)
+        .await?;
+        write_inventory_operation(
+            db,
+            mutation.user_id,
+            asset.id,
+            OwnershipModel::Entitlement,
+            "entitlement_granted",
+            &mutation.actor,
+            &mutation.context,
+            None,
+            None,
+            None,
+            None,
+        )
+        .await?;
+        created
+    };
+
+    Ok(EntitlementView {
+        asset_key: asset.key,
+        asset_definition_id: asset.id,
+        granted_at: entitlement.granted_at,
+        updated_at: entitlement.updated_at,
+    })
 }
 
 pub(crate) async fn add_stackable_in_tx(

@@ -9,6 +9,7 @@ pub struct AppConfig {
     pub discord: DiscordConfig,
     pub database: DatabaseConfig,
     pub s3: S3Config,
+    pub shop: ShopConfig,
     pub pow_complexity: i16,
     pub jwt_secret: String,
     pub gamervii_compat: Option<GamerviiCompatConfig>,
@@ -45,6 +46,29 @@ pub struct S3Config {
     pub force_path_style: bool,
 }
 
+#[derive(Debug, Clone)]
+pub struct ShopConfig {
+    pub payment_provider: ShopPaymentProviderKind,
+    pub yookassa: Option<YooKassaConfig>,
+    pub pending_payment_ttl_seconds: i64,
+    pub reconciliation_interval_seconds: u64,
+}
+
+#[derive(Debug, Clone)]
+pub struct YooKassaConfig {
+    pub shop_id: String,
+    pub secret_key: String,
+    pub api_base_url: String,
+    pub return_url: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ShopPaymentProviderKind {
+    Mock,
+    YooKassa,
+    Disabled,
+}
+
 impl AppConfig {
     pub(crate) fn from_env() -> Result<Self> {
         let binding_address =
@@ -52,6 +76,7 @@ impl AppConfig {
         let discord = DiscordConfig::from_env()?;
         let database = DatabaseConfig::from_env()?;
         let s3 = S3Config::from_env()?;
+        let shop = ShopConfig::from_env()?;
         let pow_complexity = std::env::var("POW_COMPLEXITY")
             .unwrap_or_else(|_| "19".to_string())
             .parse::<i16>()
@@ -64,6 +89,7 @@ impl AppConfig {
             discord,
             database,
             s3,
+            shop,
             pow_complexity,
             jwt_secret,
             gamervii_compat,
@@ -150,4 +176,116 @@ impl S3Config {
             force_path_style,
         })
     }
+}
+
+impl ShopConfig {
+    fn from_env() -> Result<Self> {
+        let payment_provider = ShopPaymentProviderKind::from_env()?;
+        let yookassa = if payment_provider == ShopPaymentProviderKind::YooKassa {
+            Some(YooKassaConfig::from_env()?)
+        } else {
+            None
+        };
+        let pending_payment_ttl_seconds = std::env::var("SHOP_PENDING_PAYMENT_TTL_SECONDS")
+            .unwrap_or_else(|_| "900".to_string())
+            .parse::<i64>()
+            .context("SHOP_PENDING_PAYMENT_TTL_SECONDS must be a valid integer")?;
+        if pending_payment_ttl_seconds <= 0 {
+            anyhow::bail!("SHOP_PENDING_PAYMENT_TTL_SECONDS must be positive");
+        }
+
+        let reconciliation_interval_seconds = std::env::var("SHOP_RECONCILIATION_INTERVAL_SECONDS")
+            .unwrap_or_else(|_| "30".to_string())
+            .parse::<u64>()
+            .context("SHOP_RECONCILIATION_INTERVAL_SECONDS must be a valid integer")?;
+        if reconciliation_interval_seconds == 0 {
+            anyhow::bail!("SHOP_RECONCILIATION_INTERVAL_SECONDS must be positive");
+        }
+
+        Ok(Self {
+            payment_provider,
+            yookassa,
+            pending_payment_ttl_seconds,
+            reconciliation_interval_seconds,
+        })
+    }
+}
+
+impl ShopPaymentProviderKind {
+    fn from_env() -> Result<Self> {
+        let default_value = if cfg!(debug_assertions) {
+            "mock"
+        } else {
+            "disabled"
+        };
+        let value =
+            std::env::var("SHOP_PAYMENT_PROVIDER").unwrap_or_else(|_| default_value.to_string());
+        match value.trim().to_lowercase().as_str() {
+            "mock" => Ok(Self::Mock),
+            "yookassa" | "yoo_kassa" | "yoo-kassa" => Ok(Self::YooKassa),
+            "disabled" | "none" => Ok(Self::Disabled),
+            _ => anyhow::bail!("SHOP_PAYMENT_PROVIDER must be one of: mock, yookassa, disabled"),
+        }
+    }
+
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Mock => "mock",
+            Self::YooKassa => "yookassa",
+            Self::Disabled => "disabled",
+        }
+    }
+}
+
+impl YooKassaConfig {
+    fn from_env() -> Result<Self> {
+        let shop_id = std::env::var("YOOKASSA_SHOP_ID").context("YOOKASSA_SHOP_ID not set")?;
+        let secret_key =
+            std::env::var("YOOKASSA_SECRET_KEY").context("YOOKASSA_SECRET_KEY not set")?;
+        let return_url = resolve_yookassa_return_url()?;
+        let api_base_url = std::env::var("YOOKASSA_API_BASE_URL")
+            .unwrap_or_else(|_| "https://api.yookassa.ru/v3".to_string());
+        let api_base_url = api_base_url.trim().trim_end_matches('/').to_string();
+        if api_base_url.is_empty() {
+            anyhow::bail!("YOOKASSA_API_BASE_URL must not be empty");
+        }
+
+        Ok(Self {
+            shop_id,
+            secret_key,
+            api_base_url,
+            return_url,
+        })
+    }
+}
+
+fn resolve_yookassa_return_url() -> Result<String> {
+    if let Ok(return_url) = std::env::var("YOOKASSA_RETURN_URL") {
+        let return_url = return_url.trim();
+        if !return_url.is_empty() {
+            return Ok(return_url.to_string());
+        }
+    }
+
+    if let Some(debug_port) = read_debug_port()? {
+        return Ok(format!("http://127.0.0.1:{debug_port}/api/docs"));
+    }
+
+    Err(anyhow::anyhow!(
+        "YOOKASSA_RETURN_URL not set and DEBUG_PORT is unavailable for local fallback"
+    ))
+}
+
+fn read_debug_port() -> Result<Option<u16>> {
+    let Some(raw_port) = std::env::var("DEBUG_PORT").ok() else {
+        return Ok(None);
+    };
+    let raw_port = raw_port.trim();
+    if raw_port.is_empty() {
+        return Ok(None);
+    }
+    let port = raw_port
+        .parse::<u16>()
+        .context("DEBUG_PORT must be a valid TCP port")?;
+    Ok(Some(port))
 }
