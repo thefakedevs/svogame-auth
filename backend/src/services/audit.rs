@@ -56,6 +56,10 @@ pub const ACTION_ADMIN_LOOTBOX_DROP_UPDATED: &str = "admin.lootbox.drop_updated"
 pub const ACTION_ADMIN_LOOTBOX_DROP_DELETED: &str = "admin.lootbox.drop_deleted";
 pub const ACTION_USER_LOOTBOX_OPENED: &str = "user.lootbox.opened";
 pub const ACTION_ADMIN_LOOTBOX_OPENED_FOR_USER: &str = "admin.lootbox.opened_for_user";
+pub const ACTION_ADMIN_SHOP_PRODUCT_CREATED: &str = "admin.shop.product.created";
+pub const ACTION_ADMIN_SHOP_PRODUCT_UPDATED: &str = "admin.shop.product.updated";
+pub const ACTION_USER_SHOP_ORDER_CREATED: &str = "user.shop.order.created";
+pub const ACTION_USER_SHOP_ORDER_FULFILLED: &str = "user.shop.order.fulfilled";
 
 pub async fn write_audit_log<C>(
     db: &C,

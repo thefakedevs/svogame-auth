@@ -2,9 +2,7 @@ use crate::app::http::{HttpError, HttpResult};
 use crate::app::state::AppStateExtractor;
 use crate::domains::auth::runtime::AuthPollResult;
 use crate::entities::{AuthRay, AuthRayModel, User, auth_ray::TokenDeliveryMethod};
-use crate::services::audit::{
-    ACTION_USER_LEGAL_ACCEPTED, ACTION_USER_REGISTERED, write_audit_log,
-};
+use crate::services::audit::{ACTION_USER_LEGAL_ACCEPTED, ACTION_USER_REGISTERED, write_audit_log};
 use crate::services::discord::exchange_code;
 use crate::services::token::sign_token;
 use axum::Json;
@@ -343,9 +341,7 @@ pub async fn authorize(
     })?;
 
     Ok(Json(AuthorizeResponse::terms_required(
-        pending_ray
-            .registration_token
-            .unwrap_or_default(),
+        pending_ray.registration_token.unwrap_or_default(),
     )))
 }
 
@@ -507,10 +503,7 @@ async fn load_auth_ray_by_prefix(
         .ok_or_else(|| HttpError::bad_request("Invalid or expired pow_prefix"))
 }
 
-async fn delete_auth_ray(
-    db: &sea_orm::DatabaseConnection,
-    ray: &AuthRayModel,
-) -> HttpResult<()> {
+async fn delete_auth_ray(db: &sea_orm::DatabaseConnection, ray: &AuthRayModel) -> HttpResult<()> {
     ray.clone().delete(db).await.map_err(|e| {
         error!("Failed to delete auth ray: {:?}", e);
         HttpError::internal_error("Failed to delete auth ray")

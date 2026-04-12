@@ -1,7 +1,10 @@
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use auth::app::config::{AppConfig, DatabaseConfig, DiscordConfig, S3Config};
+use auth::app::config::{
+    AppConfig, DatabaseConfig, DiscordConfig, S3Config, ShopConfig, ShopPaymentProviderKind,
+    YooKassaConfig,
+};
 use auth::app::router::build_router;
 use auth::app::state::{AppState, SharedAppState};
 use auth::entities::{
@@ -36,6 +39,43 @@ pub struct IssuedUser {
 
 impl TestApp {
     pub async fn spawn() -> Self {
+        Self::spawn_with_shop_config(ShopConfig {
+            payment_provider: ShopPaymentProviderKind::Mock,
+            yookassa: None,
+            pending_payment_ttl_seconds: 900,
+            reconciliation_interval_seconds: 30,
+        })
+        .await
+    }
+
+    pub async fn spawn_with_shop_payment_provider(
+        shop_payment_provider: ShopPaymentProviderKind,
+    ) -> Self {
+        Self::spawn_with_shop_config(ShopConfig {
+            payment_provider: shop_payment_provider,
+            yookassa: None,
+            pending_payment_ttl_seconds: 900,
+            reconciliation_interval_seconds: 30,
+        })
+        .await
+    }
+
+    pub async fn spawn_with_yookassa(api_base_url: String, return_url: String) -> Self {
+        Self::spawn_with_shop_config(ShopConfig {
+            payment_provider: ShopPaymentProviderKind::YooKassa,
+            yookassa: Some(YooKassaConfig {
+                shop_id: "test-shop".to_string(),
+                secret_key: "test-secret".to_string(),
+                api_base_url,
+                return_url,
+            }),
+            pending_payment_ttl_seconds: 900,
+            reconciliation_interval_seconds: 30,
+        })
+        .await
+    }
+
+    pub async fn spawn_with_shop_config(shop: ShopConfig) -> Self {
         let (s3_endpoint, mock_s3_server_task) = spawn_mock_s3_server().await;
 
         let db_path = test_db_path();
@@ -66,6 +106,7 @@ impl TestApp {
                 secret_access_key: "test".to_string(),
                 force_path_style: true,
             },
+            shop,
             pow_complexity: 1,
             jwt_secret: "test-jwt-secret".to_string(),
             gamervii_compat: None,
@@ -428,6 +469,21 @@ impl TestApp {
     ) -> reqwest::Response {
         self.send_with_retry(|| self.client.post(self.url(path)).json(&body))
             .await
+    }
+
+    pub async fn post_raw_without_auth(
+        &self,
+        path: &str,
+        body: impl Into<String>,
+    ) -> reqwest::Response {
+        let body = body.into();
+        self.send_with_retry(|| {
+            self.client
+                .post(self.url(path))
+                .header(reqwest::header::CONTENT_TYPE, "application/json")
+                .body(body.clone())
+        })
+        .await
     }
 
     pub async fn post_multipart(

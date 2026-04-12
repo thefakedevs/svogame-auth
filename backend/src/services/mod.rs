@@ -8,5 +8,6 @@ pub mod ownership;
 pub mod pow;
 pub mod restrictions;
 pub mod service_tokens;
+pub mod shop;
 pub mod squads;
 pub mod token;

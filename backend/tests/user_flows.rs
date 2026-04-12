@@ -2,9 +2,9 @@ mod common;
 
 use common::TestApp;
 use image::{ImageBuffer, Rgba};
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use sea_orm::ActiveModelTrait;
 use sea_orm::ActiveValue::Set;
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use serial_test::serial;
 
 fn make_skin_png(fill: [u8; 4]) -> Vec<u8> {

@@ -1,3 +1,5 @@
+use crate::app::http::ProblemDetails;
+use crate::app::http::ProblemResponse;
 use crate::domains::admin::handlers as admin_handlers;
 use crate::domains::admin::service_tokens as admin_service_tokens;
 use crate::domains::admin::squads as admin_squads;
@@ -8,6 +10,7 @@ use crate::domains::compat::gamervii as compat_gamervii;
 use crate::domains::lootboxes::handlers as lootbox_handlers;
 use crate::domains::meta::handlers as meta_handlers;
 use crate::domains::ownership::handlers as ownership_handlers;
+use crate::domains::shop::handlers as shop_handlers;
 use crate::domains::skins::handlers as skins_handlers;
 use crate::domains::skins::types as skins_types;
 use crate::domains::squads::handlers as squads_handlers;
@@ -16,6 +19,7 @@ use crate::domains::users::handlers;
 use crate::services::lootboxes as lootbox_service;
 use crate::services::ownership::catalog as ownership_catalog;
 use crate::services::ownership::types as ownership_types;
+use crate::services::shop as shop_service;
 use utoipa::OpenApi;
 
 #[derive(OpenApi)]
@@ -115,6 +119,17 @@ use utoipa::OpenApi;
         ownership_handlers::credit_wallet,
         ownership_handlers::debit_wallet,
         ownership_handlers::adjust_wallet_balance,
+        shop_handlers::list_public_products,
+        shop_handlers::get_public_product,
+        shop_handlers::list_my_orders,
+        shop_handlers::get_my_order,
+        shop_handlers::create_my_order,
+        shop_handlers::yookassa_webhook,
+        shop_handlers::complete_my_mock_order,
+        shop_handlers::list_admin_products,
+        shop_handlers::get_admin_product,
+        shop_handlers::create_product,
+        shop_handlers::patch_product,
         squads_handlers::create_squad,
         squads_handlers::find_squads_by_users,
         squads_handlers::get_squad,
@@ -206,10 +221,24 @@ use utoipa::OpenApi;
             ownership_handlers::WalletTransactionResponse,
             ownership_handlers::SubscriptionStatusResponse,
             ownership_handlers::OkResponse,
+            shop_handlers::ShopQuery,
+            shop_handlers::ShopProductLocaleResponse,
+            shop_handlers::ShopProductResponse,
+            shop_handlers::ShopPaymentAttemptResponse,
+            shop_handlers::ShopOrderResponse,
+            shop_handlers::ShopWebhookAckResponse,
+            shop_handlers::YooKassaWebhookRequest,
+            shop_handlers::YooKassaWebhookObjectRequest,
             ownership_catalog::CreateAssetDefinitionInput,
             ownership_catalog::UpdateAssetDefinitionInput,
             ownership_types::AssetKind,
             ownership_types::OwnershipModel,
+            shop_service::ProductLocaleInput,
+            shop_service::CreateShopProductInput,
+            shop_service::UpdateShopProductInput,
+            shop_service::CreateShopOrderInput,
+            ProblemDetails,
+            ProblemResponse,
             squads_handlers::CreateSquadRequest,
             squads_handlers::FindSquadsByUsersRequest,
             squads_handlers::PatchSquadRequest,
@@ -237,6 +266,8 @@ use utoipa::OpenApi;
         (name = "ownership", description = "Public and self-service ownership catalog and inventory API"),
         (name = "ownership-admin", description = "Administrative inventory and asset catalog API"),
         (name = "meta", description = "Public metadata used by clients to drive UI and validation"),
+        (name = "shop", description = "Public catalog and self-service purchase flow for shop products"),
+        (name = "shop-admin", description = "Administrative shop product configuration API"),
         (name = "skins", description = "Skin upload and retrieval API"),
         (name = "squads", description = "Squad creation, membership, invite, and moderation API"),
         (name = "system", description = "Operational health endpoints"),
