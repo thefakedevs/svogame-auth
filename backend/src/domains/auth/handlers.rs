@@ -1,8 +1,10 @@
 use crate::app::http::{HttpError, HttpResult};
 use crate::app::state::AppStateExtractor;
 use crate::domains::auth::runtime::AuthPollResult;
-use crate::entities::{AuthRay, auth_ray::TokenDeliveryMethod};
-use crate::services::audit::{ACTION_USER_REGISTERED, write_audit_log};
+use crate::entities::{AuthRay, AuthRayModel, User, auth_ray::TokenDeliveryMethod};
+use crate::services::audit::{
+    ACTION_USER_LEGAL_ACCEPTED, ACTION_USER_REGISTERED, write_audit_log,
+};
 use crate::services::discord::exchange_code;
 use crate::services::token::sign_token;
 use axum::Json;
@@ -12,7 +14,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tracing::error;
 use utoipa::ToSchema;
-use uuid::Uuid;
+
+const LEGAL_USER_AGREEMENT_VERSION: &str = "2026-04-11";
+const LEGAL_PRIVACY_POLICY_VERSION: &str = "2026-04-11";
+const AUTH_SESSION_MAX_AGE_SECONDS: i64 = 3600;
 
 #[derive(Serialize, ToSchema)]
 pub struct PrepareAuthResponse {
@@ -34,6 +39,80 @@ pub struct PrepareAuthRequest {
     pub redirect_url: Option<String>,
     #[serde(rename = "deliveryMethod")]
     pub delivery_method: String,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct AuthorizeResponse {
+    status: String,
+    #[serde(rename = "registrationToken", skip_serializing_if = "Option::is_none")]
+    registration_token: Option<String>,
+    #[serde(rename = "accessToken", skip_serializing_if = "Option::is_none")]
+    access_token: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    username: Option<String>,
+    #[serde(rename = "avatarUrl", skip_serializing_if = "Option::is_none")]
+    avatar_url: Option<String>,
+    #[serde(rename = "deliveryMethod", skip_serializing_if = "Option::is_none")]
+    delivery_method: Option<String>,
+    #[serde(rename = "deliveryTarget", skip_serializing_if = "Option::is_none")]
+    delivery_target: Option<String>,
+}
+
+impl AuthorizeResponse {
+    fn authorized(
+        access_token: String,
+        user_id: String,
+        username: String,
+        avatar_url: String,
+        delivery_method: String,
+        delivery_target: String,
+    ) -> Self {
+        Self {
+            status: "authorized".to_string(),
+            registration_token: None,
+            access_token: Some(access_token),
+            id: Some(user_id),
+            username: Some(username),
+            avatar_url: Some(avatar_url),
+            delivery_method: Some(delivery_method),
+            delivery_target: Some(delivery_target),
+        }
+    }
+
+    fn terms_required(registration_token: String) -> Self {
+        Self {
+            status: "terms_required".to_string(),
+            registration_token: Some(registration_token),
+            access_token: None,
+            id: None,
+            username: None,
+            avatar_url: None,
+            delivery_method: None,
+            delivery_target: None,
+        }
+    }
+}
+
+#[derive(Deserialize, ToSchema)]
+pub struct AuthorizeRequest {
+    #[serde(rename = "powPrefix")]
+    pub pow_prefix: String,
+    #[serde(rename = "powSolution")]
+    pub pow_solution: String,
+    #[serde(rename = "discordCode")]
+    pub discord_code: String,
+}
+
+#[derive(Deserialize, ToSchema)]
+pub struct RegisterRequest {
+    #[serde(rename = "registrationToken")]
+    pub registration_token: String,
+    #[serde(rename = "acceptedUserAgreement")]
+    pub accepted_user_agreement: bool,
+    #[serde(rename = "acceptedPrivacyPolicy")]
+    pub accepted_privacy_policy: bool,
 }
 
 #[utoipa::path(
@@ -71,7 +150,7 @@ pub async fn prepare_auth(
                 ));
             }
         },
-        TokenDeliveryMethod::Polling => Uuid::new_v4().to_string(),
+        TokenDeliveryMethod::Polling => uuid::Uuid::new_v4().to_string(),
     };
 
     let ray = AuthRay::create_with_complexity(
@@ -98,39 +177,15 @@ pub async fn prepare_auth(
     }))
 }
 
-#[derive(Serialize, ToSchema)]
-pub struct AuthorizeResponse {
-    #[serde(rename = "accessToken")]
-    access_token: String,
-    id: String,
-    username: String,
-    #[serde(rename = "avatarUrl")]
-    avatar_url: String,
-    #[serde(rename = "deliveryMethod")]
-    delivery_method: String,
-    #[serde(rename = "deliveryTarget")]
-    delivery_target: String,
-}
-
-#[derive(Deserialize, ToSchema)]
-pub struct AuthorizeRequest {
-    #[serde(rename = "powPrefix")]
-    pub pow_prefix: String,
-    #[serde(rename = "powSolution")]
-    pub pow_solution: String,
-    #[serde(rename = "discordCode")]
-    pub discord_code: String,
-}
-
 #[utoipa::path(
     post,
     path = "/api/auth/authorize",
     request_body(
         content = AuthorizeRequest,
-        description = "Complete Discord-based authentication by presenting PoW solution and Discord OAuth code. In polling mode, the same completion also notifies the waiting poll endpoint."
+        description = "Complete Discord-based authentication by presenting PoW solution and Discord OAuth code. Existing users are logged in immediately. New users receive a temporary registration token and must accept legal documents before account creation."
     ),
     responses(
-        (status = 200, description = "Authentication completed successfully.", body = AuthorizeResponse),
+        (status = 200, description = "Authentication completed or additional legal acceptance is required.", body = AuthorizeResponse),
         (status = 400, description = "Invalid or expired challenge prefix."),
         (status = 403, description = "PoW invalid, Discord code invalid, missing required scopes, email not verified, user deactivated, or token exchange rejected."),
         (status = 500, description = "Internal failure while registering user, writing audit log, or signing token.")
@@ -142,32 +197,17 @@ pub async fn authorize(
     Json(body): Json<AuthorizeRequest>,
 ) -> HttpResult<Json<AuthorizeResponse>> {
     let state = &state.read().await;
-    // Find the AuthRay
-    let ray = AuthRay::find_by_prefix(&state.db, &body.pow_prefix)
-        .await
-        .map_err(|e| {
-            error!("Database error while finding auth ray: {:?}", e);
-            HttpError::internal_error("Database error")
-        })?;
-    let ray = match ray {
-        Some(ray) => ray,
-        None => return Err(HttpError::bad_request("Invalid or expired pow_prefix")),
-    };
+    let ray = load_auth_ray_by_prefix(&state.db, &body.pow_prefix).await?;
 
-    let pow_complexity = ray.pow_complexity;
-    let pow_prefix = ray.pow_prefix.clone();
-    let pow_creation = ray.created_at;
+    if ray.registration_token.is_some() {
+        return Err(HttpError::bad_request(
+            "Auth session is already waiting for legal acceptance",
+        ));
+    }
+
     let is_polling = matches!(ray.delivery_method, TokenDeliveryMethod::Polling);
-    let delivery_method = match ray.delivery_method {
-        TokenDeliveryMethod::Redirect => "redirect".to_string(),
-        TokenDeliveryMethod::Polling => "polling".to_string(),
-    };
+    let delivery_method = delivery_method_name(&ray.delivery_method);
     let delivery_target = ray.delivery_target.clone();
-
-    ray.delete(&state.db).await.map_err(|e| {
-        error!("Failed to delete auth ray: {:?}", e);
-        HttpError::internal_error("Failed to delete auth ray")
-    })?;
 
     let notify_error = |msg: &str| {
         if is_polling {
@@ -182,10 +222,11 @@ pub async fn authorize(
 
     if !crate::services::pow::verify_pow(
         &body.pow_solution,
-        &pow_prefix,
-        pow_complexity,
-        &pow_creation,
+        &ray.pow_prefix,
+        ray.pow_complexity,
+        &ray.created_at,
     ) {
+        delete_auth_ray(&state.db, &ray).await?;
         notify_error("Invalid PoW solution");
         return Err(HttpError::forbidden("Invalid PoW solution"));
     }
@@ -194,6 +235,7 @@ pub async fn authorize(
         Ok(creds) => creds,
         Err(e) => {
             error!("Failed to exchange Discord code: {:?}", e);
+            let _ = delete_auth_ray(&state.db, &ray).await;
             notify_error("Failed to exchange Discord code");
             return Err(HttpError::forbidden("Failed to exchange Discord code"));
         }
@@ -202,8 +244,8 @@ pub async fn authorize(
     {
         let scopes = discord_creds
             .scope
-            .split(" ")
-            .map(|it| it.to_string())
+            .split(' ')
+            .map(|scope| scope.to_string())
             .collect::<Vec<String>>();
         if state
             .config
@@ -212,6 +254,7 @@ pub async fn authorize(
             .iter()
             .any(|scope| !scopes.contains(scope))
         {
+            let _ = delete_auth_ray(&state.db, &ray).await;
             notify_error("Missing required Discord scopes");
             return Err(HttpError::forbidden("Missing required Discord scopes"));
         }
@@ -226,32 +269,144 @@ pub async fn authorize(
         Ok(info) => info,
         Err(e) => {
             error!("Failed to fetch Discord user info: {:?}", e);
+            let _ = delete_auth_ray(&state.db, &ray).await;
             notify_error("Failed to fetch Discord user info");
             return Err(HttpError::forbidden("Failed to fetch Discord user info"));
         }
     };
 
-    if user_info.verified.is_none() || !user_info.verified.unwrap() {
+    if user_info.verified != Some(true) {
+        let _ = delete_auth_ray(&state.db, &ray).await;
         notify_error("Discord email not verified");
         return Err(HttpError::forbidden("Discord email not verified"));
     }
 
-    let user_result = match crate::entities::User::update_or_register_by_discord_id(
+    if User::find_by_discord_id(&state.db, &user_info.id)
+        .await
+        .map_err(|e| {
+            error!("Failed to look up user by discord id: {:?}", e);
+            HttpError::internal_error("Failed to look up user")
+        })?
+        .is_some()
+    {
+        let user_result = match User::update_or_register_by_discord_id(
+            &state.db,
+            user_info.id.clone(),
+            user_info.username.clone(),
+            discord_creds.build_avatar_url(&user_info),
+            user_info.email.clone(),
+        )
+        .await
+        {
+            Ok(user) => user,
+            Err(e) => {
+                error!("Failed to update user during auth: {:?}", e);
+                let _ = delete_auth_ray(&state.db, &ray).await;
+                notify_error("Failed to update user");
+                return Err(HttpError::internal_error("Failed to update user"));
+            }
+        };
+
+        if !user_result.user.is_active {
+            let _ = delete_auth_ray(&state.db, &ray).await;
+            notify_error("User is deactivated");
+            return Err(HttpError::forbidden("User is deactivated"));
+        }
+
+        let response = authorize_existing_user(
+            state,
+            user_result.user,
+            delivery_method,
+            delivery_target.clone(),
+            is_polling,
+        )
+        .await?;
+
+        delete_auth_ray(&state.db, &ray).await?;
+        return Ok(Json(response));
+    }
+
+    let pending_ray = AuthRay::mark_pending_registration(
         &state.db,
-        user_info.id.clone(),
-        user_info.username.clone(),
-        discord_creds.build_avatar_url(&user_info),
-        user_info.email.clone(),
+        ray,
+        crate::entities::auth_ray::PendingRegistrationProfile {
+            discord_id: user_info.id.clone(),
+            username: user_info.username.clone(),
+            avatar_url: discord_creds.build_avatar_url(&user_info),
+            email: user_info.email,
+        },
     )
     .await
-    {
-        Ok(user) => user,
-        Err(e) => {
-            error!("Failed to register user: {:?}", e);
-            notify_error("Failed to register user");
-            return Err(HttpError::internal_error("Failed to register user"));
-        }
-    };
+    .map_err(|e| {
+        error!("Failed to persist pending registration: {:?}", e);
+        HttpError::internal_error("Failed to persist pending registration")
+    })?;
+
+    Ok(Json(AuthorizeResponse::terms_required(
+        pending_ray
+            .registration_token
+            .unwrap_or_default(),
+    )))
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/auth/register",
+    request_body(
+        content = RegisterRequest,
+        description = "Finalize first-time registration after Discord identity is verified by accepting the required legal documents."
+    ),
+    responses(
+        (status = 200, description = "Registration completed successfully and token issued.", body = AuthorizeResponse),
+        (status = 400, description = "Invalid or expired registration token, or required legal documents were not accepted."),
+        (status = 403, description = "User is deactivated."),
+        (status = 500, description = "Internal failure while creating the user, writing audit log, or signing token.")
+    ),
+    tag = "auth"
+)]
+pub async fn register(
+    State(state): AppStateExtractor,
+    Json(body): Json<RegisterRequest>,
+) -> HttpResult<Json<AuthorizeResponse>> {
+    validate_legal_acceptance(&body)?;
+
+    let state = &state.read().await;
+    let ray = AuthRay::find_by_registration_token(&state.db, &body.registration_token)
+        .await
+        .map_err(|e| {
+            error!("Database error while finding registration token: {:?}", e);
+            HttpError::internal_error("Database error")
+        })?
+        .ok_or_else(|| HttpError::bad_request("Invalid or expired registration token"))?;
+
+    if auth_session_expired(ray.created_at) {
+        delete_auth_ray(&state.db, &ray).await?;
+        return Err(HttpError::bad_request("Registration session expired"));
+    }
+
+    let pending_discord_id = ray
+        .pending_discord_id
+        .clone()
+        .ok_or_else(|| HttpError::bad_request("Registration session is incomplete"))?;
+    let pending_username = ray
+        .pending_username
+        .clone()
+        .ok_or_else(|| HttpError::bad_request("Registration session is incomplete"))?;
+    let pending_avatar_url = ray.pending_avatar_url.clone();
+    let pending_email = ray.pending_email.clone();
+
+    let user_result = User::update_or_register_by_discord_id(
+        &state.db,
+        pending_discord_id.clone(),
+        pending_username,
+        pending_avatar_url,
+        pending_email,
+    )
+    .await
+    .map_err(|e| {
+        error!("Failed to register user after legal acceptance: {:?}", e);
+        HttpError::internal_error("Failed to register user")
+    })?;
     let user = user_result.user;
 
     if user_result.created {
@@ -271,21 +426,51 @@ pub async fn authorize(
             error!("Failed to write registration audit log: {:?}", e);
             HttpError::internal_error("Failed to write registration audit log")
         })?;
+
+        write_audit_log(
+            &state.db,
+            ACTION_USER_LEGAL_ACCEPTED,
+            None,
+            Some(user.id),
+            None,
+            Some(legal_acceptance_metadata()),
+        )
+        .await
+        .map_err(|e| {
+            error!("Failed to write legal acceptance audit log: {:?}", e);
+            HttpError::internal_error("Failed to write legal acceptance audit log")
+        })?;
     }
 
     if !user.is_active {
-        notify_error("User is deactivated");
         return Err(HttpError::forbidden("User is deactivated"));
     }
 
-    let jwt_token = match sign_token(&user, &state.config) {
-        Ok(token) => token,
-        Err(e) => {
-            error!("Failed to sign token: {:?}", e);
-            notify_error("Failed to sign token");
-            return Err(HttpError::internal_error("Failed to sign token"));
-        }
-    };
+    let response = authorize_existing_user(
+        state,
+        user,
+        delivery_method_name(&ray.delivery_method),
+        ray.delivery_target.clone(),
+        matches!(ray.delivery_method, TokenDeliveryMethod::Polling),
+    )
+    .await?;
+
+    delete_auth_ray(&state.db, &ray).await?;
+
+    Ok(Json(response))
+}
+
+async fn authorize_existing_user(
+    state: &crate::app::state::AppState,
+    user: crate::entities::UserModel,
+    delivery_method: String,
+    delivery_target: String,
+    is_polling: bool,
+) -> HttpResult<AuthorizeResponse> {
+    let jwt_token = sign_token(&user, &state.config).map_err(|e| {
+        error!("Failed to sign token: {:?}", e);
+        HttpError::internal_error("Failed to sign token")
+    })?;
 
     if is_polling {
         state.auth.notify_complete(
@@ -299,12 +484,81 @@ pub async fn authorize(
         );
     }
 
-    Ok(Json(AuthorizeResponse {
-        access_token: jwt_token,
-        id: user.id.to_string(),
-        username: user.username.clone(),
-        avatar_url: user.avatar_url.unwrap_or_default(),
+    Ok(AuthorizeResponse::authorized(
+        jwt_token,
+        user.id.to_string(),
+        user.username.clone(),
+        user.avatar_url.unwrap_or_default(),
         delivery_method,
         delivery_target,
-    }))
+    ))
+}
+
+async fn load_auth_ray_by_prefix(
+    db: &sea_orm::DatabaseConnection,
+    pow_prefix: &str,
+) -> HttpResult<AuthRayModel> {
+    AuthRay::find_by_prefix(db, pow_prefix)
+        .await
+        .map_err(|e| {
+            error!("Database error while finding auth ray: {:?}", e);
+            HttpError::internal_error("Database error")
+        })?
+        .ok_or_else(|| HttpError::bad_request("Invalid or expired pow_prefix"))
+}
+
+async fn delete_auth_ray(
+    db: &sea_orm::DatabaseConnection,
+    ray: &AuthRayModel,
+) -> HttpResult<()> {
+    ray.clone().delete(db).await.map_err(|e| {
+        error!("Failed to delete auth ray: {:?}", e);
+        HttpError::internal_error("Failed to delete auth ray")
+    })?;
+    Ok(())
+}
+
+fn delivery_method_name(delivery_method: &TokenDeliveryMethod) -> String {
+    match delivery_method {
+        TokenDeliveryMethod::Redirect => "redirect".to_string(),
+        TokenDeliveryMethod::Polling => "polling".to_string(),
+    }
+}
+
+fn validate_legal_acceptance(body: &RegisterRequest) -> HttpResult<()> {
+    if !body.accepted_user_agreement {
+        return Err(HttpError::bad_request(
+            "User agreement must be accepted before registration",
+        ));
+    }
+
+    if !body.accepted_privacy_policy {
+        return Err(HttpError::bad_request(
+            "Privacy policy must be accepted before registration",
+        ));
+    }
+
+    Ok(())
+}
+
+fn auth_session_expired(created_at: chrono::DateTime<chrono::Utc>) -> bool {
+    chrono::Utc::now()
+        .signed_duration_since(created_at)
+        .num_seconds()
+        > AUTH_SESSION_MAX_AGE_SECONDS
+}
+
+fn legal_acceptance_metadata() -> serde_json::Value {
+    json!({
+        "documents": [
+            {
+                "key": "user_agreement",
+                "version": LEGAL_USER_AGREEMENT_VERSION,
+            },
+            {
+                "key": "privacy_policy",
+                "version": LEGAL_PRIVACY_POLICY_VERSION,
+            }
+        ]
+    })
 }
