@@ -5,6 +5,7 @@ use axum::extract::{Multipart, Path, Query, State};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, Condition, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder,
     Set, TransactionTrait,
+    sea_query::{Expr, Func},
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -115,7 +116,11 @@ pub async fn list_squads(
         .map(|it| it.trim())
         .filter(|it| !it.is_empty())
     {
-        let mut condition = Condition::any().add(SquadColumn::Name.contains(q));
+        let lowered_query = q.to_lowercase();
+        let mut condition = Condition::any().add(
+            Expr::expr(Func::lower(Expr::col(SquadColumn::Name)))
+                .like(format!("%{lowered_query}%")),
+        );
         if let Ok(uuid) = Uuid::parse_str(q) {
             condition = condition
                 .add(SquadColumn::Id.eq(uuid))
