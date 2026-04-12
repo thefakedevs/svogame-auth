@@ -3,6 +3,7 @@ import toast from 'react-hot-toast'
 import { ApiError, toDisplayError } from '../../api/http'
 import {
   createAdminServiceToken,
+  deleteAdminSquad,
   deleteAdminUserSkin,
   deleteAdminSquadImage,
   getAdminMe,
@@ -15,6 +16,7 @@ import {
   listAdminSquads,
   listAdminServiceTokens,
   listAdminUsers,
+  patchAdminSquad,
   revokeAdminUserSuperuser,
   restrictAdminSquad,
   revokeAdminServiceToken,
@@ -31,6 +33,7 @@ import { adminSquadPath, adminTokenAuditPath, adminUserPath, paths } from '../..
 import { pushUrl, replaceUrl, usePathname } from '../../shared/navigation/history'
 import { getAuthToken } from '../../shared/session/auth-session'
 import { useQuery } from '../../util/query'
+import AdminSquadProfile from './AdminSquadProfile'
 import AdminUserProfile from './AdminUserProfile'
 import ErrorState from '../ErrorState'
 import LoadingState from '../LoadingState'
@@ -56,7 +59,7 @@ const dateTimeFormatter = new Intl.DateTimeFormat('ru-RU', {
 function formatDateTime(value?: string | null) {
   if (!value) return 'Нет данных'
   const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? value : dateTimeFormatter.format(date)
+  return Number.isNaN(date.getTime()) ? value : dateTimeFormatter.format(date).replace(', ', ' ')
 }
 
 function initials(value: string) {
@@ -302,7 +305,7 @@ export default function AdminPage() {
   }
 
   return (
-    <AdminSquadView token={token!} squad={squad} members={squadMembers} onSquadChange={setSquad} />
+    <AdminSquadProfile token={token!} squad={squad} members={squadMembers} onSquadChange={setSquad} />
   )
 }
 
@@ -698,6 +701,14 @@ function AdminSquadView({
   const outgoingInvites = members.filter((member) => member.isPendingInvite)
   const [restrictionReason, setRestrictionReason] = useState('')
   const [isUpdatingRestriction, setIsUpdatingRestriction] = useState(false)
+  const [squadName, setSquadName] = useState('')
+  const [isEditingName, setIsEditingName] = useState(false)
+  const [isUpdatingName, setIsUpdatingName] = useState(false)
+  const [isDeletingSquad, setIsDeletingSquad] = useState(false)
+
+  useEffect(() => {
+    setSquadName(squad?.name ?? '')
+  }, [squad?.id, squad?.name])
 
   const deleteSquadAvatar = async () => {
     if (!squad) return
@@ -742,6 +753,51 @@ function AdminSquadView({
     }
   }
 
+  const updateSquadName = async () => {
+    if (!squad || isUpdatingName) return
+    const normalizedName = squadName.trim()
+    if (!normalizedName) {
+      toast.error('Укажите название сквада.')
+      return
+    }
+    if (normalizedName === squad.name) return
+
+    setIsUpdatingName(true)
+    try {
+      const updated = await patchAdminSquad(token, squad.id, { name: normalizedName })
+      onSquadChange(updated)
+      setSquadName(updated.name)
+      setIsEditingName(false)
+      toast.success('Название сквада обновлено.')
+    } catch (cause) {
+      toast.error(toDisplayError(cause, 'Не удалось обновить название сквада.'))
+    } finally {
+      setIsUpdatingName(false)
+    }
+  }
+
+  const cancelSquadNameEdit = () => {
+    setSquadName(squad?.name ?? '')
+    setIsEditingName(false)
+  }
+
+  const removeSquad = async () => {
+    if (!squad || isDeletingSquad) return
+    const approved = window.confirm(`Удалить сквад "${squad.name}"? Это действие нельзя отменить.`)
+    if (!approved) return
+
+    setIsDeletingSquad(true)
+    try {
+      await deleteAdminSquad(token, squad.id)
+      toast.success('Сквад удален.')
+      pushUrl(`${paths.admin}?tab=squads`)
+    } catch (cause) {
+      toast.error(toDisplayError(cause, 'Не удалось удалить сквад.'))
+    } finally {
+      setIsDeletingSquad(false)
+    }
+  }
+
   return (
     <div className="admin-page">
       <section className="admin-top-actions">
@@ -756,7 +812,47 @@ function AdminSquadView({
             <div className="admin-squad-head">
               {squad.imageUrl ? <img src={squad.imageUrl} alt={squad.name} className="admin-avatar admin-avatar-lg" /> : <span className="ui-avatar">{initials(squad.name)}</span>}
               <div className="admin-row-user-text">
-                <h2 className="card-title">{squad.name}</h2>
+                {!isEditingName ? (
+                  <div className="admin-squad-name-row">
+                    <h2 className="card-title">{squad.name}</h2>
+                    <button
+                      type="button"
+                      className="btn btn-sm"
+                      disabled={isUpdatingName || isDeletingSquad}
+                      onClick={() => setIsEditingName(true)}
+                    >
+                      Редактировать
+                    </button>
+                  </div>
+                ) : (
+                  <div className="admin-squad-name-edit">
+                    <input
+                      className="ui-input"
+                      value={squadName}
+                      onChange={(event) => setSquadName(event.target.value)}
+                      placeholder="Название сквада"
+                      autoFocus
+                    />
+                    <div className="admin-squad-name-edit-actions">
+                      <button
+                        type="button"
+                        className="btn btn-sm"
+                        disabled={isUpdatingName || !squadName.trim() || squadName.trim() === squad.name}
+                        onClick={() => void updateSquadName()}
+                      >
+                        {isUpdatingName ? 'Сохраняем...' : 'Сохранить'}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-sm"
+                        disabled={isUpdatingName}
+                        onClick={cancelSquadNameEdit}
+                      >
+                        Отмена
+                      </button>
+                    </div>
+                  </div>
+                )}
                 <small>{squad.id}</small>
               </div>
               <button className="btn danger" type="button" disabled={!squad.imageUrl} onClick={() => void deleteSquadAvatar()}>
@@ -804,6 +900,34 @@ function AdminSquadView({
               </div>
             </section>
 
+            <section className="admin-card-subsection">
+              <h3 className="card-title">Управление сквадом</h3>
+              <div className="admin-squad-manage-row">
+                <input
+                  className="ui-input"
+                  value={squadName}
+                  onChange={(event) => setSquadName(event.target.value)}
+                  placeholder="Название сквада"
+                />
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  disabled={isUpdatingName || !squadName.trim() || squadName.trim() === squad.name}
+                  onClick={() => void updateSquadName()}
+                >
+                  {isUpdatingName ? 'Сохраняем...' : 'Сохранить название'}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-sm danger"
+                  disabled={isDeletingSquad}
+                  onClick={() => void removeSquad()}
+                >
+                  {isDeletingSquad ? 'Удаляем...' : 'Удалить сквад'}
+                </button>
+              </div>
+            </section>
+
             <div className="admin-squad-columns">
               <section>
                 <h3>Участники</h3>
@@ -842,3 +966,5 @@ function AdminSquadView({
     </div>
   )
 }
+
+void AdminSquadView

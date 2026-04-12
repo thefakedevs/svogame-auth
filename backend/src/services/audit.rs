@@ -6,6 +6,7 @@ use uuid::Uuid;
 use crate::entities::AuditLogActiveModel;
 
 pub const ACTION_USER_REGISTERED: &str = "user.registered";
+pub const ACTION_USER_LEGAL_ACCEPTED: &str = "user.legal_accepted";
 pub const ACTION_ADMIN_USER_UPDATED: &str = "admin.user.updated";
 pub const ACTION_ADMIN_USER_DEACTIVATED: &str = "admin.user.deactivated";
 pub const ACTION_ADMIN_USER_ACTIVATED: &str = "admin.user.activated";

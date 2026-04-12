@@ -17,6 +17,12 @@
   max-width: min(1180px, 100%);
 }
 
+#root:has(.landing-shell),
+.astro-app-root:has(.landing-shell) {
+  max-width: none;
+  padding: 0;
+}
+
 /* PoW / проверка на бота: полная ширина экрана для полоски 50vw */
 #root:has(.auth-pow-fullbleed),
 .astro-app-root:has(.auth-pow-fullbleed) {
@@ -25,6 +31,10 @@
 
 body:has(.ui-kit-page) {
   align-items: flex-start;
+}
+
+body:has(.landing-shell) {
+  padding: 0;
 }
 
 .app-root {

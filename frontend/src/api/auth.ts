@@ -14,7 +14,12 @@ export interface UserProfile {
   isSuperuser?: boolean
 }
 
-export interface AuthorizationCallbackResponse {
+interface AuthResponseBase {
+  status: 'authorized' | 'terms_required'
+}
+
+export interface AuthorizedAuthResponse extends AuthResponseBase {
+  status: 'authorized'
   accessToken: string
   id: string
   username: string
@@ -23,6 +28,29 @@ export interface AuthorizationCallbackResponse {
   deliveryTarget: string
   user: UserProfile
 }
+
+export interface TermsRequiredAuthResponse extends AuthResponseBase {
+  status: 'terms_required'
+  registrationToken: string
+}
+
+type RawAuthorizedAuthResponse = {
+  status: 'authorized'
+  accessToken: string
+  id: string
+  username: string
+  avatarUrl: string
+  isSuperuser?: boolean
+  deliveryMethod: 'redirect' | 'polling'
+  deliveryTarget: string
+}
+
+type RawTermsRequiredAuthResponse = {
+  status: 'terms_required'
+  registrationToken: string
+}
+
+export type AuthorizationCallbackResponse = AuthorizedAuthResponse | TermsRequiredAuthResponse
 
 export async function requestDiscordAuthInit(
   redirectUrl: string | null,
@@ -55,19 +83,14 @@ export async function fetchAuthorize(
   pow: { solution: string; prefix: string } | null,
 ): Promise<AuthorizationCallbackResponse> {
   if (!code) {
-    throw new Error('Не найден параметр code в URL.')
+    throw new Error('РќРµ РЅР°Р№РґРµРЅ РїР°СЂР°РјРµС‚СЂ code РІ URL.')
   }
 
   if (!pow) {
-    throw new Error('Локальная сессия авторизации устарела. Начните вход заново.')
+    throw new Error('Р›РѕРєР°Р»СЊРЅР°СЏ СЃРµСЃСЃРёСЏ Р°РІС‚РѕСЂРёР·Р°С†РёРё СѓСЃС‚Р°СЂРµР»Р°. РќР°С‡РЅРёС‚Рµ РІС…РѕРґ Р·Р°РЅРѕРІРѕ.')
   }
 
-  const data = await request<
-    Omit<AuthorizationCallbackResponse, 'user'> & {
-      user?: UserProfile
-      isSuperuser?: boolean
-    }
-  >('/api/auth/authorize', {
+  const data = await request<RawAuthorizedAuthResponse | RawTermsRequiredAuthResponse>('/api/auth/authorize', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -79,15 +102,43 @@ export async function fetchAuthorize(
     }),
   })
 
-  const responseUser = data.user
+  return normalizeAuthResponse(data)
+}
 
+export async function completeRegistration(registrationToken: string): Promise<AuthorizedAuthResponse> {
+  const data = await request<RawAuthorizedAuthResponse>('/api/auth/register', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      registrationToken,
+      acceptedUserAgreement: true,
+      acceptedPrivacyPolicy: true,
+    }),
+  })
+
+  return normalizeAuthorizedResponse(data)
+}
+
+function normalizeAuthResponse(
+  data: RawAuthorizedAuthResponse | RawTermsRequiredAuthResponse,
+): AuthorizationCallbackResponse {
+  if (data.status === 'terms_required') {
+    return data
+  }
+
+  return normalizeAuthorizedResponse(data)
+}
+
+function normalizeAuthorizedResponse(data: RawAuthorizedAuthResponse): AuthorizedAuthResponse {
   return {
     ...data,
     user: {
-      id: responseUser?.id ?? data.id,
-      username: responseUser?.username ?? data.username,
-      avatarUrl: responseUser?.avatarUrl ?? data.avatarUrl,
-      isSuperuser: responseUser?.isSuperuser ?? data.isSuperuser,
+      id: data.id,
+      username: data.username,
+      avatarUrl: data.avatarUrl,
+      isSuperuser: data.isSuperuser,
     },
   }
 }

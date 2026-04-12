@@ -98,6 +98,12 @@ export interface RestrictionReasonRequest {
   reason?: string | null
 }
 
+export interface PatchAdminSquadRequest {
+  name?: string | null
+  isRestricted?: boolean | null
+  restrictionReason?: string | null
+}
+
 export interface DeactivateAdminUserRequest {
   reason: string
 }
@@ -281,6 +287,29 @@ export async function listAllAdminSquads(token: string, perPage = 100): Promise<
 
 export function getAdminSquad(token: string, squadId: string): Promise<AdminSquadResponse> {
   return request<AdminSquadResponse>(`/api/admin/squads/${squadId}`, {
+    headers: authHeaders(token, {
+      'Content-Type': 'application/json',
+    }),
+  })
+}
+
+export function patchAdminSquad(
+  token: string,
+  squadId: string,
+  payload: PatchAdminSquadRequest,
+): Promise<AdminSquadResponse> {
+  return request<AdminSquadResponse>(`/api/admin/squads/${squadId}`, {
+    method: 'PATCH',
+    headers: authHeaders(token, {
+      'Content-Type': 'application/json',
+    }),
+    body: JSON.stringify(payload),
+  })
+}
+
+export function deleteAdminSquad(token: string, squadId: string): Promise<ActionResponse> {
+  return request<ActionResponse>(`/api/admin/squads/${squadId}`, {
+    method: 'DELETE',
     headers: authHeaders(token, {
       'Content-Type': 'application/json',
     }),
