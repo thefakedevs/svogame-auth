@@ -237,7 +237,7 @@ export default function HomePage() {
         <PhotoProvider loop photoClosable maskOpacity={0.92}>
           <div className="landing-gallery-grid">
             <PhotoView
-              src="/landing/gallery-capture-flag.svg"
+              src="/landing/2026-04-12_20.33.02.png"
               width={1280}
               height={720}
               overlay={(
@@ -255,12 +255,11 @@ export default function HomePage() {
                 aria-label="Открыть изображение: Арена захвата флага"
               >
                 <img
-                  src="/landing/gallery-capture-flag.svg"
+                  src="/landing/2026-04-12_20.33.02.png"
                   width={1280}
                   height={720}
                   loading="lazy"
                   decoding="async"
-                  alt="Игровая арена SVOCraft для режима Захват флага с двумя базами и центральным мостом"
                 />
                 <span className="landing-gallery-card__caption">
                   <span>Одна из ивентовых карт</span>
@@ -270,7 +269,7 @@ export default function HomePage() {
             </PhotoView>
 
             <PhotoView
-              src="/landing/gallery-duel.svg"
+              src="/landing/2026-04-12_22.13.53.png"
               width={1280}
               height={720}
               overlay={(
@@ -288,12 +287,11 @@ export default function HomePage() {
                 aria-label="Открыть изображение: Дуэльная линия"
               >
                 <img
-                  src="/landing/gallery-duel.svg"
+                  src="/landing/2026-04-12_22.13.53.png"
                   width={1280}
                   height={720}
                   loading="lazy"
                   decoding="async"
-                  alt="Дуэльная карта SVOCraft с узким мостом и подсвеченными зонами старта"
                 />
                 <span className="landing-gallery-card__caption">
                   <span>Дуэльная линия</span>
@@ -303,7 +301,7 @@ export default function HomePage() {
             </PhotoView>
 
             <PhotoView
-              src="/landing/gallery-spawn.svg"
+              src="/landing/2026-04-12_21.50.19.png"
               width={1280}
               height={720}
               overlay={(
@@ -321,12 +319,11 @@ export default function HomePage() {
                 aria-label="Открыть изображение: Командный спавн"
               >
                 <img
-                  src="/landing/gallery-spawn.svg"
+                  src="/landing/2026-04-12_21.50.19.png"
                   width={1280}
                   height={720}
                   loading="lazy"
                   decoding="async"
-                  alt="Командный спавн SVOCraft с флагами, сундуками и порталом запуска матча"
                 />
                 <span className="landing-gallery-card__caption">
                   <span>Лобби</span>
@@ -359,7 +356,6 @@ export default function HomePage() {
                   height={720}
                   loading="lazy"
                   decoding="async"
-                  alt="Экран лаунчера SVOCraft с кнопкой Играть и статусом актуальной версии"
                 />
                 <span className="landing-gallery-card__caption">
                   <span>Лаунчер</span>
