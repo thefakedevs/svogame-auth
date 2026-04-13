@@ -842,6 +842,94 @@
   justify-content: flex-end;
 }
 
+.admin-shop-layout {
+  display: grid;
+  gap: 16px;
+}
+
+.admin-shop-create .card-text {
+  margin-bottom: 12px;
+}
+
+.admin-shop-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.admin-shop-field {
+  display: grid;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: var(--ui-text-muted);
+}
+
+.admin-shop-field--full {
+  grid-column: 1 / -1;
+}
+
+.admin-shop-field--asset-select {
+  grid-column: 1 / -1;
+}
+
+.admin-shop-field--checkbox .ui-input {
+  max-width: 160px;
+}
+
+.admin-shop-textarea {
+  min-height: 88px;
+  font-family: ui-monospace, monospace;
+  font-size: 0.85rem;
+}
+
+.admin-shop-locales {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.admin-shop-locales-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.admin-shop-locale-row {
+  display: grid;
+  grid-template-columns: minmax(100px, 140px) minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.admin-shop-actions {
+  margin-top: 14px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.admin-shop-list-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.admin-shop-list-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.admin-shop-list-toolbar .ui-input {
+  min-width: 200px;
+}
+
 @media (max-width: 900px) {
   .admin-stat-grid,
   .admin-default-skin-card {
@@ -910,5 +998,9 @@
   .admin-restriction-item-actions {
     width: 100%;
     justify-content: flex-start;
+  }
+
+  .admin-shop-locale-row {
+    grid-template-columns: 1fr;
   }
 }

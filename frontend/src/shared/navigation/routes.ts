@@ -25,6 +25,9 @@ export function pageTitleForPath(pathname: string) {
   if (pathname.startsWith(`${paths.admin}/tokens/`) && pathname.endsWith('/audit')) {
     return 'Аудит токена | Админка | SVOCraft'
   }
+  if (pathname.startsWith(`${paths.admin}/shop/products/`)) {
+    return 'Товар магазина | Админка | SVOCraft'
+  }
   if (pathname === paths.token) return 'Завершение авторизации | SVOCraft'
   if (pathname === paths.uiKit) return 'UI Kit | SVOCraft'
   if (pathname === paths.legal) return 'Правовые документы | SVOCraft'
