@@ -1,5 +1,6 @@
 import { createRoot } from 'react-dom/client'
 import AccountApp from './app/AccountApp'
+import { initAnalytics, installAnalyticsInteractionTracking } from './services/analytics'
 import { bootstrapAuthSession } from './shared/session/auth-session'
 import './styles/global.css'
 
@@ -10,5 +11,7 @@ if (!container) {
 }
 
 bootstrapAuthSession()
+initAnalytics()
+installAnalyticsInteractionTracking()
 
 createRoot(container).render(<AccountApp />)

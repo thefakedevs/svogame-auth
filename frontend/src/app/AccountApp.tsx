@@ -9,7 +9,8 @@ import HomePage from '../pages/_HomePage'
 import LegalPage, { isLegalPath, legalPageHeading } from '../pages/LegalPage'
 import UiKitPage from '../pages/_UiKitPage'
 import { paths } from '../routes/paths'
-import { usePathname } from '../shared/navigation/history'
+import { buildAnalyticsPath, trackPageView } from '../services/analytics'
+import { usePathname, useSearch } from '../shared/navigation/history'
 import { normalizePathname, pageTitleForPath } from '../shared/navigation/routes'
 import AuthRoute from './AuthRoute'
 import TokenRoute from './TokenRoute'
@@ -128,6 +129,7 @@ function adminRouteForPath(pathname: string): { type: 'home' } | { type: 'user';
 
 export default function AccountApp() {
   const pathname = normalizePathname(usePathname() || paths.home)
+  const search = useSearch()
   const adminRoute = adminRouteForPath(pathname)
 
   useEffect(() => {
@@ -137,6 +139,10 @@ export default function AccountApp() {
 
     document.title = pageTitleForPath(pathname)
   }, [pathname])
+
+  useEffect(() => {
+    trackPageView(buildAnalyticsPath(pathname, search), pageTitleForPath(pathname))
+  }, [pathname, search])
 
   let page = <NotFoundShell />
 
