@@ -2,9 +2,9 @@ mod common;
 
 use common::TestApp;
 use image::{ImageBuffer, Rgba};
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use sea_orm::ActiveModelTrait;
 use sea_orm::ActiveValue::Set;
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use serial_test::serial;
 
 fn make_skin_png(fill: [u8; 4]) -> Vec<u8> {
@@ -247,6 +247,32 @@ async fn user_can_create_squad_and_see_it_in_profile() {
         Some(squad_id)
     );
     assert_eq!(app.audit_log_count("user.squad.created").await, 1);
+}
+
+#[tokio::test]
+#[serial]
+async fn admin_squad_search_is_case_insensitive() {
+    let app = TestApp::spawn().await;
+    let admin = app.issue_user_token("CaseSquadAdmin", true, &[]).await;
+    let leader = app.issue_user_token("CaseSquadLeader", false, &[]).await;
+    let squad = app.create_squad(&leader, "MixedCaseSquad").await;
+    let squad_id = squad["id"].as_str().expect("squad id");
+
+    let response = app
+        .get_json(
+            "/api/admin/squads?q=mixedcasesquad&page=1&perPage=10",
+            &admin.access_token,
+        )
+        .await;
+    assert!(response.status().is_success());
+
+    let body: serde_json::Value = response
+        .json()
+        .await
+        .expect("case-insensitive admin squad search");
+    assert_eq!(body["total"], 1);
+    assert_eq!(body["items"][0]["id"], squad_id);
+    assert_eq!(body["items"][0]["name"], "MixedCaseSquad");
 }
 
 #[tokio::test]
@@ -647,6 +673,30 @@ async fn admin_can_search_users_by_username_and_uuid() {
 
 #[tokio::test]
 #[serial]
+async fn admin_user_search_is_case_insensitive() {
+    let app = TestApp::spawn().await;
+    let admin = app.issue_user_token("CaseSearchAdmin", true, &[]).await;
+    let searched_user = app.issue_user_token("MixedCaseTarget", false, &[]).await;
+
+    let response = app
+        .get_json(
+            "/api/admin/users?q=mixedcasetarget&page=1&perPage=10",
+            &admin.access_token,
+        )
+        .await;
+    assert!(response.status().is_success());
+
+    let body: serde_json::Value = response
+        .json()
+        .await
+        .expect("case-insensitive admin user search");
+    assert_eq!(body["total"], 1);
+    assert_eq!(body["items"][0]["id"], searched_user.user_id);
+    assert_eq!(body["items"][0]["username"], "MixedCaseTarget");
+}
+
+#[tokio::test]
+#[serial]
 async fn authenticated_user_can_search_users_by_username_for_autocomplete() {
     let app = TestApp::spawn().await;
     let requester = app.issue_user_token("SearchRequester", false, &[]).await;
@@ -674,6 +724,33 @@ async fn authenticated_user_can_search_users_by_username_for_autocomplete() {
         items
             .iter()
             .all(|item| item["username"].as_str().unwrap().contains("AlphaSearch"))
+    );
+}
+
+#[tokio::test]
+#[serial]
+async fn authenticated_user_search_is_case_insensitive() {
+    let app = TestApp::spawn().await;
+    let requester = app
+        .issue_user_token("CaseInsensitiveRequester", false, &[])
+        .await;
+    let searched_user = app.issue_user_token("CaseFoldPlayer", false, &[]).await;
+
+    let response = app
+        .get_json(
+            "/api/users/search?q=casefoldplayer",
+            &requester.access_token,
+        )
+        .await;
+    assert!(response.status().is_success());
+
+    let body: serde_json::Value = response.json().await.expect("case-insensitive user search");
+    let items = body.as_array().expect("case-insensitive user array");
+    assert!(items.iter().any(|item| item["id"] == searched_user.user_id));
+    assert!(
+        items
+            .iter()
+            .any(|item| item["username"] == "CaseFoldPlayer")
     );
 }
 

@@ -5,6 +5,8 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    env_file:
+      - ./.env
     environment:
       - RUST_BACKTRACE=1
       - BINDING_ADDRESS=0.0.0.0:3000
@@ -34,6 +36,14 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        VITE_UMAMI_ENABLED: ${VITE_UMAMI_ENABLED:-true}
+        VITE_UMAMI_SCRIPT_URL: ${VITE_UMAMI_SCRIPT_URL:-https://analytics.artembay.ru/script.js}
+        VITE_UMAMI_WEBSITE_ID: ${VITE_UMAMI_WEBSITE_ID:-0c965545-fd3c-4485-9821-5267012848a5}
+        VITE_UMAMI_HOST_URL: ${VITE_UMAMI_HOST_URL:-}
+        VITE_UMAMI_DOMAINS: ${VITE_UMAMI_DOMAINS:-}
+        VITE_UMAMI_TAG: ${VITE_UMAMI_TAG:-}
+        VITE_UMAMI_DO_NOT_TRACK: ${VITE_UMAMI_DO_NOT_TRACK:-true}
     depends_on:
       - backend
     restart: unless-stopped

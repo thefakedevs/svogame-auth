@@ -40,6 +40,81 @@
   margin-top: 12px;
 }
 
+.admin-overview {
+  display: grid;
+  gap: 16px;
+}
+
+.admin-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.admin-stat-card {
+  display: grid;
+  gap: 6px;
+  min-height: 108px;
+  padding: 14px;
+  align-content: center;
+  border: 1px solid var(--ui-border);
+  background: rgba(0, 0, 0, 0.28);
+}
+
+.admin-stat-card span,
+.admin-stat-card small {
+  color: var(--ui-text-muted);
+}
+
+.admin-stat-card strong {
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.admin-default-skin-card {
+  display: grid;
+  grid-template-columns: minmax(180px, 240px) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.admin-default-skin-preview {
+  display: grid;
+  place-items: center;
+  min-height: 240px;
+  border: 1px solid var(--ui-border);
+  background: rgba(0, 0, 0, 0.24);
+}
+
+.admin-default-skin-image {
+  width: 160px;
+  max-width: 100%;
+  image-rendering: pixelated;
+}
+
+.admin-default-skin-empty {
+  color: var(--ui-text-muted);
+  text-align: center;
+  padding: 12px;
+}
+
+.admin-default-skin-info {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-default-skin-controls,
+.admin-default-skin-models {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.admin-hidden-file-input {
+  display: none;
+}
+
 .admin-row {
   display: flex;
   justify-content: space-between;
@@ -284,6 +359,12 @@
   align-self: start;
 }
 
+.ui-kit-page .admin-kv.admin-kv--compact,
+.admin-kv.admin-kv--compact {
+  margin-top: 0;
+  gap: 12px;
+}
+
 .admin-kv > div {
   display: flex;
   flex-direction: column;
@@ -383,6 +464,18 @@
   min-height: 44px;
 }
 
+.admin-member-kick-button {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
+.admin-member-list li:hover .admin-member-kick-button,
+.admin-member-list li:focus-within .admin-member-kick-button {
+  opacity: 1;
+  pointer-events: auto;
+}
+
 .admin-member-card-main {
   min-width: 0;
   display: inline-flex;
@@ -468,7 +561,293 @@
   align-items: center;
 }
 
+.admin-ownership-summary-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.admin-user-ownership-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-ownership-layout,
+.admin-ownership-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.admin-ownership-columns {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.admin-ownership-columns--two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.admin-ownership-panel,
+.admin-ownership-list,
+.admin-asset-create,
+.admin-asset-card {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--ui-border);
+  background: rgba(0, 0, 0, 0.22);
+}
+
+.admin-ownership-head,
+.admin-ownership-list-head,
+.admin-assets-toolbar,
+.admin-asset-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.admin-ownership-head {
+  flex-wrap: wrap;
+}
+
+.ui-kit-page .ui-modal.admin-ownership-modal,
+.admin-ownership-modal {
+  width: min(920px, calc(100vw - 32px));
+  max-width: min(920px, calc(100vw - 32px));
+  max-height: min(90vh, 760px);
+}
+
+.admin-ownership-modal-body {
+  display: grid;
+  gap: 14px;
+  max-height: min(70vh, 720px);
+  overflow: auto;
+}
+
+.admin-ownership-modal-summary {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid var(--ui-border);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.admin-ownership-modal-summary strong {
+  font-size: 1.6rem;
+  line-height: 1;
+}
+
+.admin-ownership-head small,
+.admin-ownership-modal-summary small,
+.admin-ownership-list-item small,
+.admin-asset-card small {
+  color: var(--ui-text-muted);
+}
+
+.admin-ownership-form,
+.admin-ownership-list {
+  display: grid;
+  gap: 8px;
+}
+
+.admin-ownership-form .ui-input {
+  width: 100%;
+  min-width: 0;
+}
+
+.ui-kit-page .ui-modal-footer.admin-wallet-modal-footer,
+.admin-wallet-modal-footer {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.admin-wallet-modal-footer .btn {
+  min-width: 132px;
+}
+
+.admin-ownership-actions,
+.admin-asset-actions,
+.admin-asset-badges,
+.admin-asset-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.admin-ownership-list-head h4 {
+  margin: 0;
+}
+
+.admin-ownership-list-item {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid var(--ui-border);
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.admin-ownership-list-item--actionable {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.admin-ownership-list-item--actionable span {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.admin-ownership-list-item strong,
+.admin-ownership-list-item small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-ownership-modal-section,
+.admin-ownership-modal-list {
+  display: grid;
+  gap: 8px;
+}
+
+.admin-assets-toolbar {
+  flex-wrap: wrap;
+}
+
+.admin-assets-search {
+  display: grid;
+  grid-template-columns: minmax(180px, 320px) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.admin-asset-form-grid,
+.admin-asset-edit-grid {
+  display: flex;
+  flex-direction: column;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.admin-asset-list {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-asset-image-panel {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+}
+
+.admin-asset-image-preview {
+  width: 112px;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid var(--ui-border);
+  background: rgba(0, 0, 0, 0.26);
+}
+
+.admin-asset-image-preview img {
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 6px;
+  object-fit: contain;
+}
+
+.admin-asset-image-preview span {
+  padding: 8px;
+  color: var(--ui-text-muted);
+  font-size: 0.78rem;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.admin-asset-image-preview--thumb {
+  width: 42px;
+  min-width: 42px;
+}
+
+.admin-asset-image-preview--thumb span {
+  padding: 0;
+}
+
+.admin-asset-image-info {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.admin-asset-image-info small {
+  color: var(--ui-text-muted);
+}
+
+.admin-asset-image-actions,
+.admin-inventory-item-main {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.admin-inventory-item-main {
+  min-width: 0;
+  flex-wrap: nowrap;
+}
+
+.admin-inventory-item-main > span {
+  min-width: 0;
+}
+
+.admin-asset-card-head {
+  align-items: flex-start;
+}
+
+.admin-asset-badges {
+  justify-content: flex-end;
+}
+
+.admin-checkbox-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ui-text);
+  font-size: 0.9rem;
+}
+
+.admin-checkbox-row input {
+  width: 16px;
+  height: 16px;
+  accent-color: #f7a41d;
+}
+
+.admin-asset-metadata {
+  min-height: 84px;
+  resize: vertical;
+}
+
+.admin-asset-actions {
+  justify-content: flex-end;
+}
+
 @media (max-width: 900px) {
+  .admin-stat-grid,
+  .admin-default-skin-card {
+    grid-template-columns: 1fr;
+  }
+
   .admin-squad-head {
     align-items: flex-start;
     flex-wrap: wrap;
@@ -491,6 +870,36 @@
 
   .admin-squad-manage-row {
     grid-template-columns: 1fr;
+  }
+
+  .admin-ownership-layout,
+  .admin-ownership-columns,
+  .admin-ownership-columns--two,
+  .admin-ownership-list-item--actionable,
+  .admin-asset-image-panel,
+  .admin-asset-form-grid,
+  .admin-asset-edit-grid,
+  .admin-assets-search {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-ownership-head,
+  .admin-ownership-summary-head,
+  .admin-assets-toolbar,
+  .admin-asset-card-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .admin-user-ownership-actions,
+  .admin-wallet-modal-footer,
+  .admin-asset-actions,
+  .admin-asset-badges {
+    justify-content: flex-start;
+  }
+
+  .admin-wallet-modal-footer .btn {
+    flex: 1 1 100%;
   }
 
   .admin-restriction-item {

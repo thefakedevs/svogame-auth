@@ -1,7 +1,22 @@
 use axum::Json;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
+use serde::Serialize;
 use serde_json::json;
+use utoipa::ToSchema;
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct ProblemDetails {
+    pub status: u16,
+    pub title: String,
+    pub detail: String,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct ProblemResponse {
+    pub error: String,
+    pub problem: ProblemDetails,
+}
 
 #[derive(Debug)]
 pub struct HttpError {
@@ -40,10 +55,17 @@ impl HttpError {
 
 impl IntoResponse for HttpError {
     fn into_response(self) -> Response {
+        let message = self.message;
+        let status = self.status;
         let body = Json(json!({
-            "error": self.message
+            "error": message.clone(),
+            "problem": {
+                "status": status.as_u16(),
+                "title": status.canonical_reason().unwrap_or("Request failed"),
+                "detail": message,
+            }
         }));
-        (self.status, body).into_response()
+        (status, body).into_response()
     }
 }
 

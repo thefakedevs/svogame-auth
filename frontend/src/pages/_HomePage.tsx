@@ -412,7 +412,7 @@ export default function HomePage() {
                 терассе, попивая чашечку кофе.
               </p>
               <footer>
-                <strong>HellRay</strong>
+                <strong>Eblan</strong>
                 <span>Ветеран сервера</span>
               </footer>
             </blockquote>

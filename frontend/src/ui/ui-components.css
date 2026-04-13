@@ -882,6 +882,7 @@
 
 .ui-kit-page .card-text {
   color: var(--ui-text-muted);
+  text-align: left;
 }
 
 .ui-kit-page .ui-card-header {

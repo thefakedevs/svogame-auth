@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
 import { ApiError, toDisplayError } from '../../api/http'
 import {
@@ -6,6 +6,7 @@ import {
   deleteAdminSquad,
   deleteAdminUserSkin,
   deleteAdminSquadImage,
+  getAdminDefaultSkin,
   getAdminMe,
   getAdminServiceTokenAudit,
   getAdminSquad,
@@ -22,17 +23,20 @@ import {
   revokeAdminServiceToken,
   rotateAdminServiceToken,
   unrestrictAdminSquad,
+  uploadAdminDefaultSkin,
   type AdminSquadResponse,
   type AdminUserResponse,
+  type DefaultSkinResponse,
   type ServiceTokenAuditResponse,
   type ServiceTokenResponse,
 } from '../../api/admin'
 import type { SquadMemberResponse } from '../../api/squads'
-import { buildSkinUrl } from '../../api/skins'
+import { buildSkinUrl, type SkinModel } from '../../api/skins'
 import { adminSquadPath, adminTokenAuditPath, adminUserPath, paths } from '../../routes/paths'
 import { pushUrl, replaceUrl, usePathname } from '../../shared/navigation/history'
 import { getAuthToken } from '../../shared/session/auth-session'
 import { useQuery } from '../../util/query'
+import AdminAssetsPanel from './AdminAssetsPanel'
 import AdminSquadProfile from './AdminSquadProfile'
 import AdminUserProfile from './AdminUserProfile'
 import ErrorState from '../ErrorState'
@@ -45,7 +49,7 @@ type AdminRoute =
   | { type: 'squad'; squadId: string }
   | { type: 'tokenAudit'; tokenId: string }
 type AccessState = 'loading' | 'allowed' | 'denied' | 'error'
-type HomeTab = 'users' | 'squads' | 'tokens'
+type HomeTab = 'overview' | 'users' | 'squads' | 'tokens' | 'assets'
 const PAGE_SIZE = 30
 
 const dateTimeFormatter = new Intl.DateTimeFormat('ru-RU', {
@@ -76,6 +80,10 @@ function formatMetadata(value: unknown) {
   }
 }
 
+function appendVersion(url: string, version: number) {
+  return `${url}${url.includes('?') ? '&' : '?'}v=${version}`
+}
+
 function parseRoute(pathname: string): AdminRoute {
   const userMatch = pathname.match(/^\/admin\/users\/([^/]+)$/)
   if (userMatch) return { type: 'user', userId: decodeURIComponent(userMatch[1]) }
@@ -90,9 +98,12 @@ function parseRoute(pathname: string): AdminRoute {
 }
 
 function tabFromQuery(tab: string | null): HomeTab {
+  if (tab === 'overview') return 'overview'
   if (tab === 'squads') return 'squads'
   if (tab === 'tokens') return 'tokens'
-  return 'users'
+  if (tab === 'assets') return 'assets'
+  if (tab === 'users') return 'users'
+  return 'overview'
 }
 
 function setHomeTab(tab: HomeTab) {
@@ -305,7 +316,7 @@ export default function AdminPage() {
   }
 
   return (
-    <AdminSquadProfile token={token!} squad={squad} members={squadMembers} onSquadChange={setSquad} />
+    <AdminSquadProfile token={token!} squad={squad} members={squadMembers} onSquadChange={setSquad} onMembersChange={setSquadMembers} />
   )
 }
 
@@ -346,6 +357,53 @@ function AdminHome({
 }) {
   const [systemName, setSystemName] = useState('')
   const [tokenModalSecret, setTokenModalSecret] = useState<string | null>(null)
+  const [overviewStats, setOverviewStats] = useState<{
+    usersTotal: number
+    squadsTotal: number
+    serviceTokensTotal: number
+    activeServiceTokensTotal: number
+  } | null>(null)
+  const [overviewError, setOverviewError] = useState('')
+  const [defaultSkin, setDefaultSkin] = useState<DefaultSkinResponse | null | undefined>(undefined)
+  const [defaultSkinVersion, setDefaultSkinVersion] = useState(() => Date.now())
+  const [defaultSkinModel, setDefaultSkinModel] = useState<SkinModel>('default')
+  const [isUploadingDefaultSkin, setIsUploadingDefaultSkin] = useState(false)
+  const defaultSkinInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (tab !== 'overview') return
+    let cancelled = false
+
+    const run = async () => {
+      setOverviewError('')
+      setOverviewStats(null)
+      setDefaultSkin(undefined)
+      try {
+        const [usersResponse, squadsResponse, serviceTokensResponse, skinResponse] = await Promise.all([
+          listAdminUsers(token, { page: 1, perPage: 1 }),
+          listAdminSquads(token, { page: 1, perPage: 1 }),
+          listAdminServiceTokens(token),
+          getAdminDefaultSkin(token),
+        ])
+        if (cancelled) return
+        setOverviewStats({
+          usersTotal: usersResponse.total,
+          squadsTotal: squadsResponse.total,
+          serviceTokensTotal: serviceTokensResponse.length,
+          activeServiceTokensTotal: serviceTokensResponse.filter((item) => item.isActive).length,
+        })
+        setDefaultSkin(skinResponse)
+        setDefaultSkinVersion(Date.now())
+      } catch (cause) {
+        if (!cancelled) setOverviewError(toDisplayError(cause, 'Ошибка загрузки обзора админки.'))
+      }
+    }
+
+    void run()
+    return () => {
+      cancelled = true
+    }
+  }, [tab, token])
 
   const createToken = async () => {
     if (!systemName.trim()) {
@@ -393,15 +451,123 @@ function AdminHome({
     }
   }
 
+  const uploadDefaultSkin = async (file: File) => {
+    if (isUploadingDefaultSkin) return
+    setIsUploadingDefaultSkin(true)
+    try {
+      const uploaded = await uploadAdminDefaultSkin(token, file, defaultSkinModel)
+      setDefaultSkin(uploaded)
+      setDefaultSkinVersion(Date.now())
+      toast.success('Дефолтный скин обновлен.')
+    } catch (cause) {
+      toast.error(toDisplayError(cause, 'Не удалось обновить дефолтный скин.'))
+    } finally {
+      setIsUploadingDefaultSkin(false)
+      if (defaultSkinInputRef.current) defaultSkinInputRef.current.value = ''
+    }
+  }
+
   return (
     <div className="admin-page">
       <section className="admin-top-actions">
         <nav className="admin-tabs">
+          <button type="button" className={`admin-tab ${tab === 'overview' ? 'is-active' : ''}`} onClick={() => setHomeTab('overview')}>Обзор</button>
           <button type="button" className={`admin-tab ${tab === 'users' ? 'is-active' : ''}`} onClick={() => setHomeTab('users')}>Пользователи</button>
           <button type="button" className={`admin-tab ${tab === 'squads' ? 'is-active' : ''}`} onClick={() => setHomeTab('squads')}>Сквады</button>
+          <button type="button" className={`admin-tab ${tab === 'assets' ? 'is-active' : ''}`} onClick={() => setHomeTab('assets')}>Ассеты</button>
           <button type="button" className={`admin-tab ${tab === 'tokens' ? 'is-active' : ''}`} onClick={() => setHomeTab('tokens')}>Сервисные токены</button>
         </nav>
       </section>
+
+      {tab === 'overview' ? (
+        <section className="admin-overview">
+          {overviewError ? <ErrorState message={overviewError} /> : null}
+
+          {!overviewStats && !overviewError ? <LoadingState title="Загружаем обзор админки" /> : null}
+
+          {overviewStats ? (
+            <>
+              <div className="admin-stat-grid">
+                <article className="admin-stat-card">
+                  <span>Пользователи</span>
+                  <strong>{overviewStats.usersTotal}</strong>
+                </article>
+                <article className="admin-stat-card">
+                  <span>Сквады</span>
+                  <strong>{overviewStats.squadsTotal}</strong>
+                </article>
+                <article className="admin-stat-card">
+                  <span>Сервисные токены</span>
+                  <strong>{overviewStats.serviceTokensTotal}</strong>
+                  <small>{overviewStats.activeServiceTokensTotal} активных</small>
+                </article>
+              </div>
+
+              <section className="card admin-card admin-default-skin-card">
+                <div className="admin-default-skin-preview">
+                  {defaultSkin === undefined ? (
+                    <LoadingState title="Загружаем дефолтный скин" />
+                  ) : defaultSkin ? (
+                    <img
+                      className="admin-default-skin-image"
+                      src={appendVersion(defaultSkin.imageUrl, defaultSkinVersion)}
+                      alt="Дефолтный скин"
+                    />
+                  ) : (
+                    <div className="admin-default-skin-empty">Дефолтный скин не задан.</div>
+                  )}
+                </div>
+
+                <div className="admin-default-skin-info">
+                  <h2 className="card-title">Дефолтный скин</h2>
+                  <dl className="admin-kv admin-kv--compact">
+                    <div><dt>Формат</dt><dd>{defaultSkin?.contentType ?? '—'}</dd></div>
+                    <div><dt>Обновлен</dt><dd>{formatDateTime(defaultSkin?.updatedAt)}</dd></div>
+                    <div><dt>Администратор</dt><dd>{defaultSkin?.updatedByUserId ?? '—'}</dd></div>
+                  </dl>
+
+                  <div className="admin-default-skin-controls">
+                    <div className="admin-default-skin-models" aria-label="Модель скина">
+                      <button
+                        type="button"
+                        className={`btn btn-sm ${defaultSkinModel === 'default' ? 'primary' : ''}`}
+                        onClick={() => setDefaultSkinModel('default')}
+                      >
+                        Обычная
+                      </button>
+                      <button
+                        type="button"
+                        className={`btn btn-sm ${defaultSkinModel === 'slim' ? 'primary' : ''}`}
+                        onClick={() => setDefaultSkinModel('slim')}
+                      >
+                        Тонкая
+                      </button>
+                    </div>
+                    <input
+                      ref={defaultSkinInputRef}
+                      type="file"
+                      accept="image/png,image/*"
+                      className="admin-hidden-file-input"
+                      onChange={(event) => {
+                        const file = event.target.files?.[0]
+                        if (file) void uploadDefaultSkin(file)
+                      }}
+                    />
+                    <button
+                      type="button"
+                      className="btn primary"
+                      disabled={isUploadingDefaultSkin}
+                      onClick={() => defaultSkinInputRef.current?.click()}
+                    >
+                      {isUploadingDefaultSkin ? 'Загружаем...' : 'Сменить дефолтный скин'}
+                    </button>
+                  </div>
+                </div>
+              </section>
+            </>
+          ) : null}
+        </section>
+      ) : null}
 
       {tab === 'users' ? (
         <section className="card admin-card">
@@ -487,6 +653,8 @@ function AdminHome({
           </div>
         </section>
       ) : null}
+
+      {tab === 'assets' ? <AdminAssetsPanel token={token} /> : null}
 
       {tokenModalSecret ? (
         <div className="admin-token-modal-backdrop" role="dialog" aria-modal="true" aria-label="Новый сервисный токен">

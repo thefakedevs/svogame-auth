@@ -1,6 +1,13 @@
+use std::io::Cursor;
+
+use aws_sdk_s3::error::ProvideErrorMetadata;
+use aws_sdk_s3::primitives::ByteStream;
 use axum::Json;
-use axum::extract::{Path, Query, State};
-use axum::http::HeaderMap;
+use axum::body::Bytes;
+use axum::extract::{Multipart, Path, Query, State};
+use axum::http::{HeaderMap, header};
+use axum::response::IntoResponse;
+use sea_orm::{ActiveModelTrait, EntityTrait, Set};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use utoipa::{IntoParams, ToSchema};
@@ -97,6 +104,11 @@ pub struct AssetResponse {
     pub is_public: bool,
     #[schema(rename = "isActive")]
     pub is_active: bool,
+    #[schema(rename = "imageUrl")]
+    pub image_url: Option<String>,
+    #[schema(rename = "weaponKey")]
+    pub weapon_key: Option<String>,
+    pub rarity: Option<crate::services::ownership::types::SkinRarity>,
     pub metadata: Value,
     #[schema(rename = "createdAt")]
     pub created_at: chrono::DateTime<chrono::Utc>,
@@ -265,6 +277,12 @@ pub struct OkResponse {
     pub ok: bool,
 }
 
+const ASSET_IMAGE_MAX_BYTES: usize = 2 * 1024 * 1024;
+const ASSET_IMAGE_MAX_WIDTH: u32 = 4096;
+const ASSET_IMAGE_MAX_HEIGHT: u32 = 4096;
+const ASSET_IMAGES_PREFIX: &str = "asset_images";
+const ASSET_IMAGE_CONTENT_TYPE: &str = "image/png";
+
 #[utoipa::path(
     get,
     path = "/api/assets",
@@ -311,6 +329,37 @@ pub async fn get_public_asset(
         .filter(|asset| asset.is_public && asset.is_active)
         .ok_or_else(|| HttpError::not_found("Asset not found"))?;
     Ok(Json(asset_json(asset)))
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/assets/{asset_id}/image",
+    params(
+        ("asset_id" = String, Path, description = "Asset UUID.")
+    ),
+    responses(
+        (status = 200, description = "Public asset image.", content_type = "image/png"),
+        (status = 400, description = "Invalid asset ID."),
+        (status = 404, description = "Asset image not found or asset not publicly visible.")
+    ),
+    tag = "ownership"
+)]
+pub async fn get_public_asset_image(
+    State(state): AppStateExtractor,
+    Path(asset_id): Path<String>,
+) -> HttpResult<impl IntoResponse> {
+    let state = state.read().await;
+    let asset_id = parse_uuid(&asset_id, "Invalid asset ID")?;
+    let asset = catalog::get_asset_definition_by_id(&state.db, asset_id)
+        .await
+        .map_err(map_domain_error)?
+        .filter(|asset| asset.is_public && asset.is_active)
+        .ok_or_else(|| HttpError::not_found("Asset not found"))?;
+    let key = asset
+        .image_key
+        .ok_or_else(|| HttpError::not_found("Asset image not found"))?;
+    let bytes = load_asset_image_bytes(&state, &key).await?;
+    Ok(([(header::CONTENT_TYPE, ASSET_IMAGE_CONTENT_TYPE)], bytes))
 }
 
 #[utoipa::path(
@@ -368,6 +417,41 @@ pub async fn get_admin_asset(
         .map_err(map_domain_error)?
         .ok_or_else(|| HttpError::not_found("Asset not found"))?;
     Ok(Json(asset_json(asset)))
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/admin/assets/{asset_id}/image",
+    params(
+        ("asset_id" = String, Path, description = "Asset UUID.")
+    ),
+    responses(
+        (status = 200, description = "Admin asset image.", content_type = "image/png"),
+        (status = 400, description = "Invalid asset ID."),
+        (status = 401, description = "Missing bearer token."),
+        (status = 403, description = "Superuser permissions required."),
+        (status = 404, description = "Asset image not found.")
+    ),
+    security(("bearer_auth" = [])),
+    tag = "ownership-admin"
+)]
+pub async fn get_admin_asset_image(
+    State(state): AppStateExtractor,
+    headers: HeaderMap,
+    Path(asset_id): Path<String>,
+) -> HttpResult<impl IntoResponse> {
+    let state = state.read().await;
+    require_privileged_actor(&headers, &state).await?;
+    let asset_id = parse_uuid(&asset_id, "Invalid asset ID")?;
+    let asset = catalog::get_asset_definition_by_id(&state.db, asset_id)
+        .await
+        .map_err(map_domain_error)?
+        .ok_or_else(|| HttpError::not_found("Asset not found"))?;
+    let key = asset
+        .image_key
+        .ok_or_else(|| HttpError::not_found("Asset image not found"))?;
+    let bytes = load_asset_image_bytes(&state, &key).await?;
+    Ok(([(header::CONTENT_TYPE, ASSET_IMAGE_CONTENT_TYPE)], bytes))
 }
 
 #[utoipa::path(
@@ -458,6 +542,145 @@ pub async fn patch_asset(
     .await
     .map_err(|error| HttpError::internal_error(format!("Failed to write audit log: {error}")))?;
     Ok(Json(asset_json(asset)))
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/admin/assets/{asset_id}/image",
+    params(
+        ("asset_id" = String, Path, description = "Asset UUID.")
+    ),
+    request_body(
+        content_type = "multipart/form-data",
+        description = "Upload asset image. The first image part is validated up to 4096x4096 and 2 MiB, then normalized to PNG."
+    ),
+    responses(
+        (status = 200, description = "Asset image uploaded or replaced.", body = AssetResponse),
+        (status = 400, description = "Invalid asset ID, malformed multipart body, missing image, or invalid image."),
+        (status = 401, description = "Missing bearer token."),
+        (status = 403, description = "Superuser permissions required."),
+        (status = 404, description = "Asset not found.")
+    ),
+    security(("bearer_auth" = [])),
+    tag = "ownership-admin"
+)]
+pub async fn upload_asset_image(
+    State(state): AppStateExtractor,
+    headers: HeaderMap,
+    Path(asset_id): Path<String>,
+    mut multipart: Multipart,
+) -> HttpResult<Json<Value>> {
+    let state = state.read().await;
+    let actor = require_privileged_actor(&headers, &state).await?;
+    let asset_id = parse_uuid(&asset_id, "Invalid asset ID")?;
+    let data = read_first_image(&mut multipart).await?;
+    let processed = process_asset_image(&data)?;
+    let model = crate::entities::AssetDefinition::find_by_id(asset_id)
+        .one(&state.db)
+        .await
+        .map_err(|e| HttpError::internal_error(format!("Failed to load asset: {e}")))?
+        .ok_or_else(|| HttpError::not_found("Asset not found"))?;
+    let key = asset_image_key(model.id);
+
+    state
+        .s3
+        .put_object()
+        .bucket(&state.config.s3.bucket)
+        .key(&key)
+        .content_type(ASSET_IMAGE_CONTENT_TYPE)
+        .body(ByteStream::from(processed))
+        .send()
+        .await
+        .map_err(|e| HttpError::internal_error(format!("Failed to upload asset image: {e}")))?;
+
+    let mut active_model: crate::entities::AssetDefinitionActiveModel = model.into();
+    active_model.image_key = Set(Some(key.clone()));
+    active_model.image_content_type = Set(Some(ASSET_IMAGE_CONTENT_TYPE.to_string()));
+    active_model.updated_at = Set(chrono::Utc::now());
+    let updated = active_model
+        .update(&state.db)
+        .await
+        .map_err(|e| HttpError::internal_error(format!("Failed to update asset image: {e}")))?;
+
+    write_audit_log(
+        &state.db,
+        ACTION_ADMIN_ASSET_UPDATED,
+        actor.actor_user_id(),
+        None,
+        None,
+        Some(with_actor_metadata(
+            json!({ "assetId": updated.id, "assetKey": updated.key, "imageUpdated": true }),
+            &actor,
+        )),
+    )
+    .await
+    .map_err(|error| HttpError::internal_error(format!("Failed to write audit log: {error}")))?;
+
+    Ok(Json(asset_json(
+        catalog::AssetDefinitionView::try_from(updated).map_err(map_domain_error)?,
+    )))
+}
+
+#[utoipa::path(
+    delete,
+    path = "/api/admin/assets/{asset_id}/image",
+    params(
+        ("asset_id" = String, Path, description = "Asset UUID.")
+    ),
+    responses(
+        (status = 200, description = "Asset image deleted.", body = AssetResponse),
+        (status = 400, description = "Invalid asset ID."),
+        (status = 401, description = "Missing bearer token."),
+        (status = 403, description = "Superuser permissions required."),
+        (status = 404, description = "Asset not found.")
+    ),
+    security(("bearer_auth" = [])),
+    tag = "ownership-admin"
+)]
+pub async fn delete_asset_image(
+    State(state): AppStateExtractor,
+    headers: HeaderMap,
+    Path(asset_id): Path<String>,
+) -> HttpResult<Json<Value>> {
+    let state = state.read().await;
+    let actor = require_privileged_actor(&headers, &state).await?;
+    let asset_id = parse_uuid(&asset_id, "Invalid asset ID")?;
+    let model = crate::entities::AssetDefinition::find_by_id(asset_id)
+        .one(&state.db)
+        .await
+        .map_err(|e| HttpError::internal_error(format!("Failed to load asset: {e}")))?
+        .ok_or_else(|| HttpError::not_found("Asset not found"))?;
+
+    if let Some(key) = model.image_key.clone() {
+        delete_asset_image_object(&state, &key).await?;
+    }
+
+    let mut active_model: crate::entities::AssetDefinitionActiveModel = model.into();
+    active_model.image_key = Set(None);
+    active_model.image_content_type = Set(None);
+    active_model.updated_at = Set(chrono::Utc::now());
+    let updated = active_model
+        .update(&state.db)
+        .await
+        .map_err(|e| HttpError::internal_error(format!("Failed to delete asset image: {e}")))?;
+
+    write_audit_log(
+        &state.db,
+        ACTION_ADMIN_ASSET_UPDATED,
+        actor.actor_user_id(),
+        None,
+        None,
+        Some(with_actor_metadata(
+            json!({ "assetId": updated.id, "assetKey": updated.key, "imageDeleted": true }),
+            &actor,
+        )),
+    )
+    .await
+    .map_err(|error| HttpError::internal_error(format!("Failed to write audit log: {error}")))?;
+
+    Ok(Json(asset_json(
+        catalog::AssetDefinitionView::try_from(updated).map_err(map_domain_error)?,
+    )))
 }
 
 #[utoipa::path(
@@ -1952,6 +2175,14 @@ fn map_domain_error(error: anyhow::Error) -> HttpError {
 }
 
 fn asset_json(asset: catalog::AssetDefinitionView) -> Value {
+    let image_url = asset.image_key.as_ref().map(|_| {
+        if asset.is_public && asset.is_active {
+            format!("/api/assets/{}/image", asset.id)
+        } else {
+            format!("/api/admin/assets/{}/image", asset.id)
+        }
+    });
+
     json!({
         "id": asset.id,
         "key": asset.key,
@@ -1963,6 +2194,9 @@ fn asset_json(asset: catalog::AssetDefinitionView) -> Value {
         "isUserPurchasable": asset.is_user_purchasable,
         "isPublic": asset.is_public,
         "isActive": asset.is_active,
+        "imageUrl": image_url,
+        "weaponKey": asset.weapon_key,
+        "rarity": asset.rarity,
         "metadata": asset.metadata,
         "createdAt": asset.created_at,
         "updatedAt": asset.updated_at
@@ -2087,4 +2321,104 @@ fn subscription_status_json(item: inventory::SubscriptionStatusView) -> Value {
             SubscriptionStatus::Pro => "pro",
         }
     })
+}
+
+async fn read_first_image(multipart: &mut Multipart) -> HttpResult<Bytes> {
+    while let Some(field) = multipart
+        .next_field()
+        .await
+        .map_err(|e| HttpError::bad_request(format!("Invalid multipart body: {e}")))? 
+    {
+        let content_type = field
+            .content_type()
+            .ok_or_else(|| HttpError::bad_request("Missing content type"))?;
+        if !content_type.starts_with("image/") {
+            return Err(HttpError::bad_request("Uploaded file must be an image"));
+        }
+        let data = field
+            .bytes()
+            .await
+            .map_err(|e| HttpError::bad_request(format!("Failed to read uploaded image: {e}")))?;
+        return Ok(data);
+    }
+
+    Err(HttpError::bad_request("Image file is required"))
+}
+
+fn process_asset_image(data: &[u8]) -> HttpResult<Vec<u8>> {
+    if data.is_empty() {
+        return Err(HttpError::bad_request("Image file is empty"));
+    }
+    if data.len() > ASSET_IMAGE_MAX_BYTES {
+        return Err(HttpError::bad_request(format!(
+            "Image exceeds maximum size of {} bytes",
+            ASSET_IMAGE_MAX_BYTES
+        )));
+    }
+
+    let format = image::guess_format(data)
+        .map_err(|e| HttpError::bad_request(format!("Failed to detect image format: {e}")))?;
+    let image = image::load_from_memory_with_format(data, format)
+        .map_err(|e| HttpError::bad_request(format!("Failed to decode image: {e}")))?;
+
+    if image.width() > ASSET_IMAGE_MAX_WIDTH || image.height() > ASSET_IMAGE_MAX_HEIGHT {
+        return Err(HttpError::bad_request(format!(
+            "Image exceeds maximum resolution of {}x{}",
+            ASSET_IMAGE_MAX_WIDTH, ASSET_IMAGE_MAX_HEIGHT
+        )));
+    }
+
+    let mut cursor = Cursor::new(Vec::new());
+    image
+        .write_to(&mut cursor, image::ImageFormat::Png)
+        .map_err(|e| HttpError::internal_error(format!("Failed to encode image: {e}")))?;
+    Ok(cursor.into_inner())
+}
+
+fn asset_image_key(asset_id: Uuid) -> String {
+    format!("{}/{}.png", ASSET_IMAGES_PREFIX, asset_id.as_hyphenated())
+}
+
+async fn load_asset_image_bytes(
+    state: &crate::app::state::AppState,
+    key: &str,
+) -> HttpResult<Bytes> {
+    let object = state
+        .s3
+        .get_object()
+        .bucket(&state.config.s3.bucket)
+        .key(key)
+        .send()
+        .await
+        .map_err(|error| {
+            let maybe_code = error
+                .as_service_error()
+                .and_then(|service_error| service_error.code());
+            if matches!(maybe_code, Some("NoSuchKey") | Some("NotFound") | Some("404")) {
+                HttpError::not_found("Asset image not found")
+            } else {
+                HttpError::internal_error(format!("Failed to load asset image: {error}"))
+            }
+        })?;
+
+    object
+        .body
+        .collect()
+        .await
+        .map(|body| body.into_bytes())
+        .map_err(|error| {
+            HttpError::internal_error(format!("Failed to read asset image body: {error}"))
+        })
+}
+
+async fn delete_asset_image_object(state: &crate::app::state::AppState, key: &str) -> HttpResult<()> {
+    state
+        .s3
+        .delete_object()
+        .bucket(&state.config.s3.bucket)
+        .key(key)
+        .send()
+        .await
+        .map_err(|e| HttpError::internal_error(format!("Failed to delete asset image object: {e}")))?;
+    Ok(())
 }
