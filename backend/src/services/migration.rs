@@ -630,6 +630,12 @@ impl MigrationTrait for CreateAssetDefinitionTable {
                             .not_null()
                             .default(true),
                     )
+                    .col(ColumnDef::new(AssetDefinition::ImageKey).string().null())
+                    .col(
+                        ColumnDef::new(AssetDefinition::ImageContentType)
+                            .string()
+                            .null(),
+                    )
                     .col(ColumnDef::new(AssetDefinition::Metadata).text().not_null())
                     .col(
                         ColumnDef::new(AssetDefinition::CreatedAt)
@@ -668,6 +674,10 @@ enum AssetDefinition {
     IsUserPurchasable,
     IsPublic,
     IsActive,
+    ImageKey,
+    ImageContentType,
+    WeaponKey,
+    Rarity,
     Metadata,
     CreatedAt,
     UpdatedAt,
@@ -2434,4 +2444,132 @@ enum DiscordDelivery {
     LastAttemptAt,
     DeliveredAt,
     FinishedAt,
+}
+
+pub struct AddAssetDefinitionGunskinColumns;
+
+impl MigrationName for AddAssetDefinitionGunskinColumns {
+    fn name(&self) -> &str {
+        "m20260413_000032_add_asset_definition_gunskin_columns"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for AddAssetDefinitionGunskinColumns {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        let backend = manager.get_database_backend();
+        let statements = match backend {
+            DatabaseBackend::Postgres | DatabaseBackend::Sqlite => vec![
+                r#"ALTER TABLE "asset_definition" ADD COLUMN "weapon_key" varchar NULL"#,
+                r#"ALTER TABLE "asset_definition" ADD COLUMN "rarity" varchar NULL"#,
+                r#"ALTER TABLE "asset_definition" ADD COLUMN "image_key" varchar NULL"#,
+                r#"ALTER TABLE "asset_definition" ADD COLUMN "image_content_type" varchar NULL"#,
+                r#"CREATE INDEX IF NOT EXISTS "idx_asset_definition_weapon_key" ON "asset_definition" ("weapon_key")"#,
+            ],
+            _ => return Ok(()),
+        };
+
+        for sql in statements {
+            match manager
+                .get_connection()
+                .execute(Statement::from_string(backend, sql.to_string()))
+                .await
+            {
+                Ok(_) => {}
+                Err(error)
+                    if is_duplicate_column_error(&error) || is_duplicate_index_error(&error) => {}
+                Err(error) => return Err(error),
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn down(&self, _manager: &SchemaManager) -> Result<(), DbErr> {
+        Ok(())
+    }
+}
+
+pub struct CreateUserSelectedGunskinTable;
+
+impl MigrationName for CreateUserSelectedGunskinTable {
+    fn name(&self) -> &str {
+        "m20260413_000033_create_user_selected_gunskin_table"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for CreateUserSelectedGunskinTable {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .create_table(
+                Table::create()
+                    .table(UserSelectedGunskin::Table)
+                    .if_not_exists()
+                    .col(ColumnDef::new(UserSelectedGunskin::UserId).uuid().not_null())
+                    .col(
+                        ColumnDef::new(UserSelectedGunskin::WeaponKey)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(UserSelectedGunskin::AssetDefinitionId)
+                            .uuid()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(UserSelectedGunskin::SelectedAt)
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .col(
+                        ColumnDef::new(UserSelectedGunskin::UpdatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .primary_key(
+                        sea_orm::sea_query::Index::create()
+                            .col(UserSelectedGunskin::UserId)
+                            .col(UserSelectedGunskin::WeaponKey),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+
+        let backend = manager.get_database_backend();
+        for sql in [
+            r#"CREATE INDEX IF NOT EXISTS "idx_user_selected_gunskin_asset_definition_id" ON "user_selected_gunskin" ("asset_definition_id")"#,
+            r#"CREATE INDEX IF NOT EXISTS "idx_user_selected_gunskin_weapon_key" ON "user_selected_gunskin" ("weapon_key")"#,
+        ] {
+            match manager
+                .get_connection()
+                .execute(Statement::from_string(backend, sql.to_string()))
+                .await
+            {
+                Ok(_) => {}
+                Err(error) if is_duplicate_index_error(&error) => {}
+                Err(error) => return Err(error),
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_table(Table::drop().table(UserSelectedGunskin::Table).to_owned())
+            .await
+    }
+}
+
+#[derive(DeriveIden)]
+enum UserSelectedGunskin {
+    Table,
+    UserId,
+    WeaponKey,
+    AssetDefinitionId,
+    SelectedAt,
+    UpdatedAt,
 }
