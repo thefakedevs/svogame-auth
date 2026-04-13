@@ -2,7 +2,10 @@ use std::collections::BTreeMap;
 
 use crate::app::config::YooKassaConfig;
 use anyhow::{Context, Result, anyhow};
-use reqwest::header::{HeaderMap, HeaderValue};
+use reqwest::{
+    Url,
+    header::{HeaderMap, HeaderValue},
+};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
@@ -87,6 +90,7 @@ impl YooKassaClient {
         &self,
         command: CreatePaymentCommand,
     ) -> Result<CreatePaymentResult> {
+        let return_url = build_return_url_with_order_id(&self.config.return_url, command.order_id)?;
         let request_payload = json!({
             "amount": {
                 "value": format!("{}.00", command.amount_rub),
@@ -95,7 +99,7 @@ impl YooKassaClient {
             "capture": true,
             "confirmation": {
                 "type": "redirect",
-                "return_url": self.config.return_url,
+                "return_url": return_url,
             },
             "description": command.description,
             "metadata": {
@@ -212,6 +216,46 @@ pub fn parse_webhook_notification(body: &str) -> Result<YooKassaWebhookNotificat
             status,
         },
     })
+}
+
+fn build_return_url_with_order_id(base_return_url: &str, order_id: uuid::Uuid) -> Result<String> {
+    let mut url =
+        Url::parse(base_return_url).context("YOOKASSA_RETURN_URL must be a valid absolute URL")?;
+    url.query_pairs_mut()
+        .append_pair("orderId", &order_id.to_string());
+    Ok(url.into())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::build_return_url_with_order_id;
+    use uuid::Uuid;
+
+    #[test]
+    fn appends_order_id_to_return_url() {
+        let order_id = Uuid::parse_str("6d5e4f2d-b82f-4d57-a69c-7ca6a234f3bd").expect("uuid");
+        let url =
+            build_return_url_with_order_id("http://localhost:5173/shop/checkout/return", order_id)
+                .expect("return url");
+        assert_eq!(
+            url,
+            "http://localhost:5173/shop/checkout/return?orderId=6d5e4f2d-b82f-4d57-a69c-7ca6a234f3bd"
+        );
+    }
+
+    #[test]
+    fn preserves_existing_query_params_when_appending_order_id() {
+        let order_id = Uuid::parse_str("6d5e4f2d-b82f-4d57-a69c-7ca6a234f3bd").expect("uuid");
+        let url = build_return_url_with_order_id(
+            "http://localhost:5173/shop/checkout/return?source=yookassa",
+            order_id,
+        )
+        .expect("return url");
+        assert_eq!(
+            url,
+            "http://localhost:5173/shop/checkout/return?source=yookassa&orderId=6d5e4f2d-b82f-4d57-a69c-7ca6a234f3bd"
+        );
+    }
 }
 
 pub fn payment_to_json(payment: &YooKassaPayment) -> Result<Value> {

@@ -1331,7 +1331,7 @@ async fn yookassa_order_creation_returns_redirect_checkout_url_and_metadata() {
     assert_eq!(create_request["metadata"]["orderId"], order_id);
     assert_eq!(
         create_request["confirmation"]["return_url"],
-        "http://localhost:5173/shop/checkout/return"
+        format!("http://localhost:5173/shop/checkout/return?orderId={order_id}")
     );
     assert_eq!(create_request["amount"]["value"], "100.00");
     assert_eq!(create_request["capture"], true);
