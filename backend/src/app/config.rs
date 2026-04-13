@@ -29,6 +29,9 @@ pub struct DiscordConfig {
     pub client_secret: String,
     pub required_scopes: Vec<String>,
     pub discord_proxy: Option<Proxy>,
+    pub bot_token: Option<String>,
+    pub events_guild_id: Option<String>,
+    pub http_timeout_ms: u64,
 }
 
 #[derive(Debug, Clone)]
@@ -134,6 +137,18 @@ impl DiscordConfig {
             warn!("DISCORD_PROXY variable not set. Make sure service is hosting out of Russia.");
             None
         };
+        let bot_token = std::env::var("DISCORD_BOT_TOKEN")
+            .ok()
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty());
+        let events_guild_id = std::env::var("DISCORD_EVENTS_GUILD_ID")
+            .ok()
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty());
+        let http_timeout_ms = std::env::var("DISCORD_HTTP_TIMEOUT_MS")
+            .unwrap_or_else(|_| "10000".to_string())
+            .parse::<u64>()
+            .context("DISCORD_HTTP_TIMEOUT_MS must be a valid integer")?;
 
         Ok(DiscordConfig {
             oauth2_url,
@@ -142,6 +157,9 @@ impl DiscordConfig {
             client_secret,
             required_scopes: scopes.split('+').map(|s| s.to_string()).collect(),
             discord_proxy,
+            bot_token,
+            events_guild_id,
+            http_timeout_ms,
         })
     }
 }

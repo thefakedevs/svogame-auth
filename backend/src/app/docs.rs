@@ -1,12 +1,14 @@
 use crate::app::http::ProblemDetails;
 use crate::app::http::ProblemResponse;
 use crate::domains::admin::handlers as admin_handlers;
+use crate::domains::admin::discord as admin_discord;
 use crate::domains::admin::service_tokens as admin_service_tokens;
 use crate::domains::admin::squads as admin_squads;
 use crate::domains::auth::handlers as auth_handlers;
 use crate::domains::auth::polling as auth_polling;
 use crate::domains::auth::verification as auth_verification;
 use crate::domains::compat::gamervii as compat_gamervii;
+use crate::domains::discord as discord_handlers;
 use crate::domains::lootboxes::handlers as lootbox_handlers;
 use crate::domains::meta::handlers as meta_handlers;
 use crate::domains::ownership::handlers as ownership_handlers;
@@ -27,6 +29,10 @@ use utoipa::OpenApi;
     paths(
         admin_handlers::health,
         admin_handlers::me,
+        admin_discord::send_notification,
+        admin_discord::create_broadcast,
+        admin_discord::list_broadcasts,
+        admin_discord::get_broadcast,
         admin_handlers::list_users,
         admin_handlers::get_user,
         admin_handlers::get_user_squad,
@@ -65,6 +71,7 @@ use utoipa::OpenApi;
         handlers::update_nickname,
         handlers::get_my_restrictions,
         compat_gamervii::gamervii_auth,
+        discord_handlers::list_events,
         meta_handlers::get_restrictions_meta,
         meta_handlers::get_squads_config,
         lootbox_handlers::list_public_lootboxes,
@@ -158,6 +165,10 @@ use utoipa::OpenApi;
         schemas(
             admin_handlers::AdminHealthResponse,
             admin_handlers::AdminMeResponse,
+            admin_discord::SendDiscordNotificationRequest,
+            admin_discord::CreateDiscordBroadcastRequest,
+            admin_discord::DiscordDeliveryResponse,
+            admin_discord::DiscordBroadcastResponse,
             admin_handlers::AdminUserResponse,
             admin_handlers::AdminUsersListResponse,
             admin_handlers::PatchAdminUserRequest,
@@ -190,6 +201,7 @@ use utoipa::OpenApi;
             handlers::UpdateNicknameRequest,
             compat_gamervii::GamerViiAuthRequest,
             compat_gamervii::GamerViiAuthResponse,
+            discord_handlers::DiscordEventResponse,
             meta_handlers::RestrictionMetaResponse,
             meta_handlers::RestrictionLocale,
             meta_handlers::RestrictionLocaleEntry,
@@ -260,6 +272,7 @@ use utoipa::OpenApi;
         (name = "admin", description = "Administrative API"),
         (name = "auth", description = "Authentication API"),
         (name = "compat", description = "Compatibility endpoints for legacy or external clients"),
+        (name = "discord", description = "Public Discord integration endpoints"),
         (name = "debug", description = "Debug and test-only endpoints"),
         (name = "lootboxes", description = "Public and self-service lootbox catalog, ownership, and opening API"),
         (name = "lootboxes-admin", description = "Administrative lootbox configuration and investigation API"),
