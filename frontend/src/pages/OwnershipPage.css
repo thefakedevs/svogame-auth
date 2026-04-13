@@ -1,0 +1,223 @@
+.ownership-page {
+  display: grid;
+  gap: 16px;
+}
+
+.ownership-hero {
+  display: grid;
+  gap: 8px;
+}
+
+.ownership-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.ownership-summary-card {
+  display: grid;
+  gap: 6px;
+  min-height: 104px;
+  padding: 14px;
+  align-content: center;
+  border: 1px solid var(--ui-border);
+  background: rgba(0, 0, 0, 0.24);
+}
+
+.ownership-summary-card span,
+.ownership-summary-card small {
+  color: var(--ui-text-muted);
+}
+
+.ownership-summary-card strong {
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.ownership-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.ownership-section {
+  display: grid;
+  gap: 10px;
+}
+
+.ownership-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.ownership-items {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.ownership-item {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--ui-border);
+  background: rgba(0, 0, 0, 0.22);
+}
+
+.ownership-item-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.ownership-item-title {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.ownership-item-title strong,
+.ownership-item-title small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ownership-item-title small,
+.ownership-muted {
+  color: var(--ui-text-muted);
+}
+
+.ownership-item-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: var(--ui-text-muted);
+  font-size: 0.8rem;
+}
+
+.ownership-wallet-list {
+  display: grid;
+  gap: 10px;
+}
+
+.ownership-wallet-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--ui-border);
+  background: rgba(0, 0, 0, 0.22);
+  color: var(--ui-text);
+  text-align: left;
+}
+
+.ownership-wallet-card.is-active {
+  border-color: rgba(247, 164, 29, 0.45);
+}
+
+.ownership-wallet-balance {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #f7a41d;
+  white-space: nowrap;
+}
+
+.ownership-wallet-default-card {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+  max-width: 520px;
+}
+
+.ownership-wallet-default-card strong {
+  color: #f7a41d;
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.ownership-wallet-default-card h1 {
+  font-size: 3rem;
+  line-height: 1;
+}
+
+.ownership-wallet-default-card hr {
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  margin: 20px 0;
+}
+
+.ownership-wallet-layout {
+  display: grid;
+  grid-template-columns: minmax(220px, 320px) minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.ownership-transaction-list {
+  display: grid;
+  gap: 8px;
+}
+
+.ownership-transaction {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--ui-border);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.ownership-transaction-delta {
+  font-weight: 800;
+  color: var(--ui-text);
+  white-space: nowrap;
+}
+
+.ownership-transaction-delta.is-positive {
+  color: #67d391;
+}
+
+.ownership-transaction-delta.is-negative {
+  color: #ff8b8b;
+}
+
+.ownership-transaction-main {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.ownership-transaction-main strong,
+.ownership-transaction-main small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ownership-transaction-balance {
+  color: var(--ui-text-muted);
+  white-space: nowrap;
+}
+
+@media (max-width: 860px) {
+  .ownership-summary,
+  .ownership-items,
+  .ownership-wallet-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .ownership-wallet-card,
+  .ownership-transaction {
+    grid-template-columns: 1fr;
+  }
+
+  .ownership-wallet-balance,
+  .ownership-transaction-balance {
+    white-space: normal;
+  }
+}

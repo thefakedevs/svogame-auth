@@ -7,7 +7,9 @@ import ContactsPage from '../pages/_ContactsPage'
 import DownloadsPage from '../pages/_DownloadsPage'
 import HomePage from '../pages/_HomePage'
 import LegalPage, { isLegalPath, legalPageHeading } from '../pages/LegalPage'
+import OwnershipPage from '../pages/OwnershipPage'
 import UiKitPage from '../pages/_UiKitPage'
+import WalletPage from '../pages/WalletPage'
 import { paths } from '../routes/paths'
 import { buildAnalyticsPath, trackPageView } from '../services/analytics'
 import { usePathname, useSearch } from '../shared/navigation/history'
@@ -22,6 +24,30 @@ function ProfileShell({ pageTitle, defaultTab }: { pageTitle: string; defaultTab
       <div className="ui-kit-page app-shell">
         <AppHeader pageTitle={pageTitle} />
         <ProfilePage defaultTab={defaultTab} />
+      </div>
+    </>
+  )
+}
+
+function OwnershipShell() {
+  return (
+    <>
+      <div className="ui-kit-vhs" aria-hidden />
+      <div className="ui-kit-page app-shell">
+        <AppHeader pageTitle="Инвентарь" />
+        <OwnershipPage />
+      </div>
+    </>
+  )
+}
+
+function WalletShell() {
+  return (
+    <>
+      <div className="ui-kit-vhs" aria-hidden />
+      <div className="ui-kit-page app-shell">
+        <AppHeader pageTitle="Кошелек" />
+        <WalletPage />
       </div>
     </>
   )
@@ -159,6 +185,12 @@ export default function AccountApp() {
       break
     case paths.profileEdit:
       page = <ProfileShell pageTitle="Настройки профиля" defaultTab="settings" />
+      break
+    case paths.ownership:
+      page = <OwnershipShell />
+      break
+    case paths.wallet:
+      page = <WalletShell />
       break
     case paths.contacts:
       page = <ContactsShell />

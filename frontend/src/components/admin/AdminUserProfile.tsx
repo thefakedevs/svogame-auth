@@ -22,6 +22,7 @@ import { pushUrl } from '../../shared/navigation/history'
 import AppPortal from '../../shared/ui/portal/AppPortal'
 import LoadingState from '../LoadingState'
 import SkinViewer3D from '../SkinViewer3D'
+import AdminUserOwnershipPanel from './AdminUserOwnershipPanel'
 
 function formatDateTime(value?: string | null) {
   if (!value) return 'Нет данных'
@@ -401,6 +402,8 @@ export default function AdminUserProfile({
                 )}
               </div>
             </section>
+
+            <AdminUserOwnershipPanel token={token} userId={user.id} />
           </>
         )}
       </section>

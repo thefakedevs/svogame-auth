@@ -13,6 +13,8 @@ export function pageTitleForPath(pathname: string) {
   if (pathname === paths.auth) return 'Авторизация | SVOCraft'
   if (pathname === paths.profileEdit) return 'Настройки профиля | SVOCraft'
   if (pathname === paths.profile) return 'Профиль | SVOCraft'
+  if (pathname === paths.ownership) return 'Инвентарь | SVOCraft'
+  if (pathname === paths.wallet) return 'Кошелек | SVOCraft'
   if (pathname === paths.downloads) return 'Скачать лаунчер | SVOCraft'
   if (pathname === paths.contacts) return 'Контакты | SVOCraft'
   if (pathname === paths.admin) return 'Админ-панель | SVOCraft'

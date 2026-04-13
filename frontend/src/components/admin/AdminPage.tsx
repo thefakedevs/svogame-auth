@@ -36,6 +36,7 @@ import { adminSquadPath, adminTokenAuditPath, adminUserPath, paths } from '../..
 import { pushUrl, replaceUrl, usePathname } from '../../shared/navigation/history'
 import { getAuthToken } from '../../shared/session/auth-session'
 import { useQuery } from '../../util/query'
+import AdminAssetsPanel from './AdminAssetsPanel'
 import AdminSquadProfile from './AdminSquadProfile'
 import AdminUserProfile from './AdminUserProfile'
 import ErrorState from '../ErrorState'
@@ -48,7 +49,7 @@ type AdminRoute =
   | { type: 'squad'; squadId: string }
   | { type: 'tokenAudit'; tokenId: string }
 type AccessState = 'loading' | 'allowed' | 'denied' | 'error'
-type HomeTab = 'overview' | 'users' | 'squads' | 'tokens'
+type HomeTab = 'overview' | 'users' | 'squads' | 'tokens' | 'assets'
 const PAGE_SIZE = 30
 
 const dateTimeFormatter = new Intl.DateTimeFormat('ru-RU', {
@@ -100,6 +101,7 @@ function tabFromQuery(tab: string | null): HomeTab {
   if (tab === 'overview') return 'overview'
   if (tab === 'squads') return 'squads'
   if (tab === 'tokens') return 'tokens'
+  if (tab === 'assets') return 'assets'
   if (tab === 'users') return 'users'
   return 'overview'
 }
@@ -472,6 +474,7 @@ function AdminHome({
           <button type="button" className={`admin-tab ${tab === 'overview' ? 'is-active' : ''}`} onClick={() => setHomeTab('overview')}>Обзор</button>
           <button type="button" className={`admin-tab ${tab === 'users' ? 'is-active' : ''}`} onClick={() => setHomeTab('users')}>Пользователи</button>
           <button type="button" className={`admin-tab ${tab === 'squads' ? 'is-active' : ''}`} onClick={() => setHomeTab('squads')}>Сквады</button>
+          <button type="button" className={`admin-tab ${tab === 'assets' ? 'is-active' : ''}`} onClick={() => setHomeTab('assets')}>Ассеты</button>
           <button type="button" className={`admin-tab ${tab === 'tokens' ? 'is-active' : ''}`} onClick={() => setHomeTab('tokens')}>Сервисные токены</button>
         </nav>
       </section>
@@ -650,6 +653,8 @@ function AdminHome({
           </div>
         </section>
       ) : null}
+
+      {tab === 'assets' ? <AdminAssetsPanel token={token} /> : null}
 
       {tokenModalSecret ? (
         <div className="admin-token-modal-backdrop" role="dialog" aria-modal="true" aria-label="Новый сервисный токен">

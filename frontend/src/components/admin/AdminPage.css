@@ -561,6 +561,217 @@
   align-items: center;
 }
 
+.admin-ownership-summary-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.admin-user-ownership-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-ownership-layout,
+.admin-ownership-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.admin-ownership-columns {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.admin-ownership-columns--two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.admin-ownership-panel,
+.admin-ownership-list,
+.admin-asset-create,
+.admin-asset-card {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--ui-border);
+  background: rgba(0, 0, 0, 0.22);
+}
+
+.admin-ownership-head,
+.admin-ownership-list-head,
+.admin-assets-toolbar,
+.admin-asset-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.admin-ownership-head {
+  flex-wrap: wrap;
+}
+
+.ui-kit-page .ui-modal.admin-ownership-modal,
+.admin-ownership-modal {
+  width: min(920px, calc(100vw - 32px));
+  max-width: min(920px, calc(100vw - 32px));
+  max-height: min(90vh, 760px);
+}
+
+.admin-ownership-modal-body {
+  display: grid;
+  gap: 14px;
+  max-height: min(70vh, 720px);
+  overflow: auto;
+}
+
+.admin-ownership-modal-summary {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid var(--ui-border);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.admin-ownership-modal-summary strong {
+  font-size: 1.6rem;
+  line-height: 1;
+}
+
+.admin-ownership-head small,
+.admin-ownership-modal-summary small,
+.admin-ownership-list-item small,
+.admin-asset-card small {
+  color: var(--ui-text-muted);
+}
+
+.admin-ownership-form,
+.admin-ownership-list {
+  display: grid;
+  gap: 8px;
+}
+
+.admin-ownership-form .ui-input {
+  width: 100%;
+  min-width: 0;
+}
+
+.ui-kit-page .ui-modal-footer.admin-wallet-modal-footer,
+.admin-wallet-modal-footer {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.admin-wallet-modal-footer .btn {
+  min-width: 132px;
+}
+
+.admin-ownership-actions,
+.admin-asset-actions,
+.admin-asset-badges,
+.admin-asset-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.admin-ownership-list-head h4 {
+  margin: 0;
+}
+
+.admin-ownership-list-item {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid var(--ui-border);
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.admin-ownership-list-item--actionable {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.admin-ownership-list-item--actionable span {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.admin-ownership-list-item strong,
+.admin-ownership-list-item small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-ownership-modal-section,
+.admin-ownership-modal-list {
+  display: grid;
+  gap: 8px;
+}
+
+.admin-assets-toolbar {
+  flex-wrap: wrap;
+}
+
+.admin-assets-search {
+  display: grid;
+  grid-template-columns: minmax(180px, 320px) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.admin-asset-form-grid,
+.admin-asset-edit-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.admin-asset-list {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-asset-card-head {
+  align-items: flex-start;
+}
+
+.admin-asset-badges {
+  justify-content: flex-end;
+}
+
+.admin-checkbox-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ui-text);
+  font-size: 0.9rem;
+}
+
+.admin-checkbox-row input {
+  width: 16px;
+  height: 16px;
+  accent-color: #f7a41d;
+}
+
+.admin-asset-metadata {
+  min-height: 84px;
+  resize: vertical;
+}
+
+.admin-asset-actions {
+  justify-content: flex-end;
+}
+
 @media (max-width: 900px) {
   .admin-stat-grid,
   .admin-default-skin-card {
@@ -589,6 +800,35 @@
 
   .admin-squad-manage-row {
     grid-template-columns: 1fr;
+  }
+
+  .admin-ownership-layout,
+  .admin-ownership-columns,
+  .admin-ownership-columns--two,
+  .admin-ownership-list-item--actionable,
+  .admin-asset-form-grid,
+  .admin-asset-edit-grid,
+  .admin-assets-search {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-ownership-head,
+  .admin-ownership-summary-head,
+  .admin-assets-toolbar,
+  .admin-asset-card-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .admin-user-ownership-actions,
+  .admin-wallet-modal-footer,
+  .admin-asset-actions,
+  .admin-asset-badges {
+    justify-content: flex-start;
+  }
+
+  .admin-wallet-modal-footer .btn {
+    flex: 1 1 100%;
   }
 
   .admin-restriction-item {
