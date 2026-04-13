@@ -8,6 +8,8 @@ import DownloadsPage from '../pages/_DownloadsPage'
 import HomePage from '../pages/_HomePage'
 import LegalPage, { isLegalPath, legalPageHeading } from '../pages/LegalPage'
 import OwnershipPage from '../pages/OwnershipPage'
+import ShopCheckoutReturnPage from '../pages/ShopCheckoutReturnPage'
+import ShopPage from '../pages/ShopPage'
 import UiKitPage from '../pages/_UiKitPage'
 import WalletPage from '../pages/WalletPage'
 import { paths } from '../routes/paths'
@@ -36,6 +38,30 @@ function OwnershipShell() {
       <div className="ui-kit-page app-shell">
         <AppHeader pageTitle="Инвентарь" />
         <OwnershipPage />
+      </div>
+    </>
+  )
+}
+
+function ShopShell() {
+  return (
+    <>
+      <div className="ui-kit-vhs" aria-hidden />
+      <div className="ui-kit-page app-shell">
+        <AppHeader pageTitle="Магазин" />
+        <ShopPage />
+      </div>
+    </>
+  )
+}
+
+function ShopCheckoutReturnShell() {
+  return (
+    <>
+      <div className="ui-kit-vhs" aria-hidden />
+      <div className="ui-kit-page app-shell">
+        <AppHeader pageTitle="Проверка оплаты" />
+        <ShopCheckoutReturnPage />
       </div>
     </>
   )
@@ -188,6 +214,12 @@ export default function AccountApp() {
       break
     case paths.inventory:
       page = <OwnershipShell />
+      break
+    case paths.shop:
+      page = <ShopShell />
+      break
+    case paths.shopCheckoutReturn:
+      page = <ShopCheckoutReturnShell />
       break
     case paths.wallet:
       page = <WalletShell />

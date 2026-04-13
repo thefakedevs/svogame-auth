@@ -7,6 +7,8 @@ export const paths = {
   profile: '/profile',
   profileEdit: '/profile/edit',
   inventory: '/inventory',
+  shop: '/shop',
+  shopCheckoutReturn: '/shop/checkout/return',
   wallet: '/wallet',
   downloads: '/downloads',
   contacts: '/contacts',

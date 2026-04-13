@@ -17,6 +17,7 @@ import {
 import { toDisplayError } from '../api/http'
 import ErrorState from '../components/ErrorState'
 import LoadingState from '../components/LoadingState'
+import SkinDetailsModal from '../components/SkinDetailsModal'
 import { currentAppPath, redirectToAuth } from '../routes/auth'
 import { getAuthToken } from '../shared/session/auth-session'
 import './OwnershipPage.css'
@@ -188,17 +189,13 @@ type InventoryVisualItem = {
 }
 
 function InventoryVisual({ item, compact = false }: { item: InventoryVisualItem; compact?: boolean }) {
-  const [isImageFailed, setIsImageFailed] = useState(false)
+  const [failedImageUrl, setFailedImageUrl] = useState<string | null>(null)
   const fallback = item.title.trim().slice(0, 1).toUpperCase() || 'I'
-  const showImage = Boolean(item.imageUrl) && !isImageFailed
-
-  useEffect(() => {
-    setIsImageFailed(false)
-  }, [item.imageUrl])
+  const showImage = Boolean(item.imageUrl) && failedImageUrl !== item.imageUrl
 
   return (
     <div className={`inventory-visual ${compact ? 'inventory-visual--compact' : ''}`} style={cardStyle(item.accent)}>
-      {showImage ? <img src={item.imageUrl ?? ''} alt="" loading="lazy" onError={() => setIsImageFailed(true)} /> : <span>{fallback}</span>}
+      {showImage ? <img src={item.imageUrl ?? ''} alt="" loading="lazy" onError={() => setFailedImageUrl(item.imageUrl)} /> : <span>{fallback}</span>}
       {/* splash for better image visibility */}
       <div className="inventory-visual-splash" />
     </div>
@@ -235,6 +232,7 @@ function SkinCard({
   isSelected,
   isSelecting,
   isResetting,
+  onOpenDetails,
   onSelect,
   onReset,
 }: {
@@ -242,6 +240,7 @@ function SkinCard({
   isSelected: boolean
   isSelecting: boolean
   isResetting: boolean
+  onOpenDetails: (item: SkinCardItem) => void
   onSelect: (item: SkinCardItem) => void
   onReset: (item: SkinCardItem) => void
 }) {
@@ -263,7 +262,9 @@ function SkinCard({
       data-rarity={item.rarity ?? 'none'}
       style={cardStyle(accent)}
     >
-      <InventoryVisual item={{ ...item, accent }} />
+      <button className="inventory-skin-card__preview" type="button" onClick={() => onOpenDetails(item)}>
+        <InventoryVisual item={{ ...item, accent }} />
+      </button>
       <div className="inventory-skin-card__body">
         <div className="inventory-card-title">
           <strong>{item.title}</strong>
@@ -271,7 +272,6 @@ function SkinCard({
         </div>
         <div className="inventory-skin-card__rarity">
           <span>{rarityLabel(item.rarity)}</span>
-          {item.weaponKey ? <small>{item.weaponKey}</small> : null}
         </div>
         <div className="inventory-skin-card__selection">
           <button
@@ -370,10 +370,15 @@ function SubscriptionCard({ item }: { item: SubscriptionCardItem }) {
   )
 }
 
+void ItemCard
+void AccessCard
+void SubscriptionCard
+
 export default function OwnershipPage() {
   const [state, setState] = useState<OwnershipState>({ status: 'loading' })
   const [selectingSkinKey, setSelectingSkinKey] = useState<string | null>(null)
   const [resettingSkinKey, setResettingSkinKey] = useState<string | null>(null)
+  const [detailsSkin, setDetailsSkin] = useState<SkinCardItem | null>(null)
 
   const load = async () => {
     const token = getAuthToken()
@@ -473,6 +478,8 @@ export default function OwnershipPage() {
     }),
     ...ownedSubscriptionEntries.filter((item) => !defaultSubscriptionKeys.has(item.assetKey)),
   ]
+  void itemEntries
+  void subscriptionEntries
   const selectSkin = async (item: SkinCardItem) => {
     const token = getAuthToken()
     if (!token) {
@@ -563,6 +570,7 @@ export default function OwnershipPage() {
                   isSelected={isSelectedSkin(item, selected)}
                   isSelecting={requestKey !== null && requestKey === selectingSkinKey}
                   isResetting={requestKey !== null && requestKey === resettingSkinKey}
+                  onOpenDetails={setDetailsSkin}
                   onSelect={selectSkin}
                   onReset={resetSkin}
                 />
@@ -571,6 +579,25 @@ export default function OwnershipPage() {
           </div>
         ) : <EmptySection text="Скинов в инвентаре пока нет." />}
       </section>
+
+      {detailsSkin ? (
+        <SkinDetailsModal
+          item={{
+            title: detailsSkin.title,
+            description: detailsSkin.description,
+            imageUrl: detailsSkin.imageUrl,
+            accent: skinRarityAccent(detailsSkin.rarity),
+            rarity: detailsSkin.rarity,
+            weaponKey: detailsSkin.weaponKey,
+            statusText: 'Уже в инвентаре',
+          }}
+          titleId="inventory-skin-details-title"
+          onClose={() => setDetailsSkin(null)}
+          footer={(
+            <button className="btn" type="button" onClick={() => setDetailsSkin(null)}>Закрыть</button>
+          )}
+        />
+      ) : null}
 {/* 
       <section className="ownership-section inventory-section">
         <SectionTitle

@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react'
 import {
   getMyDefaultWalletBalance,
-  getMyWalletTransactions,
   type WalletBalanceResponse,
-  type WalletTransactionResponse,
 } from '../api/inventory'
 import { toDisplayError } from '../api/http'
+import { listMyShopOrders, type ShopOrderResponse } from '../api/shop'
 import ErrorState from '../components/ErrorState'
 import LoadingState from '../components/LoadingState'
 import { currentAppPath, redirectToAuth } from '../routes/auth'
@@ -16,7 +15,7 @@ type WalletState =
   | { status: 'loading' }
   | { status: 'unauthorized' }
   | { status: 'error'; error: string }
-  | { status: 'ready'; balance: WalletBalanceResponse; purchases: WalletTransactionResponse[] }
+  | { status: 'ready'; balance: WalletBalanceResponse; purchases: ShopOrderResponse[] }
 
 const numberFormatter = new Intl.NumberFormat('ru-RU')
 const dateTimeFormatter = new Intl.DateTimeFormat('ru-RU', {
@@ -37,14 +36,37 @@ function formatAmount(value: number) {
   return numberFormatter.format(value)
 }
 
-function formatPrice(value: number) {
-  return `${formatAmount(Math.abs(value))} защекинов`
+function formatRubPrice(value: number) {
+  return `${formatAmount(Math.abs(value))} ₽`
 }
 
-function purchaseTitle(purchase: WalletTransactionResponse) {
-  if (purchase.reasonText) return purchase.reasonText
-  if (purchase.reasonCode) return purchase.reasonCode
-  return 'Покупка'
+function purchaseStatusText(status: string) {
+  switch (status) {
+    case 'pending_payment':
+      return 'Ожидает оплаты'
+    case 'paid':
+      return 'Оплачено'
+    case 'fulfillment_in_progress':
+      return 'Выдаем скин'
+    case 'fulfilled':
+      return 'Завершено'
+    case 'payment_canceled':
+      return 'Платеж отменен'
+    case 'payment_expired':
+      return 'Оплата истекла'
+    case 'payment_validation_failed':
+      return 'Ошибка проверки платежа'
+    case 'fulfillment_failed':
+      return 'Ошибка выдачи'
+    default:
+      return status
+  }
+}
+
+function purchaseStatusClass(status: string) {
+  if (status === 'fulfilled') return 'ui-badge ui-badge-success'
+  if (status === 'pending_payment' || status === 'paid' || status === 'fulfillment_in_progress') return 'ui-badge ui-badge-neutral'
+  return 'ui-badge ui-badge-warning'
 }
 
 export default function WalletPage() {
@@ -59,12 +81,14 @@ export default function WalletPage() {
 
     setState({ status: 'loading' })
     try {
-      const balance = await getMyDefaultWalletBalance(token)
-      const transactions = await getMyWalletTransactions(token, balance.currencyKey)
+      const [balance, orders] = await Promise.all([
+        getMyDefaultWalletBalance(token),
+        listMyShopOrders(token),
+      ])
       setState({
         status: 'ready',
         balance,
-        purchases: transactions.filter((transaction) => transaction.operationType.toLowerCase() === 'purchase'),
+        purchases: orders.slice().sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()),
       })
     } catch (cause) {
       setState({ status: 'error', error: toDisplayError(cause, 'Не удалось загрузить кошелек.') })
@@ -101,7 +125,7 @@ export default function WalletPage() {
       <section className="card ownership-wallet-default-card">
         <h1 className="card-title">Кошелек</h1>
         <hr />
-        <strong>{formatAmount(state.balance.balance)} защекинов</strong>
+        <strong>{formatAmount(state.balance.balance)} защеккоинов</strong>
       </section>
 
       <section className="card ownership-section">
@@ -115,14 +139,14 @@ export default function WalletPage() {
             {state.purchases.map((purchase) => (
               <article key={purchase.id} className="ownership-transaction">
                 <span className="ownership-transaction-delta is-negative">
-                  {formatPrice(purchase.delta)}
+                  {formatRubPrice(purchase.totalPriceRub)}
                 </span>
                 <span className="ownership-transaction-main">
-                  <strong>{purchaseTitle(purchase)}</strong>
+                  <strong>{purchase.productName}</strong>
                   <small>{formatDateTime(purchase.createdAt)}</small>
                 </span>
-                <span className="ownership-transaction-balance">
-                  После: {formatAmount(purchase.balanceAfter)} защекинов
+                <span className="ownership-transaction-balance ownership-transaction-status">
+                  <span className={purchaseStatusClass(purchase.status)}>{purchaseStatusText(purchase.status)}</span>
                 </span>
               </article>
             ))}

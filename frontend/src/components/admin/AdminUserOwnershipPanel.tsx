@@ -184,7 +184,7 @@ export default function AdminUserOwnershipPanel({ token, userId }: { token: stri
       if (kind === 'credit') return creditAdminDefaultWallet(token, userId, body)
       if (kind === 'debit') return debitAdminDefaultWallet(token, userId, body)
       return adjustAdminDefaultWallet(token, userId, body)
-    }, 'Баланс защекинов обновлен.')
+    }, 'Баланс защекоинов обновлен.')
   }
 
   const mutateEntitlement = async (action: 'grant' | 'revoke', assetKey?: string) => {
@@ -292,7 +292,7 @@ export default function AdminUserOwnershipPanel({ token, userId }: { token: stri
 
       <div className="admin-user-ownership-actions">
         <button type="button" className="btn btn-sm" onClick={() => setActiveModal('wallet')}>
-          Баланс: {formatAmount(state.wallet.balance)} защекинов
+          Баланс: {formatAmount(state.wallet.balance)} защекоинов
         </button>
         <button type="button" className="btn btn-sm" onClick={() => setActiveModal('entitlements')}>
           Скины: {state.inventory.entitlements.length}
@@ -314,7 +314,7 @@ export default function AdminUserOwnershipPanel({ token, userId }: { token: stri
       {activeModal === 'wallet' ? (
         <AdminOwnershipModal title="Баланс игрока" titleId="admin-wallet-modal-title" isBusy={isMutating} onClose={() => setActiveModal(null)}>
           <div className="admin-ownership-modal-summary">
-            <strong>{formatAmount(state.wallet.balance)} защекинов</strong>
+            <strong>{formatAmount(state.wallet.balance)} защекоинов</strong>
             <small>Обновлено: {formatDateTime(state.wallet.updatedAt)}</small>
           </div>
           <div className="admin-ownership-form">
@@ -430,7 +430,7 @@ export default function AdminUserOwnershipPanel({ token, userId }: { token: stri
             items={purchases.map((item) => ({
               id: item.id,
               title: item.reasonText || item.reasonCode || 'Покупка',
-              meta: `${formatAmount(Math.abs(item.delta))} защекинов · после: ${formatAmount(item.balanceAfter)} · ${formatDateTime(item.createdAt)}`,
+              meta: `${formatAmount(Math.abs(item.delta))} защекоинов · после: ${formatAmount(item.balanceAfter)} · ${formatDateTime(item.createdAt)}`,
             }))}
             emptyText="Покупок нет."
           />

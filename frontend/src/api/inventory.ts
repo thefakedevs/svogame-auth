@@ -287,6 +287,14 @@ export function getMyInventory(token: string): Promise<InventoryResponse> {
   })
 }
 
+export function listMyEntitlements(token: string): Promise<EntitlementResponse[]> {
+  return request<EntitlementResponse[]>('/api/user/me/inventory/entitlements', {
+    headers: authHeaders(token, {
+      'Content-Type': 'application/json',
+    }),
+  })
+}
+
 export function getMyWallet(token: string): Promise<WalletBalanceResponse[]> {
   return request<WalletBalanceResponse[]>('/api/user/me/wallet', {
     headers: authHeaders(token, {

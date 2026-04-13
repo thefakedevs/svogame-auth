@@ -175,11 +175,12 @@ export default function AppHeader({ pageTitle }: Props) {
         <a className="app-header__balance" href={paths.wallet}>
           <span>
             <small>Баланс</small>
-            <strong>{isBalanceLoading ? '...' : formatBalance(defaultBalance)} защекинов</strong>
+            <strong>{isBalanceLoading ? '...' : formatBalance(defaultBalance)} защекоинов</strong>
           </span>
         </a>
         <div className="app-header__menu-section">
           <a href={paths.profile}>Профиль</a>
+          <a href={paths.shop}>Магазин</a>
           <a href={paths.inventory}>Инвентарь</a>
           <a href={paths.wallet}>Кошелек</a>
           <a href={`${paths.profile}?tab=squads`}>Сквад</a>
