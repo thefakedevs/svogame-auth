@@ -37,6 +37,8 @@ import { pushUrl, replaceUrl, usePathname } from '../../shared/navigation/histor
 import { getAuthToken } from '../../shared/session/auth-session'
 import { useQuery } from '../../util/query'
 import AdminAssetsPanel from './AdminAssetsPanel'
+import AdminShopPanel from './AdminShopPanel'
+import AdminShopProductView from './AdminShopProductView'
 import AdminSquadProfile from './AdminSquadProfile'
 import AdminUserProfile from './AdminUserProfile'
 import ErrorState from '../ErrorState'
@@ -48,8 +50,9 @@ type AdminRoute =
   | { type: 'user'; userId: string }
   | { type: 'squad'; squadId: string }
   | { type: 'tokenAudit'; tokenId: string }
+  | { type: 'shopProduct'; productId: string }
 type AccessState = 'loading' | 'allowed' | 'denied' | 'error'
-type HomeTab = 'overview' | 'users' | 'squads' | 'tokens' | 'assets'
+type HomeTab = 'overview' | 'users' | 'squads' | 'tokens' | 'assets' | 'shop'
 const PAGE_SIZE = 30
 
 const dateTimeFormatter = new Intl.DateTimeFormat('ru-RU', {
@@ -94,6 +97,9 @@ function parseRoute(pathname: string): AdminRoute {
   const auditMatch = pathname.match(/^\/admin\/tokens\/([^/]+)\/audit$/)
   if (auditMatch) return { type: 'tokenAudit', tokenId: decodeURIComponent(auditMatch[1]) }
 
+  const shopProductMatch = pathname.match(/^\/admin\/shop\/products\/([^/]+)$/)
+  if (shopProductMatch) return { type: 'shopProduct', productId: decodeURIComponent(shopProductMatch[1]) }
+
   return { type: 'home' }
 }
 
@@ -102,6 +108,7 @@ function tabFromQuery(tab: string | null): HomeTab {
   if (tab === 'squads') return 'squads'
   if (tab === 'tokens') return 'tokens'
   if (tab === 'assets') return 'assets'
+  if (tab === 'shop') return 'shop'
   if (tab === 'users') return 'users'
   return 'overview'
 }
@@ -315,6 +322,10 @@ export default function AdminPage() {
     return <AdminTokenAuditView token={token!} tokenId={route.tokenId} />
   }
 
+  if (route.type === 'shopProduct') {
+    return <AdminShopProductView token={token!} productId={route.productId} />
+  }
+
   return (
     <AdminSquadProfile token={token!} squad={squad} members={squadMembers} onSquadChange={setSquad} onMembersChange={setSquadMembers} />
   )
@@ -475,6 +486,7 @@ function AdminHome({
           <button type="button" className={`admin-tab ${tab === 'users' ? 'is-active' : ''}`} onClick={() => setHomeTab('users')}>Пользователи</button>
           <button type="button" className={`admin-tab ${tab === 'squads' ? 'is-active' : ''}`} onClick={() => setHomeTab('squads')}>Сквады</button>
           <button type="button" className={`admin-tab ${tab === 'assets' ? 'is-active' : ''}`} onClick={() => setHomeTab('assets')}>Ассеты</button>
+          <button type="button" className={`admin-tab ${tab === 'shop' ? 'is-active' : ''}`} onClick={() => setHomeTab('shop')}>Магазин</button>
           <button type="button" className={`admin-tab ${tab === 'tokens' ? 'is-active' : ''}`} onClick={() => setHomeTab('tokens')}>Сервисные токены</button>
         </nav>
       </section>
@@ -655,6 +667,8 @@ function AdminHome({
       ) : null}
 
       {tab === 'assets' ? <AdminAssetsPanel token={token} /> : null}
+
+      {tab === 'shop' ? <AdminShopPanel token={token} /> : null}
 
       {tokenModalSecret ? (
         <div className="admin-token-modal-backdrop" role="dialog" aria-modal="true" aria-label="Новый сервисный токен">

@@ -35,3 +35,7 @@ export function adminSquadPath(squadId: string) {
 export function adminTokenAuditPath(tokenId: string) {
   return `${paths.admin}/tokens/${encodeURIComponent(tokenId)}/audit`
 }
+
+export function adminShopProductPath(productId: string) {
+  return `${paths.admin}/shop/products/${encodeURIComponent(productId)}`
+}

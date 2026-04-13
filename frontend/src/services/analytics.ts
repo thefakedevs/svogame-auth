@@ -92,6 +92,7 @@ function normalizeDynamicPathname(pathname: string) {
     .replace(/^\/admin\/users\/[^/]+$/, '/admin/users/:userId')
     .replace(/^\/admin\/squads\/[^/]+$/, '/admin/squads/:squadId')
     .replace(/^\/admin\/tokens\/[^/]+\/audit$/, '/admin/tokens/:tokenId/audit')
+    .replace(/^\/admin\/shop\/products\/[^/]+$/, '/admin/shop/products/:productId')
 }
 
 export function buildAnalyticsPath(pathname: string, search = '') {
