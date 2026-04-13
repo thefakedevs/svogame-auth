@@ -1,4 +1,5 @@
 import { authHeaders, request, requestNullable } from './http'
+import type { ShopProductResponse } from './shop'
 import type { SquadMemberResponse } from './squads'
 import type { SkinModel } from './skins'
 
@@ -118,6 +119,45 @@ export interface DeactivateAdminUserRequest {
 
 export interface ActionResponse {
   status: string
+}
+
+export interface ProductLocaleInput {
+  locale: string
+  name: string
+  description?: string | null
+}
+
+/** POST /api/admin/shop/products — тело в snake_case, как в OpenAPI бэкенда. */
+export interface CreateShopProductInput {
+  key: string
+  asset_key: string
+  price_rub: number
+  locales: ProductLocaleInput[]
+  durationSeconds?: number | null
+  ends_at?: string | null
+  is_active?: boolean | null
+  is_public?: boolean | null
+  max_owned_amount?: number | null
+  max_per_purchase?: number | null
+  metadata?: unknown
+  sort_order?: number | null
+  stackable_amount?: number | null
+  starts_at?: string | null
+}
+
+export interface UpdateShopProductInput {
+  durationSeconds?: number | null
+  ends_at?: string | null
+  is_active?: boolean | null
+  is_public?: boolean | null
+  locales?: ProductLocaleInput[] | null
+  max_owned_amount?: number | null
+  max_per_purchase?: number | null
+  metadata?: unknown
+  price_rub?: number | null
+  sort_order?: number | null
+  stackable_amount?: number | null
+  starts_at?: string | null
 }
 
 export function getAdminMe(token: string): Promise<AdminMeResponse> {
@@ -478,5 +518,54 @@ export function getPublicSquadMembers(squadId: string): Promise<SquadMemberRespo
     headers: {
       'Content-Type': 'application/json',
     },
+  })
+}
+
+export function listAdminShopProducts(token: string, locale?: string | null): Promise<ShopProductResponse[]> {
+  const params = new URLSearchParams()
+  if (locale) params.set('locale', locale)
+  const suffix = params.toString()
+  return request<ShopProductResponse[]>(`/api/admin/shop/products${suffix ? `?${suffix}` : ''}`, {
+    headers: authHeaders(token, {
+      'Content-Type': 'application/json',
+    }),
+  })
+}
+
+export function createAdminShopProduct(token: string, body: CreateShopProductInput): Promise<ShopProductResponse> {
+  return request<ShopProductResponse>('/api/admin/shop/products', {
+    method: 'POST',
+    headers: authHeaders(token, {
+      'Content-Type': 'application/json',
+    }),
+    body: JSON.stringify(body),
+  })
+}
+
+export function getAdminShopProduct(token: string, productId: string, locale?: string | null): Promise<ShopProductResponse> {
+  const params = new URLSearchParams()
+  if (locale) params.set('locale', locale)
+  const suffix = params.toString()
+  return request<ShopProductResponse>(
+    `/api/admin/shop/products/${encodeURIComponent(productId)}${suffix ? `?${suffix}` : ''}`,
+    {
+      headers: authHeaders(token, {
+        'Content-Type': 'application/json',
+      }),
+    },
+  )
+}
+
+export function patchAdminShopProduct(
+  token: string,
+  productId: string,
+  body: UpdateShopProductInput,
+): Promise<ShopProductResponse> {
+  return request<ShopProductResponse>(`/api/admin/shop/products/${encodeURIComponent(productId)}`, {
+    method: 'PATCH',
+    headers: authHeaders(token, {
+      'Content-Type': 'application/json',
+    }),
+    body: JSON.stringify(body),
   })
 }

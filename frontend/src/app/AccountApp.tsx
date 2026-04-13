@@ -156,7 +156,15 @@ function NotFoundShell() {
   )
 }
 
-function adminRouteForPath(pathname: string): { type: 'home' } | { type: 'user'; userId: string } | { type: 'squad'; squadId: string } | { type: 'tokenAudit'; tokenId: string } | null {
+function adminRouteForPath(
+  pathname: string,
+):
+  | { type: 'home' }
+  | { type: 'user'; userId: string }
+  | { type: 'squad'; squadId: string }
+  | { type: 'tokenAudit'; tokenId: string }
+  | { type: 'shopProduct'; productId: string }
+  | null {
   if (pathname === paths.admin) {
     return { type: 'home' }
   }
@@ -174,6 +182,11 @@ function adminRouteForPath(pathname: string): { type: 'home' } | { type: 'user';
   const tokenAuditMatch = pathname.match(/^\/admin\/tokens\/([^/]+)\/audit$/)
   if (tokenAuditMatch) {
     return { type: 'tokenAudit', tokenId: decodeURIComponent(tokenAuditMatch[1]) }
+  }
+
+  const shopProductMatch = pathname.match(/^\/admin\/shop\/products\/([^/]+)$/)
+  if (shopProductMatch) {
+    return { type: 'shopProduct', productId: decodeURIComponent(shopProductMatch[1]) }
   }
 
   return null
