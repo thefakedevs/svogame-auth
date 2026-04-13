@@ -1,15 +1,19 @@
-import { authHeaders, request } from './http'
+import { ApiError, authHeaders, request } from './http'
 
 export type OwnershipModel = 'stackable' | 'entitlement' | 'expirable'
-export type AssetKind = 'currency' | 'subscription' | 'lootbox' | 'item' | string
+export type AssetKind = 'currency' | 'subscription' | 'lootbox' | 'item' | 'skin' | 'cosmetic' | 'ticket' | 'token' | string
+export type SkinRarity = 'common' | 'rare' | 'legendary'
 
 export interface AssetResponse {
   id: string
   key: string
   displayName: string
   description: string | null
+  imageUrl?: string | null
   assetKind: AssetKind
   ownershipModel: OwnershipModel
+  rarity?: SkinRarity | null
+  weaponKey?: string | null
   isCurrency: boolean
   isUserPurchasable: boolean
   isPublic: boolean
@@ -114,6 +118,45 @@ export interface OkResponse {
   ok: boolean
 }
 
+export interface SelectedGunskinResponse {
+  weaponKey: string
+  assetDefinitionId: string
+  assetKey: string
+  displayName: string
+  description?: string | null
+  rarity: SkinRarity
+  selectedAt: string
+  updatedAt: string
+}
+
+export interface GunskinSelectionListItemResponse {
+  weaponKey: string
+  selected: SelectedGunskinResponse
+}
+
+export interface GunskinAssetResponse {
+  id: string
+  key: string
+  displayName: string
+  description?: string | null
+  weaponKey: string
+  rarity: SkinRarity
+  ownershipModel: string
+}
+
+export interface GunskinCollectionResponse {
+  weaponKey: string
+  selected?: SelectedGunskinResponse | null
+  available: GunskinAssetResponse[]
+}
+
+export interface SelectGunskinInput {
+  assetKey: string
+  metadata?: unknown
+  reasonCode?: string | null
+  reasonText?: string | null
+}
+
 export interface CreateAssetDefinitionInput {
   key: string
   display_name: string
@@ -123,6 +166,8 @@ export interface CreateAssetDefinitionInput {
   is_user_purchasable: boolean
   is_public: boolean
   description?: string | null
+  rarity?: SkinRarity | null
+  weaponKey?: string | null
   metadata?: unknown
 }
 
@@ -132,7 +177,64 @@ export interface UpdateAssetDefinitionInput {
   is_active?: boolean | null
   is_public?: boolean | null
   is_user_purchasable?: boolean | null
+  rarity?: SkinRarity | null
+  weaponKey?: string | null
   metadata?: unknown
+}
+
+function appendImageVersion(url: string, version?: string | null) {
+  return version ? `${url}?v=${encodeURIComponent(version)}` : url
+}
+
+export function buildPublicAssetImageUrl(assetId: string, version?: string | null) {
+  return appendImageVersion(`/api/assets/${encodeURIComponent(assetId)}/image`, version)
+}
+
+export function buildAdminAssetImageUrl(assetId: string, version?: string | null) {
+  return appendImageVersion(`/api/admin/assets/${encodeURIComponent(assetId)}/image`, version)
+}
+
+export async function fetchAdminAssetImageObjectUrl(
+  token: string,
+  assetId: string,
+  version?: string | null,
+): Promise<string | null> {
+  let response: Response
+  try {
+    response = await fetch(buildAdminAssetImageUrl(assetId, version), {
+      headers: authHeaders(token),
+    })
+  } catch (error) {
+    throw new ApiError({
+      kind: 'network',
+      message: 'Не удалось загрузить изображение ассета.',
+      details: error,
+    })
+  }
+
+  if (response.status === 404) {
+    return null
+  }
+
+  if (!response.ok) {
+    let details: unknown = null
+    try {
+      details = await response.text()
+    } catch {
+      details = null
+    }
+
+    throw new ApiError({
+      kind: 'http',
+      status: response.status,
+      statusText: response.statusText,
+      message: response.statusText || 'Не удалось загрузить изображение ассета.',
+      details,
+    })
+  }
+
+  const blob = await response.blob()
+  return blob.size > 0 ? URL.createObjectURL(blob) : null
 }
 
 export function listPublicAssets(query?: {
@@ -217,6 +319,45 @@ export async function getMyDefaultWalletTransactions(token: string): Promise<Wal
   return getMyWalletTransactions(token, balance.currencyKey)
 }
 
+export function listMyGunskinSelections(token: string): Promise<GunskinSelectionListItemResponse[]> {
+  return request<GunskinSelectionListItemResponse[]>('/api/user/me/gunskins/selections', {
+    headers: authHeaders(token, {
+      'Content-Type': 'application/json',
+    }),
+  })
+}
+
+export function getMyGunskinCollection(token: string, weaponKey: string): Promise<GunskinCollectionResponse> {
+  return request<GunskinCollectionResponse>(`/api/user/me/gunskins/${encodeURIComponent(weaponKey)}`, {
+    headers: authHeaders(token, {
+      'Content-Type': 'application/json',
+    }),
+  })
+}
+
+export function selectMyGunskin(
+  token: string,
+  weaponKey: string,
+  body: SelectGunskinInput,
+): Promise<SelectedGunskinResponse> {
+  return request<SelectedGunskinResponse>(`/api/user/me/gunskins/${encodeURIComponent(weaponKey)}/selected`, {
+    method: 'PUT',
+    headers: authHeaders(token, {
+      'Content-Type': 'application/json',
+    }),
+    body: JSON.stringify(body),
+  })
+}
+
+export function resetMyGunskin(token: string, weaponKey: string): Promise<OkResponse> {
+  return request<OkResponse>(`/api/user/me/gunskins/${encodeURIComponent(weaponKey)}/selected`, {
+    method: 'DELETE',
+    headers: authHeaders(token, {
+      'Content-Type': 'application/json',
+    }),
+  })
+}
+
 export function listAdminAssets(
   token: string,
   query?: {
@@ -290,6 +431,24 @@ export function patchAdminAsset(
       'Content-Type': 'application/json',
     }),
     body: JSON.stringify(body),
+  })
+}
+
+export function uploadAdminAssetImage(token: string, assetId: string, file: File): Promise<AssetResponse> {
+  const formData = new FormData()
+  formData.append('image', file)
+
+  return request<AssetResponse>(buildAdminAssetImageUrl(assetId), {
+    method: 'POST',
+    headers: authHeaders(token),
+    body: formData,
+  })
+}
+
+export function deleteAdminAssetImage(token: string, assetId: string): Promise<AssetResponse> {
+  return request<AssetResponse>(buildAdminAssetImageUrl(assetId), {
+    method: 'DELETE',
+    headers: authHeaders(token),
   })
 }
 

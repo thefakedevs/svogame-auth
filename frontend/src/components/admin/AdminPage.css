@@ -731,7 +731,8 @@
 
 .admin-asset-form-grid,
 .admin-asset-edit-grid {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
@@ -739,6 +740,75 @@
 .admin-asset-list {
   display: grid;
   gap: 10px;
+}
+
+.admin-asset-image-panel {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+}
+
+.admin-asset-image-preview {
+  width: 112px;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid var(--ui-border);
+  background: rgba(0, 0, 0, 0.26);
+}
+
+.admin-asset-image-preview img {
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 6px;
+  object-fit: contain;
+}
+
+.admin-asset-image-preview span {
+  padding: 8px;
+  color: var(--ui-text-muted);
+  font-size: 0.78rem;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.admin-asset-image-preview--thumb {
+  width: 42px;
+  min-width: 42px;
+}
+
+.admin-asset-image-preview--thumb span {
+  padding: 0;
+}
+
+.admin-asset-image-info {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.admin-asset-image-info small {
+  color: var(--ui-text-muted);
+}
+
+.admin-asset-image-actions,
+.admin-inventory-item-main {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.admin-inventory-item-main {
+  min-width: 0;
+  flex-wrap: nowrap;
+}
+
+.admin-inventory-item-main > span {
+  min-width: 0;
 }
 
 .admin-asset-card-head {
@@ -806,6 +876,7 @@
   .admin-ownership-columns,
   .admin-ownership-columns--two,
   .admin-ownership-list-item--actionable,
+  .admin-asset-image-panel,
   .admin-asset-form-grid,
   .admin-asset-edit-grid,
   .admin-assets-search {

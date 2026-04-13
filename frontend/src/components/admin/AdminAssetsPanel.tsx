@@ -1,14 +1,19 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react'
 import toast from 'react-hot-toast'
 import { toDisplayError } from '../../api/http'
 import {
+  buildPublicAssetImageUrl,
   createAdminAsset,
+  deleteAdminAssetImage,
   listAdminAssets,
   patchAdminAsset,
+  uploadAdminAssetImage,
   type AssetKind,
   type AssetResponse,
   type OwnershipModel,
-} from '../../api/ownership'
+  type SkinRarity,
+} from '../../api/inventory'
+import AdminAssetImage from './AdminAssetImage'
 import ErrorState from '../ErrorState'
 import LoadingState from '../LoadingState'
 
@@ -23,6 +28,8 @@ type CreateAssetDraft = {
   description: string
   assetKind: AssetKind
   ownershipModel: OwnershipModel
+  rarity: SkinRarity | ''
+  weaponKey: string
   isCurrency: boolean
   isUserPurchasable: boolean
   isPublic: boolean
@@ -32,6 +39,8 @@ type CreateAssetDraft = {
 type EditAssetDraft = {
   displayName: string
   description: string
+  rarity: SkinRarity | ''
+  weaponKey: string
   isActive: boolean
   isPublic: boolean
   isUserPurchasable: boolean
@@ -44,6 +53,8 @@ const emptyCreateDraft: CreateAssetDraft = {
   description: '',
   assetKind: 'item',
   ownershipModel: 'stackable',
+  rarity: '',
+  weaponKey: '',
   isCurrency: false,
   isUserPurchasable: false,
   isPublic: true,
@@ -69,6 +80,8 @@ function makeEditDraft(asset: AssetResponse): EditAssetDraft {
   return {
     displayName: asset.displayName,
     description: asset.description ?? '',
+    rarity: asset.rarity ?? '',
+    weaponKey: asset.weaponKey ?? '',
     isActive: asset.isActive,
     isPublic: asset.isPublic,
     isUserPurchasable: asset.isUserPurchasable,
@@ -147,6 +160,8 @@ export default function AdminAssetsPanel({ token }: { token: string }) {
         is_currency: draft.isCurrency,
         is_user_purchasable: draft.isUserPurchasable,
         is_public: draft.isPublic,
+        rarity: draft.rarity || null,
+        weaponKey: draft.weaponKey.trim() || null,
         metadata,
       })
       updateCreatedAsset(created)
@@ -218,6 +233,22 @@ export default function AdminAssetsPanel({ token }: { token: string }) {
             <option value="entitlement">entitlement</option>
             <option value="expirable">expirable</option>
           </select>
+          <select
+            className="ui-input"
+            value={draft.rarity}
+            onChange={(event) => setDraft((prev) => ({ ...prev, rarity: event.target.value as SkinRarity | '' }))}
+          >
+            <option value="">Без редкости</option>
+            <option value="common">common</option>
+            <option value="rare">rare</option>
+            <option value="legendary">legendary</option>
+          </select>
+          <input
+            className="ui-input"
+            value={draft.weaponKey}
+            onChange={(event) => setDraft((prev) => ({ ...prev, weaponKey: event.target.value }))}
+            placeholder="weaponKey"
+          />
         </div>
 
         <textarea
@@ -302,10 +333,56 @@ function AdminAssetCard({
 }) {
   const [draft, setDraft] = useState(() => makeEditDraft(asset))
   const [isSaving, setIsSaving] = useState(false)
+  const [isImageMutating, setIsImageMutating] = useState(false)
+  const [imageReloadKey, setImageReloadKey] = useState(0)
+  const imageInputRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
     setDraft(makeEditDraft(asset))
   }, [asset])
+
+  const uploadImage = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] ?? null
+    event.target.value = ''
+
+    if (!file || isImageMutating) return
+    if (!file.type.startsWith('image/')) {
+      toast.error('Выберите файл изображения.')
+      return
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('Изображение должно быть не больше 2 МБ.')
+      return
+    }
+
+    setIsImageMutating(true)
+    try {
+      const updated = await uploadAdminAssetImage(token, asset.id, file)
+      onAssetChange(updated)
+      setImageReloadKey((value) => value + 1)
+      toast.success('Изображение ассета загружено.')
+    } catch (cause) {
+      toast.error(toDisplayError(cause, 'Не удалось загрузить изображение ассета.'))
+    } finally {
+      setIsImageMutating(false)
+    }
+  }
+
+  const deleteImage = async () => {
+    if (isImageMutating) return
+
+    setIsImageMutating(true)
+    try {
+      const updated = await deleteAdminAssetImage(token, asset.id)
+      onAssetChange(updated)
+      setImageReloadKey((value) => value + 1)
+      toast.success('Изображение ассета удалено.')
+    } catch (cause) {
+      toast.error(toDisplayError(cause, 'Не удалось удалить изображение ассета.'))
+    } finally {
+      setIsImageMutating(false)
+    }
+  }
 
   const saveAsset = async () => {
     if (isSaving) return
@@ -330,6 +407,8 @@ function AdminAssetCard({
         is_active: draft.isActive,
         is_public: draft.isPublic,
         is_user_purchasable: draft.isUserPurchasable,
+        rarity: draft.rarity || null,
+        weaponKey: draft.weaponKey.trim() || null,
         metadata,
       })
       onAssetChange(updated)
@@ -358,6 +437,32 @@ function AdminAssetCard({
         </div>
       </div>
 
+      <div className="admin-asset-image-panel">
+        <AdminAssetImage token={token} asset={asset} reloadKey={imageReloadKey} />
+        <div className="admin-asset-image-info">
+          <strong>Изображение ассета</strong>
+          <small>PNG, JPG или WebP до 2 МБ.</small>
+          <div className="admin-asset-image-actions">
+            <input
+              ref={imageInputRef}
+              className="admin-hidden-file-input"
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/*"
+              onChange={(event) => void uploadImage(event)}
+            />
+            <button type="button" className="btn btn-sm" disabled={isImageMutating} onClick={() => imageInputRef.current?.click()}>
+              {isImageMutating ? 'Обновляем...' : 'Загрузить'}
+            </button>
+            <a className="btn btn-sm" href={buildPublicAssetImageUrl(asset.id, asset.updatedAt)} target="_blank" rel="noreferrer">
+              Открыть
+            </a>
+            <button type="button" className="btn btn-sm danger" disabled={isImageMutating} onClick={() => void deleteImage()}>
+              Удалить
+            </button>
+          </div>
+        </div>
+      </div>
+
       <div className="admin-asset-edit-grid">
         <input
           className="ui-input"
@@ -365,11 +470,28 @@ function AdminAssetCard({
           onChange={(event) => setDraft((prev) => ({ ...prev, displayName: event.target.value }))}
           placeholder="Название"
         />
-        <input
+        <textarea
           className="ui-input"
           value={draft.description}
           onChange={(event) => setDraft((prev) => ({ ...prev, description: event.target.value }))}
           placeholder="Описание"
+          rows={1}
+        />
+        <select
+          className="ui-input"
+          value={draft.rarity}
+          onChange={(event) => setDraft((prev) => ({ ...prev, rarity: event.target.value as SkinRarity | '' }))}
+        >
+          <option value="">Без редкости</option>
+          <option value="common">common</option>
+          <option value="rare">rare</option>
+          <option value="legendary">legendary</option>
+        </select>
+        <input
+          className="ui-input"
+          value={draft.weaponKey}
+          onChange={(event) => setDraft((prev) => ({ ...prev, weaponKey: event.target.value }))}
+          placeholder="weaponKey"
         />
       </div>
 

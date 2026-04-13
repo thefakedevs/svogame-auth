@@ -186,7 +186,7 @@ export default function AccountApp() {
     case paths.profileEdit:
       page = <ProfileShell pageTitle="Настройки профиля" defaultTab="settings" />
       break
-    case paths.ownership:
+    case paths.inventory:
       page = <OwnershipShell />
       break
     case paths.wallet:

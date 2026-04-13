@@ -24,8 +24,9 @@ import {
   type InventoryResponse,
   type WalletBalanceResponse,
   type WalletTransactionResponse,
-} from '../../api/ownership'
+} from '../../api/inventory'
 import AppPortal from '../../shared/ui/portal/AppPortal'
+import AdminAssetImage from './AdminAssetImage'
 
 type AdminOwnershipState =
   | { status: 'loading' }
@@ -69,8 +70,12 @@ function makeAssetMap(assets: AssetResponse[]) {
   return map
 }
 
+function assetByKey(assetMap: Map<string, AssetResponse>, assetKey: string, assetDefinitionId?: string) {
+  return assetMap.get(assetKey) ?? (assetDefinitionId ? assetMap.get(assetDefinitionId) : null) ?? null
+}
+
 function assetName(assetMap: Map<string, AssetResponse>, assetKey: string, assetDefinitionId?: string) {
-  return assetMap.get(assetKey)?.displayName ?? (assetDefinitionId ? assetMap.get(assetDefinitionId)?.displayName : null) ?? assetKey
+  return assetByKey(assetMap, assetKey, assetDefinitionId)?.displayName ?? assetKey
 }
 
 function parseAmount(value: string) {
@@ -110,7 +115,7 @@ export default function AdminUserOwnershipPanel({ token, userId }: { token: stri
       const walletTransactions = await getAdminUserWalletTransactions(token, userId, wallet.currencyKey)
       setState({ status: 'ready', assets, inventory, wallet, walletTransactions, inventoryHistory })
     } catch (cause) {
-      setState({ status: 'error', error: toDisplayError(cause, 'Не удалось загрузить имущество и кошелек.') })
+      setState({ status: 'error', error: toDisplayError(cause, 'Не удалось загрузить инвентарь и кошелек.') })
     }
   }, [token, userId])
 
@@ -185,20 +190,20 @@ export default function AdminUserOwnershipPanel({ token, userId }: { token: stri
   const mutateEntitlement = async (action: 'grant' | 'revoke', assetKey?: string) => {
     const key = assetKey ?? selectedEntitlement?.key
     if (!key) {
-      toast.error('Выберите ассет.')
+      toast.error('Выберите скин.')
       return
     }
 
     await runMutation(async () => {
       if (action === 'grant') return grantAdminEntitlement(token, userId, key, inventoryMutationBody())
       return revokeAdminEntitlement(token, userId, key, inventoryMutationBody())
-    }, action === 'grant' ? 'Ассет выдан.' : 'Ассет снят.')
+    }, action === 'grant' ? 'Скин выдан.' : 'Скин снят.')
   }
 
   const mutateStackable = async (action: 'add' | 'remove' | 'set' | 'clear', assetKey?: string) => {
     const key = assetKey ?? selectedStackable?.key
     if (!key) {
-      toast.error('Выберите stackable ассет.')
+      toast.error('Выберите предмет с количеством.')
       return
     }
 
@@ -212,13 +217,13 @@ export default function AdminUserOwnershipPanel({ token, userId }: { token: stri
       if (action === 'add') return addAdminStackable(token, userId, key, inventoryMutationBody({ amount }))
       if (action === 'remove') return removeAdminStackable(token, userId, key, inventoryMutationBody({ amount }))
       return setAdminStackable(token, userId, key, inventoryMutationBody({ amount }))
-    }, action === 'clear' ? 'Stackable ассет обнулен.' : 'Stackable ассет обновлен.')
+    }, action === 'clear' ? 'Предмет обнулен.' : 'Предмет обновлен.')
   }
 
   const mutateExpirable = async (action: 'prolong' | 'expiration' | 'revoke', assetKey?: string) => {
     const key = assetKey ?? selectedExpirable?.key
     if (!key) {
-      toast.error('Выберите expirable ассет.')
+      toast.error('Выберите временный бонус.')
       return
     }
 
@@ -230,7 +235,7 @@ export default function AdminUserOwnershipPanel({ token, userId }: { token: stri
       }
       await runMutation(
         async () => prolongAdminExpirable(token, userId, key, inventoryMutationBody({ durationSeconds: days * 24 * 60 * 60 })),
-        'Expirable ассет продлен.',
+        'Временный бонус продлен.',
       )
       return
     }
@@ -243,18 +248,18 @@ export default function AdminUserOwnershipPanel({ token, userId }: { token: stri
       }
       await runMutation(
         async () => setAdminExpirableExpiration(token, userId, key, inventoryMutationBody({ expiresAt: iso })),
-        'Срок expirable ассета обновлен.',
+        'Срок временного бонуса обновлен.',
       )
       return
     }
 
-    await runMutation(async () => revokeAdminExpirable(token, userId, key, inventoryMutationBody()), 'Expirable ассет снят.')
+    await runMutation(async () => revokeAdminExpirable(token, userId, key, inventoryMutationBody()), 'Временный бонус снят.')
   }
 
   if (state.status === 'loading') {
     return (
       <section className="admin-card-subsection">
-        <h3 className="card-title">Имущество и кошелек</h3>
+        <h3 className="card-title">Инвентарь и кошелек</h3>
         <div className="admin-ownership-actions">
           <button type="button" className="btn btn-sm" disabled>Загружаем...</button>
         </div>
@@ -265,7 +270,7 @@ export default function AdminUserOwnershipPanel({ token, userId }: { token: stri
   if (state.status === 'error') {
     return (
       <section className="admin-card-subsection">
-        <h3 className="card-title">Имущество и кошелек</h3>
+        <h3 className="card-title">Инвентарь и кошелек</h3>
         <p className="admin-inline-muted">{state.error}</p>
         <button type="button" className="btn btn-sm" onClick={() => void load()}>
           Повторить
@@ -279,7 +284,7 @@ export default function AdminUserOwnershipPanel({ token, userId }: { token: stri
   return (
     <section className="admin-card-subsection">
       <div className="admin-ownership-summary-head">
-        <h3 className="card-title">Имущество и кошелек</h3>
+        <h3 className="card-title">Инвентарь и кошелек</h3>
         <button type="button" className="btn btn-sm" disabled={isMutating} onClick={() => void load()}>
           Обновить
         </button>
@@ -290,13 +295,13 @@ export default function AdminUserOwnershipPanel({ token, userId }: { token: stri
           Баланс: {formatAmount(state.wallet.balance)} защекинов
         </button>
         <button type="button" className="btn btn-sm" onClick={() => setActiveModal('entitlements')}>
-          Ассеты: {state.inventory.entitlements.length}
+          Скины: {state.inventory.entitlements.length}
         </button>
         <button type="button" className="btn btn-sm" onClick={() => setActiveModal('stackables')}>
-          Stackable: {state.inventory.stackables.length}
+          Предметы: {state.inventory.stackables.length}
         </button>
         <button type="button" className="btn btn-sm" onClick={() => setActiveModal('expirables')}>
-          Expirable: {state.inventory.expirables.length}
+          Временные: {state.inventory.expirables.length}
         </button>
         <button type="button" className="btn btn-sm" onClick={() => setActiveModal('purchases')}>
           Покупки: {purchases.length}
@@ -326,7 +331,7 @@ export default function AdminUserOwnershipPanel({ token, userId }: { token: stri
       ) : null}
 
       {activeModal === 'entitlements' ? (
-        <AdminOwnershipModal title="Ассеты игрока" titleId="admin-entitlements-modal-title" isBusy={isMutating} onClose={() => setActiveModal(null)}>
+        <AdminOwnershipModal title="Скины игрока" titleId="admin-entitlements-modal-title" isBusy={isMutating} onClose={() => setActiveModal(null)}>
           <InventoryGrantForm
             assets={entitlementAssets}
             selectedKey={selectedEntitlement?.key ?? ''}
@@ -335,25 +340,27 @@ export default function AdminUserOwnershipPanel({ token, userId }: { token: stri
             onReasonTextChange={setReasonText}
             onGrant={() => void mutateEntitlement('grant')}
             disabled={isMutating}
-            emptyText="Entitlement ассетов в каталоге нет."
+            emptyText="Скинов в каталоге нет."
           />
           <AdminInventoryModalList
+            token={token}
             title="Выдано"
             items={state.inventory.entitlements.map((item) => ({
               key: item.assetKey,
               title: assetName(assetMap, item.assetKey, item.assetDefinitionId),
+              asset: assetByKey(assetMap, item.assetKey, item.assetDefinitionId),
               meta: `Выдано: ${formatDateTime(item.grantedAt)}`,
               onRemove: () => void mutateEntitlement('revoke', item.assetKey),
             }))}
             removeLabel="Снять"
-            emptyText="У игрока нет entitlement ассетов."
+            emptyText="У игрока нет скинов."
             disabled={isMutating}
           />
         </AdminOwnershipModal>
       ) : null}
 
       {activeModal === 'stackables' ? (
-        <AdminOwnershipModal title="Stackable ассеты" titleId="admin-stackables-modal-title" isBusy={isMutating} onClose={() => setActiveModal(null)}>
+        <AdminOwnershipModal title="Предметы с количеством" titleId="admin-stackables-modal-title" isBusy={isMutating} onClose={() => setActiveModal(null)}>
           <StackableControlForm
             assets={stackableAssets}
             selectedKey={selectedStackable?.key ?? ''}
@@ -368,22 +375,24 @@ export default function AdminUserOwnershipPanel({ token, userId }: { token: stri
             onSet={() => void mutateStackable('set')}
           />
           <AdminInventoryModalList
+            token={token}
             title="На балансе"
             items={state.inventory.stackables.map((item) => ({
               key: item.assetKey,
               title: assetName(assetMap, item.assetKey, item.assetDefinitionId),
+              asset: assetByKey(assetMap, item.assetKey, item.assetDefinitionId),
               meta: `${formatAmount(item.amount)} · ${formatDateTime(item.updatedAt)}`,
               onRemove: () => void mutateStackable('clear', item.assetKey),
             }))}
             removeLabel="Обнулить"
-            emptyText="У игрока нет stackable ассетов."
+            emptyText="У игрока нет предметов с количеством."
             disabled={isMutating}
           />
         </AdminOwnershipModal>
       ) : null}
 
       {activeModal === 'expirables' ? (
-        <AdminOwnershipModal title="Expirable ассеты" titleId="admin-expirables-modal-title" isBusy={isMutating} onClose={() => setActiveModal(null)}>
+        <AdminOwnershipModal title="Временные бонусы" titleId="admin-expirables-modal-title" isBusy={isMutating} onClose={() => setActiveModal(null)}>
           <ExpirableControlForm
             assets={expirableAssets}
             selectedKey={selectedExpirable?.key ?? ''}
@@ -399,15 +408,17 @@ export default function AdminUserOwnershipPanel({ token, userId }: { token: stri
             onSetExpiration={() => void mutateExpirable('expiration')}
           />
           <AdminInventoryModalList
+            token={token}
             title="Активно"
             items={state.inventory.expirables.map((item) => ({
               key: item.assetKey,
               title: assetName(assetMap, item.assetKey, item.assetDefinitionId),
+              asset: assetByKey(assetMap, item.assetKey, item.assetDefinitionId),
               meta: `До: ${formatDateTime(item.expiresAt)}`,
               onRemove: () => void mutateExpirable('revoke', item.assetKey),
             }))}
             removeLabel="Снять"
-            emptyText="У игрока нет expirable ассетов."
+            emptyText="У игрока нет временных бонусов."
             disabled={isMutating}
           />
         </AdminOwnershipModal>
@@ -535,7 +546,7 @@ function StackableControlForm({
   onRemove: () => void
   onSet: () => void
 }) {
-  if (!assets.length) return <p className="admin-inline-muted">Stackable ассетов в каталоге нет.</p>
+  if (!assets.length) return <p className="admin-inline-muted">Предметов с количеством в каталоге нет.</p>
 
   return (
     <div className="admin-ownership-form">
@@ -582,7 +593,7 @@ function ExpirableControlForm({
   onProlong: () => void
   onSetExpiration: () => void
 }) {
-  if (!assets.length) return <p className="admin-inline-muted">Expirable ассетов в каталоге нет.</p>
+  if (!assets.length) return <p className="admin-inline-muted">Временных бонусов в каталоге нет.</p>
 
   return (
     <div className="admin-ownership-form">
@@ -603,14 +614,16 @@ function ExpirableControlForm({
 }
 
 function AdminInventoryModalList({
+  token,
   title,
   items,
   removeLabel,
   emptyText,
   disabled,
 }: {
+  token: string
   title: string
-  items: { key: string; title: string; meta: string; onRemove: () => void }[]
+  items: { key: string; title: string; meta: string; asset: AssetResponse | null; onRemove: () => void }[]
   removeLabel: string
   emptyText: string
   disabled: boolean
@@ -625,10 +638,18 @@ function AdminInventoryModalList({
         <div className="admin-ownership-modal-list">
           {items.map((item) => (
             <article key={item.key} className="admin-ownership-list-item admin-ownership-list-item--actionable">
-              <span>
-                <strong>{item.title}</strong>
-                <small>{item.meta}</small>
-              </span>
+              <div className="admin-inventory-item-main">
+                <AdminAssetImage
+                  token={token}
+                  asset={item.asset}
+                  className="admin-asset-image-preview--thumb"
+                  placeholder="—"
+                />
+                <span>
+                  <strong>{item.title}</strong>
+                  <small>{item.meta}</small>
+                </span>
+              </div>
               <button className="btn btn-sm danger" type="button" disabled={disabled} onClick={item.onRemove}>{removeLabel}</button>
             </article>
           ))}

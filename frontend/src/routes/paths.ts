@@ -6,7 +6,7 @@ export const paths = {
   auth: '/auth',
   profile: '/profile',
   profileEdit: '/profile/edit',
-  ownership: '/ownership',
+  inventory: '/inventory',
   wallet: '/wallet',
   downloads: '/downloads',
   contacts: '/contacts',

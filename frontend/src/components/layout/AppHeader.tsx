@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { toDisplayError } from '../../api/http'
-import { getMyDefaultWalletBalance, type WalletBalanceResponse } from '../../api/ownership'
+import { getMyDefaultWalletBalance, type WalletBalanceResponse } from '../../api/inventory'
 import { buildAuthUrl } from '../../routes/auth'
 import { paths } from '../../routes/paths'
 import { navigateTo } from '../../shared/navigation/history'
@@ -146,13 +146,13 @@ export default function AppHeader({ pageTitle }: Props) {
     >
       <div className="app-header__menu-topbar">
         <span className="app-header__menu-kicker">Меню</span>
-        <div
+        <button
           className="app-header__menu-close"
           aria-label="Закрыть меню"
           onClick={() => setIsMenuOpen(false)}
         >
           ×
-        </div>
+        </button>
       </div>
       <div className="app-header__menu-body">
         <div className="app-header__menu-head">
@@ -180,7 +180,7 @@ export default function AppHeader({ pageTitle }: Props) {
         </a>
         <div className="app-header__menu-section">
           <a href={paths.profile}>Профиль</a>
-          <a href={paths.ownership}>Инвентарь</a>
+          <a href={paths.inventory}>Инвентарь</a>
           <a href={paths.wallet}>Кошелек</a>
           <a href={`${paths.profile}?tab=squads`}>Сквад</a>
           <a href={`${paths.profile}?tab=settings`}>Настройки</a>

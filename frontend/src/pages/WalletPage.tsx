@@ -4,7 +4,7 @@ import {
   getMyWalletTransactions,
   type WalletBalanceResponse,
   type WalletTransactionResponse,
-} from '../api/ownership'
+} from '../api/inventory'
 import { toDisplayError } from '../api/http'
 import ErrorState from '../components/ErrorState'
 import LoadingState from '../components/LoadingState'

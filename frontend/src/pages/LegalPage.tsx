@@ -60,7 +60,14 @@ export function legalPageHeading(pathname: string) {
     return 'Правовые документы'
   }
 
-  return 'Правовые документы'
+  const headings: Record<string, string> = {
+    [paths.legalPrivacyPolicy]: 'Политика конфиденциальности',
+    [paths.legalPublicOffer]: 'Публичная оферта',
+    [paths.legalRefundPolicy]: 'Политика возвратов',
+    [paths.legalUserAgreement]: 'Пользовательское соглашение',
+  }
+
+  return headings[pathname] ?? 'Правовые документы'
 }
 
 export default function LegalPage({ pathname }: { pathname: string }) {
