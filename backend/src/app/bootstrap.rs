@@ -25,6 +25,8 @@ pub async fn run() -> Result<()> {
 
     let state: SharedAppState = Arc::new(RwLock::new(AppState::new(config.clone(), db, s3)));
     spawn_auth_cleanup_worker(state.clone());
+    spawn_shop_reconciliation_worker(state.clone());
+    spawn_discord_delivery_worker(state.clone());
 
     let app = build_router(state);
     let listener = TcpListener::bind(&config.binding_address).await?;
@@ -121,13 +123,57 @@ fn spawn_auth_cleanup_worker(state: SharedAppState) {
     });
 }
 
+fn spawn_shop_reconciliation_worker(state: SharedAppState) {
+    tokio::spawn(async move {
+        let interval_seconds = {
+            let state_guard = state.read().await;
+            state_guard.config.shop.reconciliation_interval_seconds
+        };
+        let mut interval = tokio::time::interval(std::time::Duration::from_secs(interval_seconds));
+        loop {
+            interval.tick().await;
+            let (db, shop_config) = {
+                let state_guard = state.read().await;
+                (state_guard.db.clone(), state_guard.config.shop.clone())
+            };
+            if let Err(error) =
+                crate::services::shop::reconcile_pending_orders(&db, &shop_config).await
+            {
+                warn!("Shop reconciliation failed: {error}");
+            }
+        }
+    });
+}
+
+fn spawn_discord_delivery_worker(state: SharedAppState) {
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(std::time::Duration::from_secs(1));
+        loop {
+            interval.tick().await;
+            let (db, discord_config) = {
+                let state_guard = state.read().await;
+                (state_guard.db.clone(), state_guard.config.discord.clone())
+            };
+            if let Err(error) =
+                crate::services::discord_notifications::process_next_delivery(&db, &discord_config)
+                    .await
+            {
+                warn!("Discord delivery worker failed: {error}");
+            }
+        }
+    });
+}
+
 fn log_frontend_dev_target() {
     #[cfg(debug_assertions)]
     {
         let frontend_host =
             std::env::var("FRONTEND_DEV_HOST").unwrap_or_else(|_| "localhost".to_string());
-        let frontend_port =
-            std::env::var("FRONTEND_DEV_PORT").unwrap_or_else(|_| "5173".to_string());
+        let frontend_port = std::env::var("DEBUG_PORT")
+            .ok()
+            .filter(|value| !value.trim().is_empty())
+            .or_else(|| std::env::var("FRONTEND_DEV_PORT").ok())
+            .unwrap_or_else(|| "5173".to_string());
 
         info!(
             "Frontend dev server expected at http://{}:{}",

@@ -630,6 +630,12 @@ impl MigrationTrait for CreateAssetDefinitionTable {
                             .not_null()
                             .default(true),
                     )
+                    .col(ColumnDef::new(AssetDefinition::ImageKey).string().null())
+                    .col(
+                        ColumnDef::new(AssetDefinition::ImageContentType)
+                            .string()
+                            .null(),
+                    )
                     .col(ColumnDef::new(AssetDefinition::Metadata).text().not_null())
                     .col(
                         ColumnDef::new(AssetDefinition::CreatedAt)
@@ -668,6 +674,10 @@ enum AssetDefinition {
     IsUserPurchasable,
     IsPublic,
     IsActive,
+    ImageKey,
+    ImageContentType,
+    WeaponKey,
+    Rarity,
     Metadata,
     CreatedAt,
     UpdatedAt,
@@ -1706,4 +1716,860 @@ enum LootboxOpenOperation {
     WinnerIndex,
     FeedJson,
     CreatedAt,
+}
+
+pub struct CreateShopProductTable;
+
+impl MigrationName for CreateShopProductTable {
+    fn name(&self) -> &str {
+        "m20260412_000024_create_shop_product_table"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for CreateShopProductTable {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .create_table(
+                Table::create()
+                    .table(ShopProduct::Table)
+                    .if_not_exists()
+                    .col(
+                        ColumnDef::new(ShopProduct::Id)
+                            .uuid()
+                            .not_null()
+                            .primary_key(),
+                    )
+                    .col(
+                        ColumnDef::new(ShopProduct::Key)
+                            .string()
+                            .not_null()
+                            .unique_key(),
+                    )
+                    .col(
+                        ColumnDef::new(ShopProduct::AssetDefinitionId)
+                            .uuid()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(ShopProduct::PriceRub)
+                            .big_integer()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(ShopProduct::StackableAmount)
+                            .big_integer()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(ShopProduct::ExpirableDurationSeconds)
+                            .big_integer()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(ShopProduct::MaxPerPurchase)
+                            .big_integer()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(ShopProduct::MaxOwnedAmount)
+                            .big_integer()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(ShopProduct::IsActive)
+                            .boolean()
+                            .not_null()
+                            .default(true),
+                    )
+                    .col(
+                        ColumnDef::new(ShopProduct::IsPublic)
+                            .boolean()
+                            .not_null()
+                            .default(true),
+                    )
+                    .col(
+                        ColumnDef::new(ShopProduct::SortOrder)
+                            .integer()
+                            .not_null()
+                            .default(0),
+                    )
+                    .col(
+                        ColumnDef::new(ShopProduct::StartsAt)
+                            .timestamp_with_time_zone()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(ShopProduct::EndsAt)
+                            .timestamp_with_time_zone()
+                            .null(),
+                    )
+                    .col(ColumnDef::new(ShopProduct::Metadata).text().not_null())
+                    .col(
+                        ColumnDef::new(ShopProduct::CreatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .col(
+                        ColumnDef::new(ShopProduct::UpdatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .to_owned(),
+            )
+            .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_table(Table::drop().table(ShopProduct::Table).to_owned())
+            .await
+    }
+}
+
+#[derive(DeriveIden)]
+enum ShopProduct {
+    Table,
+    Id,
+    Key,
+    AssetDefinitionId,
+    PriceRub,
+    StackableAmount,
+    ExpirableDurationSeconds,
+    MaxPerPurchase,
+    MaxOwnedAmount,
+    IsActive,
+    IsPublic,
+    SortOrder,
+    StartsAt,
+    EndsAt,
+    Metadata,
+    CreatedAt,
+    UpdatedAt,
+}
+
+pub struct CreateShopProductLocaleTable;
+
+impl MigrationName for CreateShopProductLocaleTable {
+    fn name(&self) -> &str {
+        "m20260412_000025_create_shop_product_locale_table"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for CreateShopProductLocaleTable {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .create_table(
+                Table::create()
+                    .table(ShopProductLocale::Table)
+                    .if_not_exists()
+                    .col(
+                        ColumnDef::new(ShopProductLocale::ProductId)
+                            .uuid()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(ShopProductLocale::Locale)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(ColumnDef::new(ShopProductLocale::Name).string().not_null())
+                    .col(
+                        ColumnDef::new(ShopProductLocale::Description)
+                            .string()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(ShopProductLocale::CreatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .col(
+                        ColumnDef::new(ShopProductLocale::UpdatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .primary_key(
+                        sea_orm::sea_query::Index::create()
+                            .col(ShopProductLocale::ProductId)
+                            .col(ShopProductLocale::Locale),
+                    )
+                    .to_owned(),
+            )
+            .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_table(Table::drop().table(ShopProductLocale::Table).to_owned())
+            .await
+    }
+}
+
+#[derive(DeriveIden)]
+enum ShopProductLocale {
+    Table,
+    ProductId,
+    Locale,
+    Name,
+    Description,
+    CreatedAt,
+    UpdatedAt,
+}
+
+pub struct CreateShopOrderTable;
+
+impl MigrationName for CreateShopOrderTable {
+    fn name(&self) -> &str {
+        "m20260412_000026_create_shop_order_table"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for CreateShopOrderTable {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .create_table(
+                Table::create()
+                    .table(ShopOrder::Table)
+                    .if_not_exists()
+                    .col(
+                        ColumnDef::new(ShopOrder::Id)
+                            .uuid()
+                            .not_null()
+                            .primary_key(),
+                    )
+                    .col(ColumnDef::new(ShopOrder::UserId).uuid().not_null())
+                    .col(ColumnDef::new(ShopOrder::ProductId).uuid().not_null())
+                    .col(ColumnDef::new(ShopOrder::ProductKey).string().not_null())
+                    .col(ColumnDef::new(ShopOrder::ProductLocale).string().null())
+                    .col(ColumnDef::new(ShopOrder::ProductName).string().not_null())
+                    .col(
+                        ColumnDef::new(ShopOrder::ProductDescription)
+                            .string()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(ShopOrder::AssetDefinitionId)
+                            .uuid()
+                            .not_null(),
+                    )
+                    .col(ColumnDef::new(ShopOrder::AssetKey).string().not_null())
+                    .col(
+                        ColumnDef::new(ShopOrder::OwnershipModel)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(ColumnDef::new(ShopOrder::Quantity).big_integer().not_null())
+                    .col(
+                        ColumnDef::new(ShopOrder::UnitPriceRub)
+                            .big_integer()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(ShopOrder::TotalPriceRub)
+                            .big_integer()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(ShopOrder::StackableAmountPerUnit)
+                            .big_integer()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(ShopOrder::ExpirableDurationSecondsPerUnit)
+                            .big_integer()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(ShopOrder::MaxOwnedAmountSnapshot)
+                            .big_integer()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(ShopOrder::PaymentProvider)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(ColumnDef::new(ShopOrder::Status).string().not_null())
+                    .col(ColumnDef::new(ShopOrder::FailureProblem).string().null())
+                    .col(
+                        ColumnDef::new(ShopOrder::PaymentExpiresAt)
+                            .timestamp_with_time_zone()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(ShopOrder::PaidAt)
+                            .timestamp_with_time_zone()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(ShopOrder::FulfilledAt)
+                            .timestamp_with_time_zone()
+                            .null(),
+                    )
+                    .col(ColumnDef::new(ShopOrder::Metadata).text().not_null())
+                    .col(
+                        ColumnDef::new(ShopOrder::CreatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .col(
+                        ColumnDef::new(ShopOrder::UpdatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .to_owned(),
+            )
+            .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_table(Table::drop().table(ShopOrder::Table).to_owned())
+            .await
+    }
+}
+
+#[derive(DeriveIden)]
+enum ShopOrder {
+    Table,
+    Id,
+    UserId,
+    ProductId,
+    ProductKey,
+    ProductLocale,
+    ProductName,
+    ProductDescription,
+    AssetDefinitionId,
+    AssetKey,
+    OwnershipModel,
+    Quantity,
+    UnitPriceRub,
+    TotalPriceRub,
+    StackableAmountPerUnit,
+    ExpirableDurationSecondsPerUnit,
+    MaxOwnedAmountSnapshot,
+    PaymentProvider,
+    Status,
+    FailureProblem,
+    PaymentExpiresAt,
+    PaidAt,
+    FulfilledAt,
+    Metadata,
+    CreatedAt,
+    UpdatedAt,
+}
+
+pub struct CreateShopPaymentAttemptTable;
+
+impl MigrationName for CreateShopPaymentAttemptTable {
+    fn name(&self) -> &str {
+        "m20260412_000027_create_shop_payment_attempt_table"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for CreateShopPaymentAttemptTable {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .create_table(
+                Table::create()
+                    .table(ShopPaymentAttempt::Table)
+                    .if_not_exists()
+                    .col(
+                        ColumnDef::new(ShopPaymentAttempt::Id)
+                            .uuid()
+                            .not_null()
+                            .primary_key(),
+                    )
+                    .col(
+                        ColumnDef::new(ShopPaymentAttempt::OrderId)
+                            .uuid()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(ShopPaymentAttempt::Provider)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(ShopPaymentAttempt::ProviderPaymentId)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(ShopPaymentAttempt::CheckoutToken)
+                            .string()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(ShopPaymentAttempt::CheckoutUrl)
+                            .string()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(ShopPaymentAttempt::Status)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(ShopPaymentAttempt::RequestPayload)
+                            .text()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(ShopPaymentAttempt::ResponsePayload)
+                            .text()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(ShopPaymentAttempt::CreatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .col(
+                        ColumnDef::new(ShopPaymentAttempt::UpdatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .to_owned(),
+            )
+            .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_table(Table::drop().table(ShopPaymentAttempt::Table).to_owned())
+            .await
+    }
+}
+
+#[derive(DeriveIden)]
+enum ShopPaymentAttempt {
+    Table,
+    Id,
+    OrderId,
+    Provider,
+    ProviderPaymentId,
+    CheckoutToken,
+    CheckoutUrl,
+    Status,
+    RequestPayload,
+    ResponsePayload,
+    CreatedAt,
+    UpdatedAt,
+}
+
+pub struct AddShopOrderPaymentLifecycleColumns;
+
+impl MigrationName for AddShopOrderPaymentLifecycleColumns {
+    fn name(&self) -> &str {
+        "m20260413_000028_add_shop_order_payment_lifecycle_columns"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for AddShopOrderPaymentLifecycleColumns {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        let backend = manager.get_database_backend();
+        let statements = match backend {
+            DatabaseBackend::Postgres | DatabaseBackend::Sqlite => vec![
+                r#"ALTER TABLE "shop_order" ADD COLUMN "payment_expires_at" timestamptz NULL"#,
+                r#"CREATE INDEX IF NOT EXISTS "idx_shop_order_status_payment_expires_at" ON "shop_order" ("status", "payment_expires_at")"#,
+            ],
+            _ => return Ok(()),
+        };
+
+        for sql in statements {
+            match manager
+                .get_connection()
+                .execute(Statement::from_string(backend, sql.to_string()))
+                .await
+            {
+                Ok(_) => {}
+                Err(error)
+                    if is_duplicate_column_error(&error) || is_duplicate_index_error(&error) => {}
+                Err(error) => return Err(error),
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn down(&self, _manager: &SchemaManager) -> Result<(), DbErr> {
+        Ok(())
+    }
+}
+
+pub struct AddShopPaymentAttemptProviderIndex;
+
+impl MigrationName for AddShopPaymentAttemptProviderIndex {
+    fn name(&self) -> &str {
+        "m20260413_000029_add_shop_payment_attempt_provider_index"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for AddShopPaymentAttemptProviderIndex {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        let backend = manager.get_database_backend();
+        let sql = match backend {
+            DatabaseBackend::Postgres | DatabaseBackend::Sqlite => {
+                r#"CREATE UNIQUE INDEX IF NOT EXISTS "idx_shop_payment_attempt_provider_payment_id" ON "shop_payment_attempt" ("provider", "provider_payment_id")"#
+            }
+            _ => return Ok(()),
+        };
+
+        match manager
+            .get_connection()
+            .execute(Statement::from_string(backend, sql.to_string()))
+            .await
+        {
+            Ok(_) => Ok(()),
+            Err(error) if is_duplicate_index_error(&error) => Ok(()),
+            Err(error) => Err(error),
+        }
+    }
+
+    async fn down(&self, _manager: &SchemaManager) -> Result<(), DbErr> {
+        Ok(())
+    }
+}
+
+fn is_duplicate_index_error(error: &DbErr) -> bool {
+    let error_text = error.to_string().to_lowercase();
+    error_text.contains("already exists")
+        || error_text.contains("duplicate")
+        || error_text.contains("exists")
+}
+
+pub struct CreateDiscordBroadcastTable;
+
+impl MigrationName for CreateDiscordBroadcastTable {
+    fn name(&self) -> &str {
+        "m20260413_000030_create_discord_broadcast_table"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for CreateDiscordBroadcastTable {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .create_table(
+                Table::create()
+                    .table(DiscordBroadcast::Table)
+                    .if_not_exists()
+                    .col(
+                        ColumnDef::new(DiscordBroadcast::Id)
+                            .uuid()
+                            .not_null()
+                            .primary_key(),
+                    )
+                    .col(ColumnDef::new(DiscordBroadcast::RequestedByUserId).uuid().null())
+                    .col(ColumnDef::new(DiscordBroadcast::TemplateKey).string().not_null())
+                    .col(ColumnDef::new(DiscordBroadcast::Message).text().not_null())
+                    .col(ColumnDef::new(DiscordBroadcast::Status).string().not_null())
+                    .col(ColumnDef::new(DiscordBroadcast::TotalCount).big_integer().not_null())
+                    .col(
+                        ColumnDef::new(DiscordBroadcast::CreatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .col(
+                        ColumnDef::new(DiscordBroadcast::UpdatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .col(
+                        ColumnDef::new(DiscordBroadcast::StartedAt)
+                            .timestamp_with_time_zone()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(DiscordBroadcast::FinishedAt)
+                            .timestamp_with_time_zone()
+                            .null(),
+                    )
+                    .to_owned(),
+            )
+            .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_table(Table::drop().table(DiscordBroadcast::Table).to_owned())
+            .await
+    }
+}
+
+#[derive(DeriveIden)]
+enum DiscordBroadcast {
+    Table,
+    Id,
+    RequestedByUserId,
+    TemplateKey,
+    Message,
+    Status,
+    TotalCount,
+    CreatedAt,
+    UpdatedAt,
+    StartedAt,
+    FinishedAt,
+}
+
+pub struct CreateDiscordDeliveryTable;
+
+impl MigrationName for CreateDiscordDeliveryTable {
+    fn name(&self) -> &str {
+        "m20260413_000031_create_discord_delivery_table"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for CreateDiscordDeliveryTable {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .create_table(
+                Table::create()
+                    .table(DiscordDelivery::Table)
+                    .if_not_exists()
+                    .col(
+                        ColumnDef::new(DiscordDelivery::Id)
+                            .uuid()
+                            .not_null()
+                            .primary_key(),
+                    )
+                    .col(ColumnDef::new(DiscordDelivery::BroadcastId).uuid().null())
+                    .col(ColumnDef::new(DiscordDelivery::UserId).uuid().not_null())
+                    .col(ColumnDef::new(DiscordDelivery::RequestedByUserId).uuid().null())
+                    .col(ColumnDef::new(DiscordDelivery::TemplateKey).string().not_null())
+                    .col(ColumnDef::new(DiscordDelivery::Message).text().not_null())
+                    .col(ColumnDef::new(DiscordDelivery::Status).string().not_null())
+                    .col(ColumnDef::new(DiscordDelivery::ErrorMessage).text().null())
+                    .col(ColumnDef::new(DiscordDelivery::DiscordChannelId).string().null())
+                    .col(ColumnDef::new(DiscordDelivery::DiscordMessageId).string().null())
+                    .col(
+                        ColumnDef::new(DiscordDelivery::AttemptCount)
+                            .integer()
+                            .not_null()
+                            .default(0),
+                    )
+                    .col(ColumnDef::new(DiscordDelivery::Metadata).text().not_null())
+                    .col(
+                        ColumnDef::new(DiscordDelivery::CreatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .col(
+                        ColumnDef::new(DiscordDelivery::UpdatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .col(
+                        ColumnDef::new(DiscordDelivery::LastAttemptAt)
+                            .timestamp_with_time_zone()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(DiscordDelivery::DeliveredAt)
+                            .timestamp_with_time_zone()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(DiscordDelivery::FinishedAt)
+                            .timestamp_with_time_zone()
+                            .null(),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+
+        let backend = manager.get_database_backend();
+        for sql in [
+            r#"CREATE INDEX IF NOT EXISTS "idx_discord_delivery_status_created_at" ON "discord_delivery" ("status", "created_at")"#,
+            r#"CREATE INDEX IF NOT EXISTS "idx_discord_delivery_broadcast_id" ON "discord_delivery" ("broadcast_id")"#,
+        ] {
+            match manager
+                .get_connection()
+                .execute(Statement::from_string(backend, sql.to_string()))
+                .await
+            {
+                Ok(_) => {}
+                Err(error) if is_duplicate_index_error(&error) => {}
+                Err(error) => return Err(error),
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_table(Table::drop().table(DiscordDelivery::Table).to_owned())
+            .await
+    }
+}
+
+#[derive(DeriveIden)]
+enum DiscordDelivery {
+    Table,
+    Id,
+    BroadcastId,
+    UserId,
+    RequestedByUserId,
+    TemplateKey,
+    Message,
+    Status,
+    ErrorMessage,
+    DiscordChannelId,
+    DiscordMessageId,
+    AttemptCount,
+    Metadata,
+    CreatedAt,
+    UpdatedAt,
+    LastAttemptAt,
+    DeliveredAt,
+    FinishedAt,
+}
+
+pub struct AddAssetDefinitionGunskinColumns;
+
+impl MigrationName for AddAssetDefinitionGunskinColumns {
+    fn name(&self) -> &str {
+        "m20260413_000032_add_asset_definition_gunskin_columns"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for AddAssetDefinitionGunskinColumns {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        let backend = manager.get_database_backend();
+        let statements = match backend {
+            DatabaseBackend::Postgres | DatabaseBackend::Sqlite => vec![
+                r#"ALTER TABLE "asset_definition" ADD COLUMN "weapon_key" varchar NULL"#,
+                r#"ALTER TABLE "asset_definition" ADD COLUMN "rarity" varchar NULL"#,
+                r#"ALTER TABLE "asset_definition" ADD COLUMN "image_key" varchar NULL"#,
+                r#"ALTER TABLE "asset_definition" ADD COLUMN "image_content_type" varchar NULL"#,
+                r#"CREATE INDEX IF NOT EXISTS "idx_asset_definition_weapon_key" ON "asset_definition" ("weapon_key")"#,
+            ],
+            _ => return Ok(()),
+        };
+
+        for sql in statements {
+            match manager
+                .get_connection()
+                .execute(Statement::from_string(backend, sql.to_string()))
+                .await
+            {
+                Ok(_) => {}
+                Err(error)
+                    if is_duplicate_column_error(&error) || is_duplicate_index_error(&error) => {}
+                Err(error) => return Err(error),
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn down(&self, _manager: &SchemaManager) -> Result<(), DbErr> {
+        Ok(())
+    }
+}
+
+pub struct CreateUserSelectedGunskinTable;
+
+impl MigrationName for CreateUserSelectedGunskinTable {
+    fn name(&self) -> &str {
+        "m20260413_000033_create_user_selected_gunskin_table"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for CreateUserSelectedGunskinTable {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .create_table(
+                Table::create()
+                    .table(UserSelectedGunskin::Table)
+                    .if_not_exists()
+                    .col(ColumnDef::new(UserSelectedGunskin::UserId).uuid().not_null())
+                    .col(
+                        ColumnDef::new(UserSelectedGunskin::WeaponKey)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(UserSelectedGunskin::AssetDefinitionId)
+                            .uuid()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(UserSelectedGunskin::SelectedAt)
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .col(
+                        ColumnDef::new(UserSelectedGunskin::UpdatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .primary_key(
+                        sea_orm::sea_query::Index::create()
+                            .col(UserSelectedGunskin::UserId)
+                            .col(UserSelectedGunskin::WeaponKey),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+
+        let backend = manager.get_database_backend();
+        for sql in [
+            r#"CREATE INDEX IF NOT EXISTS "idx_user_selected_gunskin_asset_definition_id" ON "user_selected_gunskin" ("asset_definition_id")"#,
+            r#"CREATE INDEX IF NOT EXISTS "idx_user_selected_gunskin_weapon_key" ON "user_selected_gunskin" ("weapon_key")"#,
+        ] {
+            match manager
+                .get_connection()
+                .execute(Statement::from_string(backend, sql.to_string()))
+                .await
+            {
+                Ok(_) => {}
+                Err(error) if is_duplicate_index_error(&error) => {}
+                Err(error) => return Err(error),
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_table(Table::drop().table(UserSelectedGunskin::Table).to_owned())
+            .await
+    }
+}
+
+#[derive(DeriveIden)]
+enum UserSelectedGunskin {
+    Table,
+    UserId,
+    WeaponKey,
+    AssetDefinitionId,
+    SelectedAt,
+    UpdatedAt,
 }

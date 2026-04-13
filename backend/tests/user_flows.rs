@@ -2,9 +2,9 @@ mod common;
 
 use common::TestApp;
 use image::{ImageBuffer, Rgba};
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use sea_orm::ActiveModelTrait;
 use sea_orm::ActiveValue::Set;
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use serial_test::serial;
 
 fn make_skin_png(fill: [u8; 4]) -> Vec<u8> {
@@ -247,6 +247,32 @@ async fn user_can_create_squad_and_see_it_in_profile() {
         Some(squad_id)
     );
     assert_eq!(app.audit_log_count("user.squad.created").await, 1);
+}
+
+#[tokio::test]
+#[serial]
+async fn admin_squad_search_is_case_insensitive() {
+    let app = TestApp::spawn().await;
+    let admin = app.issue_user_token("CaseSquadAdmin", true, &[]).await;
+    let leader = app.issue_user_token("CaseSquadLeader", false, &[]).await;
+    let squad = app.create_squad(&leader, "MixedCaseSquad").await;
+    let squad_id = squad["id"].as_str().expect("squad id");
+
+    let response = app
+        .get_json(
+            "/api/admin/squads?q=mixedcasesquad&page=1&perPage=10",
+            &admin.access_token,
+        )
+        .await;
+    assert!(response.status().is_success());
+
+    let body: serde_json::Value = response
+        .json()
+        .await
+        .expect("case-insensitive admin squad search");
+    assert_eq!(body["total"], 1);
+    assert_eq!(body["items"][0]["id"], squad_id);
+    assert_eq!(body["items"][0]["name"], "MixedCaseSquad");
 }
 
 #[tokio::test]
@@ -647,6 +673,30 @@ async fn admin_can_search_users_by_username_and_uuid() {
 
 #[tokio::test]
 #[serial]
+async fn admin_user_search_is_case_insensitive() {
+    let app = TestApp::spawn().await;
+    let admin = app.issue_user_token("CaseSearchAdmin", true, &[]).await;
+    let searched_user = app.issue_user_token("MixedCaseTarget", false, &[]).await;
+
+    let response = app
+        .get_json(
+            "/api/admin/users?q=mixedcasetarget&page=1&perPage=10",
+            &admin.access_token,
+        )
+        .await;
+    assert!(response.status().is_success());
+
+    let body: serde_json::Value = response
+        .json()
+        .await
+        .expect("case-insensitive admin user search");
+    assert_eq!(body["total"], 1);
+    assert_eq!(body["items"][0]["id"], searched_user.user_id);
+    assert_eq!(body["items"][0]["username"], "MixedCaseTarget");
+}
+
+#[tokio::test]
+#[serial]
 async fn authenticated_user_can_search_users_by_username_for_autocomplete() {
     let app = TestApp::spawn().await;
     let requester = app.issue_user_token("SearchRequester", false, &[]).await;
@@ -674,6 +724,33 @@ async fn authenticated_user_can_search_users_by_username_for_autocomplete() {
         items
             .iter()
             .all(|item| item["username"].as_str().unwrap().contains("AlphaSearch"))
+    );
+}
+
+#[tokio::test]
+#[serial]
+async fn authenticated_user_search_is_case_insensitive() {
+    let app = TestApp::spawn().await;
+    let requester = app
+        .issue_user_token("CaseInsensitiveRequester", false, &[])
+        .await;
+    let searched_user = app.issue_user_token("CaseFoldPlayer", false, &[]).await;
+
+    let response = app
+        .get_json(
+            "/api/users/search?q=casefoldplayer",
+            &requester.access_token,
+        )
+        .await;
+    assert!(response.status().is_success());
+
+    let body: serde_json::Value = response.json().await.expect("case-insensitive user search");
+    let items = body.as_array().expect("case-insensitive user array");
+    assert!(items.iter().any(|item| item["id"] == searched_user.user_id));
+    assert!(
+        items
+            .iter()
+            .any(|item| item["username"] == "CaseFoldPlayer")
     );
 }
 
@@ -932,6 +1009,113 @@ async fn squad_members_endpoint_includes_active_pending_invites() {
     assert_eq!(members[1]["isLeader"], false);
     assert_eq!(members[1]["isPendingInvite"], true);
     assert_eq!(members[1]["inviteId"], invite_id);
+}
+
+#[tokio::test]
+#[serial]
+async fn service_endpoint_returns_squads_that_contain_any_of_requested_users() {
+    let app = TestApp::spawn().await;
+    let admin = app.issue_user_token("SquadLookupAdmin", true, &[]).await;
+    let leader_alpha = app.issue_user_token("LeaderAlpha", false, &[]).await;
+    let leader_beta = app.issue_user_token("LeaderBeta", false, &[]).await;
+    let alpha_member = app.issue_user_token("AlphaMember", false, &[]).await;
+    let beta_member = app.issue_user_token("BetaMember", false, &[]).await;
+    let outsider = app.issue_user_token("NoSquadUser", false, &[]).await;
+
+    let alpha_squad = app.create_squad(&leader_alpha, "Alpha Team").await;
+    let alpha_squad_id = alpha_squad["id"]
+        .as_str()
+        .expect("alpha squad id")
+        .to_string();
+    let alpha_invite = app
+        .issue_invite(&leader_alpha, &alpha_squad_id, &alpha_member.user_id)
+        .await;
+    let alpha_accept = app
+        .post_json(
+            &format!("/api/squad-invites/{alpha_invite}/accept"),
+            &alpha_member.access_token,
+            serde_json::json!({}),
+        )
+        .await;
+    assert!(alpha_accept.status().is_success());
+
+    let beta_squad = app.create_squad(&leader_beta, "Beta Team").await;
+    let beta_squad_id = beta_squad["id"]
+        .as_str()
+        .expect("beta squad id")
+        .to_string();
+    let beta_invite = app
+        .issue_invite(&leader_beta, &beta_squad_id, &beta_member.user_id)
+        .await;
+    let beta_accept = app
+        .post_json(
+            &format!("/api/squad-invites/{beta_invite}/accept"),
+            &beta_member.access_token,
+            serde_json::json!({}),
+        )
+        .await;
+    assert!(beta_accept.status().is_success());
+
+    let created_token = app
+        .post_json(
+            "/api/admin/service-tokens",
+            &admin.access_token,
+            serde_json::json!({ "systemName": "squad_lookup" }),
+        )
+        .await;
+    assert!(created_token.status().is_success());
+    let created_token_body: serde_json::Value =
+        created_token.json().await.expect("service token json");
+    let service_token = created_token_body["plaintextToken"]
+        .as_str()
+        .expect("plaintext token")
+        .to_string();
+
+    let response = app
+        .post_json(
+            "/api/service/squads/by-users",
+            &service_token,
+            serde_json::json!({
+                "userIds": [
+                    alpha_member.user_id,
+                    beta_member.user_id,
+                    outsider.user_id
+                ]
+            }),
+        )
+        .await;
+    assert!(
+        response.status().is_success(),
+        "{}",
+        response.text().await.unwrap_or_default()
+    );
+    let body: serde_json::Value = response.json().await.expect("service squad lookup json");
+    let items = body.as_array().expect("service squad lookup array");
+    assert_eq!(items.len(), 2);
+
+    assert_eq!(items[0]["squad"]["name"], "Alpha Team");
+    assert_eq!(items[0]["squad"]["memberCount"], 2);
+    assert_eq!(
+        items[0]["matchedUsers"]
+            .as_array()
+            .expect("alpha matched")
+            .len(),
+        1
+    );
+    assert_eq!(items[0]["matchedUsers"][0]["id"], alpha_member.user_id);
+    assert_eq!(items[0]["matchedUsers"][0]["username"], "AlphaMember");
+
+    assert_eq!(items[1]["squad"]["name"], "Beta Team");
+    assert_eq!(items[1]["squad"]["memberCount"], 2);
+    assert_eq!(
+        items[1]["matchedUsers"]
+            .as_array()
+            .expect("beta matched")
+            .len(),
+        1
+    );
+    assert_eq!(items[1]["matchedUsers"][0]["id"], beta_member.user_id);
+    assert_eq!(items[1]["matchedUsers"][0]["username"], "BetaMember");
 }
 
 #[tokio::test]

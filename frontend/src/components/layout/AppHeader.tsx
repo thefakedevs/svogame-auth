@@ -148,7 +148,6 @@ export default function AppHeader({ pageTitle }: Props) {
         <span className="app-header__menu-kicker">Меню</span>
         <div
           className="app-header__menu-close"
-          type="button"
           aria-label="Закрыть меню"
           onClick={() => setIsMenuOpen(false)}
         >

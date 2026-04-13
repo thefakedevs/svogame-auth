@@ -1,13 +1,18 @@
 use crate::app::config::DatabaseConfig;
 use crate::services::migration::{
-    AddAuthRayRegistrationColumns, AddUserDeactivationReasonColumn, AddUserSquadIdColumn,
-    AddUserSuperuserColumn,
-    CreateAssetDefinitionTable, CreateAuditLogTable, CreateAuthRayTable, CreateDefaultSkinTable,
-    CreateInventoryOperationTable, CreateLootboxDefinitionTable, CreateLootboxDropDefinitionTable,
-    CreateLootboxOpenOperationTable, CreateServiceTokenAuditTable, CreateServiceTokenTable,
+    AddAssetDefinitionGunskinColumns, AddAuthRayRegistrationColumns,
+    AddShopOrderPaymentLifecycleColumns,
+    AddShopPaymentAttemptProviderIndex, AddUserDeactivationReasonColumn, AddUserSquadIdColumn,
+    AddUserSuperuserColumn, CreateAssetDefinitionTable, CreateAuditLogTable, CreateAuthRayTable,
+    CreateDefaultSkinTable, CreateDiscordBroadcastTable, CreateDiscordDeliveryTable,
+    CreateInventoryOperationTable, CreateLootboxDefinitionTable,
+    CreateLootboxDropDefinitionTable, CreateLootboxOpenOperationTable,
+    CreateServiceTokenAuditTable, CreateServiceTokenTable, CreateShopOrderTable,
+    CreateShopPaymentAttemptTable, CreateShopProductLocaleTable, CreateShopProductTable,
     CreateSquadInviteTable, CreateSquadTable, CreateUserEntitlementTable,
     CreateUserExpirableAssetTable, CreateUserRestrictionTable, CreateUserStackableAssetTable,
-    CreateUserTable, CreateWalletBalanceTable, CreateWalletTransactionTable,
+    CreateUserSelectedGunskinTable, CreateUserTable, CreateWalletBalanceTable,
+    CreateWalletTransactionTable,
 };
 use anyhow::Result;
 use sea_orm::{Database, DatabaseConnection};
@@ -44,5 +49,23 @@ pub async fn run_migrations(db: &DatabaseConnection) -> Result<()> {
     CreateLootboxDefinitionTable.up(&schema_manager).await?;
     CreateLootboxDropDefinitionTable.up(&schema_manager).await?;
     CreateLootboxOpenOperationTable.up(&schema_manager).await?;
+    CreateShopProductTable.up(&schema_manager).await?;
+    CreateShopProductLocaleTable.up(&schema_manager).await?;
+    CreateShopOrderTable.up(&schema_manager).await?;
+    CreateShopPaymentAttemptTable.up(&schema_manager).await?;
+    CreateDiscordBroadcastTable.up(&schema_manager).await?;
+    CreateDiscordDeliveryTable.up(&schema_manager).await?;
+    AddShopOrderPaymentLifecycleColumns
+        .up(&schema_manager)
+        .await?;
+    AddShopPaymentAttemptProviderIndex
+        .up(&schema_manager)
+        .await?;
+    AddAssetDefinitionGunskinColumns
+        .up(&schema_manager)
+        .await?;
+    CreateUserSelectedGunskinTable
+        .up(&schema_manager)
+        .await?;
     Ok(())
 }

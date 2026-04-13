@@ -1,12 +1,17 @@
 pub mod audit;
 pub mod db;
 pub mod discord;
+pub mod discord_events;
+pub mod discord_notifications;
+pub mod discord_templates;
 pub mod gml;
+pub mod gunskins;
 pub mod lootboxes;
 pub mod migration;
 pub mod ownership;
 pub mod pow;
 pub mod restrictions;
 pub mod service_tokens;
+pub mod shop;
 pub mod squads;
 pub mod token;

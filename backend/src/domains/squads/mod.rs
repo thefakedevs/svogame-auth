@@ -5,6 +5,10 @@ use axum::routing::{delete, get, post};
 
 pub fn router() -> Router<crate::app::state::SharedAppState> {
     Router::new()
+        .route(
+            "/api/service/squads/by-users",
+            post(handlers::find_squads_by_users),
+        )
         .route("/api/squads", post(handlers::create_squad))
         .route(
             "/api/squads/{squad_id}",

@@ -1,3 +1,4 @@
+pub mod discord;
 pub mod handlers;
 pub mod service_tokens;
 pub mod skins;
@@ -10,6 +11,9 @@ pub fn router() -> Router<crate::app::state::SharedAppState> {
     Router::new()
         .route("/api/admin/health", get(handlers::health))
         .route("/api/admin/me", get(handlers::me))
+        .route("/api/admin/discord/notify", post(discord::send_notification))
+        .route("/api/admin/discord/broadcasts", get(discord::list_broadcasts).post(discord::create_broadcast))
+        .route("/api/admin/discord/broadcasts/{broadcast_id}", get(discord::get_broadcast))
         .route("/api/admin/users", get(handlers::list_users))
         .route(
             "/api/admin/users/{user_id}",

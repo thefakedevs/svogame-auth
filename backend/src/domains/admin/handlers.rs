@@ -4,6 +4,7 @@ use axum::http::HeaderMap;
 use sea_orm::{
     ActiveModelTrait, ActiveValue, ColumnTrait, Condition, ConnectionTrait, DatabaseTransaction,
     EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, Set, TransactionTrait,
+    sea_query::{Expr, Func},
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -218,7 +219,11 @@ pub async fn list_users(
         .map(|it| it.trim())
         .filter(|it| !it.is_empty())
     {
-        let mut condition = Condition::any().add(UserColumn::Username.contains(q));
+        let lowered_query = q.to_lowercase();
+        let mut condition = Condition::any().add(
+            Expr::expr(Func::lower(Expr::col(UserColumn::Username)))
+                .like(format!("%{lowered_query}%")),
+        );
         if let Ok(uuid) = Uuid::parse_str(q) {
             condition = condition.add(UserColumn::Id.eq(uuid));
         }

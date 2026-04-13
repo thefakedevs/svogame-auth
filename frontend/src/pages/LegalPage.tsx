@@ -60,13 +60,6 @@ export function legalPageHeading(pathname: string) {
     return 'Правовые документы'
   }
 
-  const headings: Record<string, string> = {
-    [paths.legalPrivacyPolicy]: 'Политика конфиденциальности',
-    [paths.legalPublicOffer]: 'Публичная оферта',
-    [paths.legalRefundPolicy]: 'Политика возвратов',
-    [paths.legalUserAgreement]: 'Пользовательское соглашение',
-  }
-
   return 'Правовые документы'
 }
 

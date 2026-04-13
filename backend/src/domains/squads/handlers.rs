@@ -15,7 +15,7 @@ use std::collections::HashMap;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
-use crate::app::auth::get_user_from_headers;
+use crate::app::auth::{get_user_from_headers, require_privileged_actor};
 use crate::app::http::{HttpError, HttpResult};
 use crate::app::state::{AppState, AppStateExtractor};
 use crate::entities::{
@@ -26,6 +26,9 @@ use crate::services::audit::{
     ACTION_USER_SQUAD_CREATED, ACTION_USER_SQUAD_DISBANDED, ACTION_USER_SQUAD_IMAGE_DELETED,
     ACTION_USER_SQUAD_IMAGE_UPDATED, ACTION_USER_SQUAD_INVITE_CREATED, ACTION_USER_SQUAD_KICKED,
     ACTION_USER_SQUAD_LEFT, ACTION_USER_SQUAD_UPDATED, write_audit_log,
+};
+use crate::services::discord_notifications::{
+    queue_squad_invite_notification, queue_squad_kicked_notification,
 };
 use crate::services::restrictions::{RestrictionKind, has_restriction};
 use crate::services::squads::{
@@ -47,6 +50,12 @@ pub struct PatchSquadRequest {
 pub struct CreateInviteRequest {
     #[serde(rename = "userId")]
     pub user_id: String,
+}
+
+#[derive(Deserialize, ToSchema)]
+pub struct FindSquadsByUsersRequest {
+    #[serde(rename = "userIds")]
+    pub user_ids: Vec<String>,
 }
 
 #[derive(Serialize, ToSchema)]
@@ -106,6 +115,21 @@ pub struct SquadInviteResponse {
     pub expires_at: chrono::DateTime<chrono::Utc>,
     #[serde(rename = "createdAt")]
     pub created_at: chrono::DateTime<chrono::Utc>,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct MatchedSquadUserResponse {
+    pub id: String,
+    pub username: String,
+    #[serde(rename = "avatarUrl")]
+    pub avatar_url: Option<String>,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct ServiceSquadLookupResponse {
+    pub squad: SquadResponse,
+    #[serde(rename = "matchedUsers")]
+    pub matched_users: Vec<MatchedSquadUserResponse>,
 }
 
 #[derive(Serialize, ToSchema)]
@@ -208,6 +232,116 @@ pub async fn get_squad(
     let squad = get_squad_by_id(&state.db, &squad_id).await?;
     let member_count = squad_member_count(&state.db, squad.id).await?;
     Ok(Json(to_squad_response(squad, member_count)))
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/service/squads/by-users",
+    request_body(
+        content = FindSquadsByUsersRequest,
+        description = "Return squads that contain at least one of the provided users. Intended for service integrations such as game servers. Response includes only matched users from the request, grouped by squad."
+    ),
+    responses(
+        (status = 200, description = "Matching squads found. Empty list means none of the provided users currently belong to any squad.", body = [ServiceSquadLookupResponse]),
+        (status = 400, description = "Invalid user id in request or too many users provided."),
+        (status = 401, description = "Missing bearer token."),
+        (status = 403, description = "Superuser or service token required.")
+    ),
+    security(("bearer_auth" = [])),
+    tag = "squads"
+)]
+pub async fn find_squads_by_users(
+    State(state): AppStateExtractor,
+    headers: HeaderMap,
+    Json(body): Json<FindSquadsByUsersRequest>,
+) -> HttpResult<Json<Vec<ServiceSquadLookupResponse>>> {
+    const MAX_USER_IDS: usize = 500;
+
+    let state = state.read().await;
+    require_privileged_actor(&headers, &state).await?;
+
+    if body.user_ids.len() > MAX_USER_IDS {
+        return Err(HttpError::bad_request(format!(
+            "Too many user IDs. Maximum is {MAX_USER_IDS}"
+        )));
+    }
+
+    let user_ids = body
+        .user_ids
+        .iter()
+        .map(|user_id| parse_uuid(user_id, "Invalid user ID"))
+        .collect::<HttpResult<Vec<Uuid>>>()?;
+
+    if user_ids.is_empty() {
+        return Ok(Json(Vec::new()));
+    }
+
+    let matched_users = User::find()
+        .filter(UserColumn::Id.is_in(user_ids))
+        .filter(UserColumn::SquadId.is_not_null())
+        .all(&state.db)
+        .await
+        .map_err(|e| HttpError::internal_error(format!("Failed to load users: {e}")))?;
+
+    if matched_users.is_empty() {
+        return Ok(Json(Vec::new()));
+    }
+
+    let mut matched_users_by_squad: HashMap<Uuid, Vec<UserModel>> = HashMap::new();
+    for user in matched_users {
+        if let Some(squad_id) = user.squad_id {
+            matched_users_by_squad
+                .entry(squad_id)
+                .or_default()
+                .push(user);
+        }
+    }
+
+    let squad_ids: Vec<Uuid> = matched_users_by_squad.keys().copied().collect();
+    let squads = Squad::find()
+        .filter(crate::entities::SquadColumn::Id.is_in(squad_ids.clone()))
+        .all(&state.db)
+        .await
+        .map_err(|e| HttpError::internal_error(format!("Failed to load squads: {e}")))?;
+
+    let squad_members = User::find()
+        .filter(UserColumn::SquadId.is_in(squad_ids))
+        .all(&state.db)
+        .await
+        .map_err(|e| HttpError::internal_error(format!("Failed to count squad members: {e}")))?;
+
+    let mut member_counts: HashMap<Uuid, u64> = HashMap::new();
+    for member in squad_members {
+        if let Some(squad_id) = member.squad_id {
+            *member_counts.entry(squad_id).or_insert(0) += 1;
+        }
+    }
+
+    let mut response = Vec::with_capacity(squads.len());
+    for squad in squads {
+        if let Some(users) = matched_users_by_squad.remove(&squad.id) {
+            let mut matched_users = users
+                .into_iter()
+                .map(|user| MatchedSquadUserResponse {
+                    id: user.id.to_string(),
+                    username: user.username,
+                    avatar_url: user.avatar_url,
+                })
+                .collect::<Vec<_>>();
+            matched_users.sort_by(|left, right| left.username.cmp(&right.username));
+
+            response.push(ServiceSquadLookupResponse {
+                squad: to_squad_response(
+                    squad.clone(),
+                    member_counts.get(&squad.id).copied().unwrap_or(0),
+                ),
+                matched_users,
+            });
+        }
+    }
+
+    response.sort_by(|left, right| left.squad.name.cmp(&right.squad.name));
+    Ok(Json(response))
 }
 
 #[utoipa::path(
@@ -706,6 +840,17 @@ pub async fn create_invite(
     .await
     .map_err(|e| HttpError::internal_error(format!("Failed to write audit log: {e}")))?;
 
+    queue_squad_invite_notification(
+        &state.db,
+        invited_user.id,
+        squad.id,
+        invite.id,
+        &squad.name,
+        &user.username,
+    )
+    .await
+    .map_err(|e| HttpError::internal_error(format!("Failed to queue Discord notification: {e}")))?;
+
     Ok(Json(to_invite_response(
         invite,
         squad.name,
@@ -1042,6 +1187,16 @@ pub async fn kick_member(
     )
     .await
     .map_err(|e| HttpError::internal_error(format!("Failed to write audit log: {e}")))?;
+
+    queue_squad_kicked_notification(
+        &state.db,
+        target_user.id,
+        squad.id,
+        &squad.name,
+        &leader.username,
+    )
+    .await
+    .map_err(|e| HttpError::internal_error(format!("Failed to queue Discord notification: {e}")))?;
 
     Ok(Json(SquadActionResponse { status: "ok" }))
 }
