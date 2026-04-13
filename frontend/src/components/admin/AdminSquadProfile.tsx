@@ -1,11 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
 import {
   deleteAdminSquad,
   deleteAdminSquadImage,
+  kickAdminSquadMember,
   patchAdminSquad,
   restrictAdminSquad,
   unrestrictAdminSquad,
+  uploadAdminSquadImage,
   type AdminSquadResponse,
 } from '../../api/admin'
 import { toDisplayError } from '../../api/http'
@@ -33,16 +35,22 @@ function initials(value: string) {
   return value.slice(0, 2).toUpperCase()
 }
 
+function appendVersion(url: string, version: number) {
+  return `${url}${url.includes('?') ? '&' : '?'}v=${version}`
+}
+
 export default function AdminSquadProfile({
   token,
   squad,
   members,
   onSquadChange,
+  onMembersChange,
 }: {
   token: string
   squad: AdminSquadResponse | null
   members: SquadMemberResponse[]
   onSquadChange: (value: AdminSquadResponse | null) => void
+  onMembersChange: (value: SquadMemberResponse[]) => void
 }) {
   const activeMembers = members.filter((member) => !member.isPendingInvite)
   const outgoingInvites = members.filter((member) => member.isPendingInvite)
@@ -53,8 +61,12 @@ export default function AdminSquadProfile({
   const [isUpdatingName, setIsUpdatingName] = useState(false)
   const [isDeletingSquad, setIsDeletingSquad] = useState(false)
   const [isDeletingAvatar, setIsDeletingAvatar] = useState(false)
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
+  const [kickingMemberId, setKickingMemberId] = useState<string | null>(null)
   const [isDeleteSquadModalOpen, setIsDeleteSquadModalOpen] = useState(false)
   const [isDeleteAvatarModalOpen, setIsDeleteAvatarModalOpen] = useState(false)
+  const [avatarVersion, setAvatarVersion] = useState(() => Date.now())
+  const avatarInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     setSquadName(squad?.name ?? '')
@@ -66,12 +78,50 @@ export default function AdminSquadProfile({
     try {
       const updated = await deleteAdminSquadImage(token, squad.id)
       onSquadChange(updated)
+      setAvatarVersion(Date.now())
       setIsDeleteAvatarModalOpen(false)
       toast.success('Аватарка сквада удалена.')
     } catch (cause) {
       toast.error(toDisplayError(cause, 'Не удалось удалить аватарку сквада.'))
     } finally {
       setIsDeletingAvatar(false)
+    }
+  }
+
+  const uploadSquadAvatar = async (file: File) => {
+    if (!squad || isUploadingAvatar) return
+    setIsUploadingAvatar(true)
+    try {
+      const updated = await uploadAdminSquadImage(token, squad.id, file)
+      onSquadChange(updated)
+      setAvatarVersion(Date.now())
+      toast.success('Аватарка сквада обновлена.')
+    } catch (cause) {
+      toast.error(toDisplayError(cause, 'Не удалось обновить аватарку сквада.'))
+    } finally {
+      setIsUploadingAvatar(false)
+      if (avatarInputRef.current) avatarInputRef.current.value = ''
+    }
+  }
+
+  const kickMember = async (member: SquadMemberResponse) => {
+    if (!squad || kickingMemberId || member.id === squad.leaderUserId) return
+    const approved = window.confirm(`Кикнуть игрока "${member.username}" из сквада "${squad.name}"?`)
+    if (!approved) return
+
+    setKickingMemberId(member.id)
+    try {
+      await kickAdminSquadMember(token, squad.id, member.id)
+      onMembersChange(members.filter((item) => item.id !== member.id))
+      onSquadChange({
+        ...squad,
+        memberCount: Math.max(0, squad.memberCount - 1),
+      })
+      toast.success('Игрок кикнут из сквада.')
+    } catch (cause) {
+      toast.error(toDisplayError(cause, 'Не удалось кикнуть игрока из сквада.'))
+    } finally {
+      setKickingMemberId(null)
     }
   }
 
@@ -162,7 +212,7 @@ export default function AdminSquadProfile({
         {!squad ? <LoadingState title="Загружаем профиль сквада" /> : (
           <>
             <div className="admin-squad-head">
-              {squad.imageUrl ? <img src={squad.imageUrl} alt={squad.name} className="admin-avatar admin-avatar-lg" /> : <span className="ui-avatar">{initials(squad.name)}</span>}
+              {squad.imageUrl ? <img src={appendVersion(squad.imageUrl, avatarVersion)} alt={squad.name} className="admin-avatar admin-avatar-lg" /> : <span className="ui-avatar">{initials(squad.name)}</span>}
               <div className="admin-row-user-text">
                 {!isEditingName ? (
                   <div className="admin-squad-name-row">
@@ -212,6 +262,24 @@ export default function AdminSquadProfile({
                 <small>{squad.id}</small>
               </div>
               <div className="admin-squad-actions">
+                <input
+                  ref={avatarInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="admin-hidden-file-input"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0]
+                    if (file) void uploadSquadAvatar(file)
+                  }}
+                />
+                <button
+                  className="btn"
+                  type="button"
+                  disabled={isUploadingAvatar || isDeletingAvatar}
+                  onClick={() => avatarInputRef.current?.click()}
+                >
+                  {isUploadingAvatar ? 'Загружаем...' : 'Сменить аватарку сквада'}
+                </button>
                 <button
                   className="btn danger"
                   type="button"
@@ -282,6 +350,16 @@ export default function AdminSquadProfile({
                         <span className="admin-member-name">{member.username}</span>
                       </div>
                       {member.id === squad.leaderUserId && <span className="ui-badge ui-badge-secondary">Лидер</span>}
+                      {member.id !== squad.leaderUserId ? (
+                        <button
+                          type="button"
+                          className="btn btn-sm danger admin-member-kick-button"
+                          disabled={kickingMemberId !== null}
+                          onClick={() => void kickMember(member)}
+                        >
+                          {kickingMemberId === member.id ? 'Кикаем...' : 'Кикнуть'}
+                        </button>
+                      ) : null}
                     </li>
                   ))}
                 </ul>

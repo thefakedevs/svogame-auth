@@ -40,6 +40,81 @@
   margin-top: 12px;
 }
 
+.admin-overview {
+  display: grid;
+  gap: 16px;
+}
+
+.admin-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.admin-stat-card {
+  display: grid;
+  gap: 6px;
+  min-height: 108px;
+  padding: 14px;
+  align-content: center;
+  border: 1px solid var(--ui-border);
+  background: rgba(0, 0, 0, 0.28);
+}
+
+.admin-stat-card span,
+.admin-stat-card small {
+  color: var(--ui-text-muted);
+}
+
+.admin-stat-card strong {
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.admin-default-skin-card {
+  display: grid;
+  grid-template-columns: minmax(180px, 240px) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.admin-default-skin-preview {
+  display: grid;
+  place-items: center;
+  min-height: 240px;
+  border: 1px solid var(--ui-border);
+  background: rgba(0, 0, 0, 0.24);
+}
+
+.admin-default-skin-image {
+  width: 160px;
+  max-width: 100%;
+  image-rendering: pixelated;
+}
+
+.admin-default-skin-empty {
+  color: var(--ui-text-muted);
+  text-align: center;
+  padding: 12px;
+}
+
+.admin-default-skin-info {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-default-skin-controls,
+.admin-default-skin-models {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.admin-hidden-file-input {
+  display: none;
+}
+
 .admin-row {
   display: flex;
   justify-content: space-between;
@@ -284,6 +359,12 @@
   align-self: start;
 }
 
+.ui-kit-page .admin-kv.admin-kv--compact,
+.admin-kv.admin-kv--compact {
+  margin-top: 0;
+  gap: 12px;
+}
+
 .admin-kv > div {
   display: flex;
   flex-direction: column;
@@ -383,6 +464,18 @@
   min-height: 44px;
 }
 
+.admin-member-kick-button {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
+.admin-member-list li:hover .admin-member-kick-button,
+.admin-member-list li:focus-within .admin-member-kick-button {
+  opacity: 1;
+  pointer-events: auto;
+}
+
 .admin-member-card-main {
   min-width: 0;
   display: inline-flex;
@@ -469,6 +562,11 @@
 }
 
 @media (max-width: 900px) {
+  .admin-stat-grid,
+  .admin-default-skin-card {
+    grid-template-columns: 1fr;
+  }
+
   .admin-squad-head {
     align-items: flex-start;
     flex-wrap: wrap;
