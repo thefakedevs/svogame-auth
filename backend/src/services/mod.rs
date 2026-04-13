@@ -5,6 +5,7 @@ pub mod discord_events;
 pub mod discord_notifications;
 pub mod discord_templates;
 pub mod gml;
+pub mod gunskins;
 pub mod lootboxes;
 pub mod migration;
 pub mod ownership;

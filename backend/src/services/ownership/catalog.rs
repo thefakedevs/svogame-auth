@@ -1,4 +1,4 @@
-use anyhow::{Result, bail};
+use anyhow::{Result, anyhow, bail};
 use sea_orm::{
     ActiveModelTrait, ActiveValue::Set, ColumnTrait, Condition, EntityTrait, PaginatorTrait,
     QueryFilter, QueryOrder,
@@ -12,7 +12,8 @@ use crate::entities::{
     AssetDefinition, AssetDefinitionActiveModel, AssetDefinitionColumn, AssetDefinitionModel,
 };
 use crate::services::ownership::types::{
-    AssetKind, OwnershipModel, normalize_metadata, validate_asset_key,
+    AssetKind, OwnershipModel, SkinRarity, normalize_metadata, validate_asset_key,
+    validate_weapon_key,
 };
 
 #[derive(Clone, Debug, Serialize)]
@@ -27,6 +28,10 @@ pub struct AssetDefinitionView {
     pub is_user_purchasable: bool,
     pub is_public: bool,
     pub is_active: bool,
+    pub image_key: Option<String>,
+    pub image_content_type: Option<String>,
+    pub weapon_key: Option<String>,
+    pub rarity: Option<SkinRarity>,
     pub metadata: Value,
     pub created_at: chrono::DateTime<chrono::Utc>,
     pub updated_at: chrono::DateTime<chrono::Utc>,
@@ -47,6 +52,10 @@ impl TryFrom<AssetDefinitionModel> for AssetDefinitionView {
             is_user_purchasable: value.is_user_purchasable,
             is_public: value.is_public,
             is_active: value.is_active,
+            image_key: value.image_key,
+            image_content_type: value.image_content_type,
+            weapon_key: value.weapon_key,
+            rarity: value.rarity.map(|value| SkinRarity::parse(&value)).transpose()?,
             metadata: serde_json::from_str(&value.metadata)?,
             created_at: value.created_at,
             updated_at: value.updated_at,
@@ -64,6 +73,10 @@ pub struct CreateAssetDefinitionInput {
     pub is_currency: bool,
     pub is_user_purchasable: bool,
     pub is_public: bool,
+    #[serde(rename = "weaponKey")]
+    pub weapon_key: Option<String>,
+    #[serde(rename = "rarity")]
+    pub rarity: Option<SkinRarity>,
     pub metadata: Option<Value>,
 }
 
@@ -74,6 +87,10 @@ pub struct UpdateAssetDefinitionInput {
     pub is_user_purchasable: Option<bool>,
     pub is_public: Option<bool>,
     pub is_active: Option<bool>,
+    #[serde(rename = "weaponKey")]
+    pub weapon_key: Option<String>,
+    #[serde(rename = "rarity")]
+    pub rarity: Option<SkinRarity>,
     pub metadata: Option<Value>,
 }
 
@@ -177,6 +194,8 @@ async fn ensure_system_asset(
                     is_currency: asset.is_currency,
                     is_user_purchasable: false,
                     is_public: true,
+                    weapon_key: None,
+                    rarity: None,
                     metadata: None,
                 },
             )
@@ -228,6 +247,11 @@ pub async fn create_asset_definition(
         &input.asset_kind,
         &input.ownership_model,
     )?;
+    let (weapon_key, rarity) = validate_skin_attributes(
+        &input.asset_kind,
+        input.weapon_key.as_deref(),
+        input.rarity.as_ref(),
+    )?;
     if input.display_name.trim().is_empty() {
         bail!("Display name cannot be empty");
     }
@@ -255,6 +279,10 @@ pub async fn create_asset_definition(
         is_user_purchasable: Set(input.is_user_purchasable),
         is_public: Set(input.is_public),
         is_active: Set(true),
+        image_key: Set(None),
+        image_content_type: Set(None),
+        weapon_key: Set(weapon_key),
+        rarity: Set(rarity.map(|value| value.as_str().to_string())),
         metadata: Set(normalize_metadata(input.metadata).to_string()),
         created_at: Set(now),
         updated_at: Set(now),
@@ -368,7 +396,14 @@ pub async fn update_asset_definition(
     let model = AssetDefinition::find_by_id(asset_id)
         .one(db)
         .await?
-        .ok_or_else(|| anyhow::anyhow!("Asset not found"))?;
+        .ok_or_else(|| anyhow!("Asset not found"))?;
+    let asset_kind = AssetKind::parse(&model.asset_kind)?;
+    let current_weapon_key = model.weapon_key.clone();
+    let current_rarity = model
+        .rarity
+        .clone()
+        .map(|value| SkinRarity::parse(&value))
+        .transpose()?;
     let mut active_model: AssetDefinitionActiveModel = model.into();
 
     if let Some(display_name) = input.display_name {
@@ -391,6 +426,18 @@ pub async fn update_asset_definition(
     }
     if let Some(is_active) = input.is_active {
         active_model.is_active = Set(is_active);
+    }
+    if input.weapon_key.is_some() || input.rarity.is_some() {
+        let requested_weapon_key = input.weapon_key.as_deref().or(current_weapon_key.as_deref());
+        let requested_rarity = input.rarity.as_ref().or(current_rarity.as_ref());
+        let (weapon_key, rarity) =
+            validate_skin_attributes(&asset_kind, requested_weapon_key, requested_rarity)?;
+        if input.weapon_key.is_some() {
+            active_model.weapon_key = Set(weapon_key);
+        }
+        if input.rarity.is_some() {
+            active_model.rarity = Set(rarity.map(|value| value.as_str().to_string()));
+        }
     }
     if let Some(metadata) = input.metadata {
         active_model.metadata = Set(normalize_metadata(Some(metadata)).to_string());
@@ -415,4 +462,29 @@ fn validate_asset_type_compatibility(
         bail!("Currency assets must use currency asset kind");
     }
     Ok(())
+}
+
+fn validate_skin_attributes(
+    asset_kind: &AssetKind,
+    weapon_key: Option<&str>,
+    rarity: Option<&SkinRarity>,
+) -> Result<(Option<String>, Option<SkinRarity>)> {
+    if *asset_kind == AssetKind::Skin {
+        match (weapon_key, rarity) {
+            (None, None) => Ok((None, None)),
+            (Some(weapon_key), Some(rarity)) => {
+                Ok((Some(validate_weapon_key(weapon_key)?), Some(rarity.clone())))
+            }
+            (None, Some(_)) => bail!("weaponKey is required when rarity is set for skin assets"),
+            (Some(_), None) => bail!("rarity is required when weaponKey is set for skin assets"),
+        }
+    } else {
+        if weapon_key.is_some() {
+            bail!("weaponKey is supported only for skin assets");
+        }
+        if rarity.is_some() {
+            bail!("rarity is supported only for skin assets");
+        }
+        Ok((None, None))
+    }
 }

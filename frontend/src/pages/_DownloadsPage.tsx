@@ -203,7 +203,7 @@ export default function DownloadsPage() {
         />
         <DownloadCard
           title="Linux"
-          description="Сборки для популярных Linux-дистрибутивов. Начните с AppImage, если не уверены."
+          description="Сборки для популярных Linux-дистрибутивов."
           image="/icons/linux.svg"
           alt="Символ Linux для загрузки лаунчера SVOCraft"
           recommended={recommendedPlatform === 'linux'}

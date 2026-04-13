@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { toDisplayError } from '../../api/http'
+import { getMyDefaultWalletBalance, type WalletBalanceResponse } from '../../api/inventory'
 import { buildAuthUrl } from '../../routes/auth'
 import { paths } from '../../routes/paths'
 import { navigateTo } from '../../shared/navigation/history'
@@ -11,11 +12,20 @@ import './AppHeader.css'
 
 type Props = { pageTitle?: string }
 
+const balanceFormatter = new Intl.NumberFormat('ru-RU')
+
+function formatBalance(balance?: WalletBalanceResponse | null) {
+  if (!balance) return '0'
+  return balanceFormatter.format(balance.balance)
+}
+
 export default function AppHeader({ pageTitle }: Props) {
   const authHydrated = useAuthStore((store) => store.hydrated)
   const authUser = useAuthStore((store) => store.user)
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isMobileMenu, setIsMobileMenu] = useState(false)
+  const [defaultBalance, setDefaultBalance] = useState<WalletBalanceResponse | null>(null)
+  const [isBalanceLoading, setIsBalanceLoading] = useState(false)
   const triggerRef = useRef<HTMLDivElement | null>(null)
   const menuPanelRef = useRef<HTMLDivElement | null>(null)
 
@@ -84,6 +94,38 @@ export default function AppHeader({ pageTitle }: Props) {
   const avatarFallback = authUser?.username ? authUser.username.slice(0, 2).toUpperCase() : 'SV'
   const hasSession = authHydrated && Boolean(authUser)
 
+  useEffect(() => {
+    let cancelled = false
+    const run = async () => {
+      const token = getAuthToken()
+      await Promise.resolve()
+
+      if (cancelled) return
+
+      if (!authHydrated || !authUser || !token) {
+        setDefaultBalance(null)
+        setIsBalanceLoading(false)
+        return
+      }
+
+      setIsBalanceLoading(true)
+      try {
+        const balance = await getMyDefaultWalletBalance(token)
+        if (!cancelled) setDefaultBalance(balance)
+      } catch {
+        if (!cancelled) setDefaultBalance(null)
+      } finally {
+        if (!cancelled) setIsBalanceLoading(false)
+      }
+    }
+
+    void run()
+
+    return () => {
+      cancelled = true
+    }
+  }, [authHydrated, authUser])
+
   const onLogout = () => {
     try {
       clearAuthSession()
@@ -104,13 +146,13 @@ export default function AppHeader({ pageTitle }: Props) {
     >
       <div className="app-header__menu-topbar">
         <span className="app-header__menu-kicker">Меню</span>
-        <div
+        <button
           className="app-header__menu-close"
           aria-label="Закрыть меню"
           onClick={() => setIsMenuOpen(false)}
         >
           ×
-        </div>
+        </button>
       </div>
       <div className="app-header__menu-body">
         <div className="app-header__menu-head">
@@ -130,8 +172,17 @@ export default function AppHeader({ pageTitle }: Props) {
             <span>{sessionWarning}</span>
           </div>
         ) : null}
+        <a className="app-header__balance" href={paths.wallet}>
+          <span>
+            <small>Баланс</small>
+            <strong>{isBalanceLoading ? '...' : formatBalance(defaultBalance)} защекоинов</strong>
+          </span>
+        </a>
         <div className="app-header__menu-section">
           <a href={paths.profile}>Профиль</a>
+          <a href={paths.shop}>Магазин</a>
+          <a href={paths.inventory}>Инвентарь</a>
+          <a href={paths.wallet}>Кошелек</a>
           <a href={`${paths.profile}?tab=squads`}>Сквад</a>
           <a href={`${paths.profile}?tab=settings`}>Настройки</a>
           {authUser?.isSuperuser ? <a href={paths.admin}>Админка</a> : null}

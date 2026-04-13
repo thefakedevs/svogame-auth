@@ -197,6 +197,41 @@
   color: var(--ui-text);
 }
 
+.app-header__balance {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 58px;
+  padding: 10px 12px;
+  border: 1px solid rgba(247, 164, 29, 0.25);
+  background: rgba(247, 164, 29, 0.08);
+  color: var(--ui-text);
+  text-decoration: none;
+}
+
+.app-header__balance:hover,
+.app-header__balance:focus-visible {
+  border-color: rgba(247, 164, 29, 0.45);
+}
+
+.app-header__balance span:first-child {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.app-header__balance small {
+  color: var(--ui-text-muted);
+  font-size: 0.75rem;
+}
+
+.app-header__balance strong {
+  color: #f7a41d;
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
 .app-header__menu-meta {
   color: var(--ui-text-muted);
   font-size: 0.8rem;

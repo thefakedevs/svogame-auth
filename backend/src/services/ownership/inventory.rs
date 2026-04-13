@@ -343,6 +343,12 @@ pub async fn revoke_entitlement(
             None,
         )
         .await?;
+        crate::services::gunskins::clear_selection_if_asset_no_longer_owned(
+            &tx,
+            mutation.user_id,
+            asset.id,
+        )
+        .await?;
     }
 
     tx.commit().await?;
@@ -408,6 +414,12 @@ pub async fn set_stackable(
         Some(mutation.amount),
         None,
         None,
+    )
+    .await?;
+    crate::services::gunskins::clear_selection_if_asset_no_longer_owned(
+        &tx,
+        mutation.user_id,
+        asset.id,
     )
     .await?;
 
@@ -644,6 +656,12 @@ pub async fn set_expiration(
         Some(mutation.expires_at),
     )
     .await?;
+    crate::services::gunskins::clear_selection_if_asset_no_longer_owned(
+        &tx,
+        mutation.user_id,
+        asset.id,
+    )
+    .await?;
 
     tx.commit().await?;
     Ok(ExpirableView {
@@ -687,6 +705,12 @@ pub async fn revoke_expirable(
             None,
             Some(existing.expires_at),
             None,
+        )
+        .await?;
+        crate::services::gunskins::clear_selection_if_asset_no_longer_owned(
+            &tx,
+            mutation.user_id,
+            asset.id,
         )
         .await?;
     }
@@ -800,6 +824,12 @@ where
         None,
     )
     .await?;
+    crate::services::gunskins::clear_selection_if_asset_no_longer_owned(
+        db,
+        mutation.user_id,
+        asset.id,
+    )
+    .await?;
 
     Ok(StackableView {
         asset_key: asset.key,
@@ -890,6 +920,8 @@ async fn revoke_active_subscription(
             None,
         )
         .await?;
+        crate::services::gunskins::clear_selection_if_asset_no_longer_owned(db, user_id, asset.id)
+            .await?;
     }
     Ok(())
 }

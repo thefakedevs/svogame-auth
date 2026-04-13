@@ -1,5 +1,6 @@
-import { authHeaders, request } from './http'
+import { authHeaders, request, requestNullable } from './http'
 import type { SquadMemberResponse } from './squads'
+import type { SkinModel } from './skins'
 
 export interface AdminMeResponse {
   id: string
@@ -53,6 +54,13 @@ export interface AdminSquadListResponse {
   total: number
   page: number
   perPage: number
+}
+
+export interface DefaultSkinResponse {
+  imageUrl: string
+  contentType: string
+  updatedAt: string
+  updatedByUserId: string | null
 }
 
 export interface ServiceTokenResponse {
@@ -187,6 +195,15 @@ export function deactivateAdminUser(
       'Content-Type': 'application/json',
     }),
     body: JSON.stringify(payload),
+  })
+}
+
+export function resetAdminUserAuthEpoch(token: string, userId: string): Promise<AdminUserResponse> {
+  return request<AdminUserResponse>(`/api/admin/users/${userId}/reset-auth-epoch`, {
+    method: 'POST',
+    headers: authHeaders(token, {
+      'Content-Type': 'application/json',
+    }),
   })
 }
 
@@ -350,6 +367,49 @@ export function deleteAdminSquadImage(token: string, squadId: string): Promise<A
     headers: authHeaders(token, {
       'Content-Type': 'application/json',
     }),
+  })
+}
+
+export function uploadAdminSquadImage(token: string, squadId: string, file: File): Promise<AdminSquadResponse> {
+  const formData = new FormData()
+  formData.append('file', file)
+
+  return request<AdminSquadResponse>(`/api/admin/squads/${squadId}/image`, {
+    method: 'POST',
+    headers: authHeaders(token),
+    body: formData,
+  })
+}
+
+export function kickAdminSquadMember(token: string, squadId: string, userId: string): Promise<ActionResponse> {
+  return request<ActionResponse>(`/api/admin/squads/${squadId}/members/${userId}/kick`, {
+    method: 'POST',
+    headers: authHeaders(token, {
+      'Content-Type': 'application/json',
+    }),
+  })
+}
+
+export function getAdminDefaultSkin(token: string): Promise<DefaultSkinResponse | null> {
+  return requestNullable<DefaultSkinResponse>('/api/admin/skins/default', {
+    headers: authHeaders(token, {
+      'Content-Type': 'application/json',
+    }),
+  })
+}
+
+export function uploadAdminDefaultSkin(
+  token: string,
+  file: File,
+  model: SkinModel,
+): Promise<DefaultSkinResponse> {
+  const formData = new FormData()
+  formData.append('file', file)
+
+  return request<DefaultSkinResponse>(`/api/admin/skins/default?model=${model}`, {
+    method: 'POST',
+    headers: authHeaders(token),
+    body: formData,
   })
 }
 

@@ -7,6 +7,7 @@ import {
   getAdminUserRestrictions,
   grantAdminUserSuperuser,
   grantAdminUserRestriction,
+  resetAdminUserAuthEpoch,
   revokeAdminUserSuperuser,
   revokeAdminUserRestriction,
   type AdminSquadResponse,
@@ -18,8 +19,10 @@ import { getRestrictionMeta, type RestrictionMetaResponse } from '../../api/meta
 import { buildSkinUrl } from '../../api/skins'
 import { adminSquadPath, paths } from '../../routes/paths'
 import { pushUrl } from '../../shared/navigation/history'
+import AppPortal from '../../shared/ui/portal/AppPortal'
 import LoadingState from '../LoadingState'
 import SkinViewer3D from '../SkinViewer3D'
+import AdminUserOwnershipPanel from './AdminUserOwnershipPanel'
 
 function formatDateTime(value?: string | null) {
   if (!value) return 'Нет данных'
@@ -57,6 +60,8 @@ export default function AdminUserProfile({
   const [isUpdatingSuperuser, setIsUpdatingSuperuser] = useState(false)
   const [isUpdatingActivity, setIsUpdatingActivity] = useState(false)
   const [isUpdatingRestrictions, setIsUpdatingRestrictions] = useState(false)
+  const [isResettingAuthEpoch, setIsResettingAuthEpoch] = useState(false)
+  const [isResetAuthEpochModalOpen, setIsResetAuthEpochModalOpen] = useState(false)
   const [restrictionReason, setRestrictionReason] = useState('')
   const [userRestrictions, setUserRestrictions] = useState<AdminUserRestrictionResponse[]>([])
   const [restrictionMeta, setRestrictionMeta] = useState<RestrictionMetaResponse[]>([])
@@ -205,6 +210,22 @@ export default function AdminUserProfile({
     }
   }
 
+  const resetAuthEpoch = async () => {
+    if (!user || isResettingAuthEpoch) return
+
+    setIsResettingAuthEpoch(true)
+    try {
+      const updated = await resetAdminUserAuthEpoch(token, user.id)
+      onUserChange(updated)
+      setIsResetAuthEpochModalOpen(false)
+      toast.success('Все сессии игрока очищены.')
+    } catch (cause) {
+      toast.error(toDisplayError(cause, 'Не удалось очистить сессии игрока.'))
+    } finally {
+      setIsResettingAuthEpoch(false)
+    }
+  }
+
   return (
     <div className="admin-page">
       <section className="admin-top-actions">
@@ -242,6 +263,14 @@ export default function AdminUserProfile({
                 >
                   Снять Superuser
                 </button>
+                <button
+                  className="btn btn-sm danger"
+                  type="button"
+                  disabled={isResettingAuthEpoch}
+                  onClick={() => setIsResetAuthEpochModalOpen(true)}
+                >
+                  {isResettingAuthEpoch ? 'Очищаем...' : 'Очистить сессии'}
+                </button>
               </div>
             </div>
 
@@ -276,6 +305,7 @@ export default function AdminUserProfile({
               <dl className="admin-kv">
                 <div><dt>Email</dt><dd>{user.email ?? 'Не указан'}</dd></div>
                 <div><dt>Discord ID</dt><dd>{user.discordId}</dd></div>
+                <div><dt>Auth epoch</dt><dd>{user.authEpoch}</dd></div>
                 <div><dt>Последний вход</dt><dd>{formatDateTime(user.lastLoginAt)}</dd></div>
                 <div><dt>Создан</dt><dd>{formatDateTime(user.createdAt)}</dd></div>
                 <div>
@@ -372,9 +402,39 @@ export default function AdminUserProfile({
                 )}
               </div>
             </section>
+
+            <AdminUserOwnershipPanel token={token} userId={user.id} />
           </>
         )}
       </section>
+
+      {user && isResetAuthEpochModalOpen ? (
+        <AppPortal>
+          <div className="ui-modal-backdrop" role="presentation" onClick={() => !isResettingAuthEpoch && setIsResetAuthEpochModalOpen(false)}>
+            <div className="ui-modal" role="dialog" aria-modal="true" aria-labelledby="reset-auth-epoch-modal-title" onClick={(event) => event.stopPropagation()}>
+              <div className="ui-modal-header">
+                <h2 id="reset-auth-epoch-modal-title" className="ui-modal-title">Очистить сессии игрока?</h2>
+                <button className="ui-modal-close" type="button" aria-label="Закрыть" onClick={() => setIsResetAuthEpochModalOpen(false)} disabled={isResettingAuthEpoch}>
+                  ×
+                </button>
+              </div>
+              <div className="ui-modal-body">
+                <p>
+                  Все текущие сессии игрока <strong>{user.username}</strong> станут недействительными. Игроку нужно будет войти снова.
+                </p>
+              </div>
+              <div className="ui-modal-footer">
+                <button className="btn" type="button" onClick={() => setIsResetAuthEpochModalOpen(false)} disabled={isResettingAuthEpoch}>
+                  Отменить
+                </button>
+                <button className="btn danger" type="button" onClick={() => void resetAuthEpoch()} disabled={isResettingAuthEpoch}>
+                  {isResettingAuthEpoch ? 'Очистка...' : 'Очистить сессии'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </AppPortal>
+      ) : null}
     </div>
   )
 }

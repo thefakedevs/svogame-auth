@@ -7,9 +7,14 @@ import ContactsPage from '../pages/_ContactsPage'
 import DownloadsPage from '../pages/_DownloadsPage'
 import HomePage from '../pages/_HomePage'
 import LegalPage, { isLegalPath, legalPageHeading } from '../pages/LegalPage'
+import OwnershipPage from '../pages/OwnershipPage'
+import ShopCheckoutReturnPage from '../pages/ShopCheckoutReturnPage'
+import ShopPage from '../pages/ShopPage'
 import UiKitPage from '../pages/_UiKitPage'
+import WalletPage from '../pages/WalletPage'
 import { paths } from '../routes/paths'
-import { usePathname } from '../shared/navigation/history'
+import { buildAnalyticsPath, trackPageView } from '../services/analytics'
+import { usePathname, useSearch } from '../shared/navigation/history'
 import { normalizePathname, pageTitleForPath } from '../shared/navigation/routes'
 import AuthRoute from './AuthRoute'
 import TokenRoute from './TokenRoute'
@@ -21,6 +26,54 @@ function ProfileShell({ pageTitle, defaultTab }: { pageTitle: string; defaultTab
       <div className="ui-kit-page app-shell">
         <AppHeader pageTitle={pageTitle} />
         <ProfilePage defaultTab={defaultTab} />
+      </div>
+    </>
+  )
+}
+
+function OwnershipShell() {
+  return (
+    <>
+      <div className="ui-kit-vhs" aria-hidden />
+      <div className="ui-kit-page app-shell">
+        <AppHeader pageTitle="Инвентарь" />
+        <OwnershipPage />
+      </div>
+    </>
+  )
+}
+
+function ShopShell() {
+  return (
+    <>
+      <div className="ui-kit-vhs" aria-hidden />
+      <div className="ui-kit-page app-shell">
+        <AppHeader pageTitle="Магазин" />
+        <ShopPage />
+      </div>
+    </>
+  )
+}
+
+function ShopCheckoutReturnShell() {
+  return (
+    <>
+      <div className="ui-kit-vhs" aria-hidden />
+      <div className="ui-kit-page app-shell">
+        <AppHeader pageTitle="Проверка оплаты" />
+        <ShopCheckoutReturnPage />
+      </div>
+    </>
+  )
+}
+
+function WalletShell() {
+  return (
+    <>
+      <div className="ui-kit-vhs" aria-hidden />
+      <div className="ui-kit-page app-shell">
+        <AppHeader pageTitle="Кошелек" />
+        <WalletPage />
       </div>
     </>
   )
@@ -128,6 +181,7 @@ function adminRouteForPath(pathname: string): { type: 'home' } | { type: 'user';
 
 export default function AccountApp() {
   const pathname = normalizePathname(usePathname() || paths.home)
+  const search = useSearch()
   const adminRoute = adminRouteForPath(pathname)
 
   useEffect(() => {
@@ -137,6 +191,10 @@ export default function AccountApp() {
 
     document.title = pageTitleForPath(pathname)
   }, [pathname])
+
+  useEffect(() => {
+    trackPageView(buildAnalyticsPath(pathname, search), pageTitleForPath(pathname))
+  }, [pathname, search])
 
   let page = <NotFoundShell />
 
@@ -153,6 +211,18 @@ export default function AccountApp() {
       break
     case paths.profileEdit:
       page = <ProfileShell pageTitle="Настройки профиля" defaultTab="settings" />
+      break
+    case paths.inventory:
+      page = <OwnershipShell />
+      break
+    case paths.shop:
+      page = <ShopShell />
+      break
+    case paths.shopCheckoutReturn:
+      page = <ShopCheckoutReturnShell />
+      break
+    case paths.wallet:
+      page = <WalletShell />
       break
     case paths.contacts:
       page = <ContactsShell />

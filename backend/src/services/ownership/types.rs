@@ -20,6 +20,33 @@ pub enum AssetKind {
     Token,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum SkinRarity {
+    Common,
+    Rare,
+    Legendary,
+}
+
+impl SkinRarity {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Common => "common",
+            Self::Rare => "rare",
+            Self::Legendary => "legendary",
+        }
+    }
+
+    pub fn parse(value: &str) -> Result<Self> {
+        match value {
+            "common" => Ok(Self::Common),
+            "rare" => Ok(Self::Rare),
+            "legendary" => Ok(Self::Legendary),
+            _ => bail!("Unsupported skin rarity"),
+        }
+    }
+}
+
 impl AssetKind {
     pub fn as_str(&self) -> &'static str {
         match self {
@@ -195,4 +222,12 @@ pub fn normalize_metadata(metadata: Option<Value>) -> Value {
         Some(Value::Null) | None => Value::Object(Default::default()),
         Some(value) => value,
     }
+}
+
+pub fn validate_weapon_key(value: &str) -> Result<String> {
+    let normalized = value.trim();
+    if normalized.is_empty() {
+        bail!("Weapon key cannot be empty");
+    }
+    Ok(normalized.to_string())
 }

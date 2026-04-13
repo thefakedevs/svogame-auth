@@ -1,6 +1,7 @@
 use crate::app::config::DatabaseConfig;
 use crate::services::migration::{
-    AddAuthRayRegistrationColumns, AddShopOrderPaymentLifecycleColumns,
+    AddAssetDefinitionGunskinColumns, AddAuthRayRegistrationColumns,
+    AddShopOrderPaymentLifecycleColumns,
     AddShopPaymentAttemptProviderIndex, AddUserDeactivationReasonColumn, AddUserSquadIdColumn,
     AddUserSuperuserColumn, CreateAssetDefinitionTable, CreateAuditLogTable, CreateAuthRayTable,
     CreateDefaultSkinTable, CreateDiscordBroadcastTable, CreateDiscordDeliveryTable,
@@ -10,7 +11,8 @@ use crate::services::migration::{
     CreateShopPaymentAttemptTable, CreateShopProductLocaleTable, CreateShopProductTable,
     CreateSquadInviteTable, CreateSquadTable, CreateUserEntitlementTable,
     CreateUserExpirableAssetTable, CreateUserRestrictionTable, CreateUserStackableAssetTable,
-    CreateUserTable, CreateWalletBalanceTable, CreateWalletTransactionTable,
+    CreateUserSelectedGunskinTable, CreateUserTable, CreateWalletBalanceTable,
+    CreateWalletTransactionTable,
 };
 use anyhow::Result;
 use sea_orm::{Database, DatabaseConnection};
@@ -57,6 +59,12 @@ pub async fn run_migrations(db: &DatabaseConnection) -> Result<()> {
         .up(&schema_manager)
         .await?;
     AddShopPaymentAttemptProviderIndex
+        .up(&schema_manager)
+        .await?;
+    AddAssetDefinitionGunskinColumns
+        .up(&schema_manager)
+        .await?;
+    CreateUserSelectedGunskinTable
         .up(&schema_manager)
         .await?;
     Ok(())
