@@ -1,6 +1,9 @@
 pub mod audit;
 pub mod db;
 pub mod discord;
+pub mod discord_events;
+pub mod discord_notifications;
+pub mod discord_templates;
 pub mod gml;
 pub mod lootboxes;
 pub mod migration;

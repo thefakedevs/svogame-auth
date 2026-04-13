@@ -26,6 +26,7 @@ pub async fn run() -> Result<()> {
     let state: SharedAppState = Arc::new(RwLock::new(AppState::new(config.clone(), db, s3)));
     spawn_auth_cleanup_worker(state.clone());
     spawn_shop_reconciliation_worker(state.clone());
+    spawn_discord_delivery_worker(state.clone());
 
     let app = build_router(state);
     let listener = TcpListener::bind(&config.binding_address).await?;
@@ -139,6 +140,25 @@ fn spawn_shop_reconciliation_worker(state: SharedAppState) {
                 crate::services::shop::reconcile_pending_orders(&db, &shop_config).await
             {
                 warn!("Shop reconciliation failed: {error}");
+            }
+        }
+    });
+}
+
+fn spawn_discord_delivery_worker(state: SharedAppState) {
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(std::time::Duration::from_secs(1));
+        loop {
+            interval.tick().await;
+            let (db, discord_config) = {
+                let state_guard = state.read().await;
+                (state_guard.db.clone(), state_guard.config.discord.clone())
+            };
+            if let Err(error) =
+                crate::services::discord_notifications::process_next_delivery(&db, &discord_config)
+                    .await
+            {
+                warn!("Discord delivery worker failed: {error}");
             }
         }
     });

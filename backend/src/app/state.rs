@@ -6,12 +6,14 @@ use tokio::sync::RwLock;
 
 use crate::app::config::AppConfig;
 use crate::domains::auth::runtime::AuthRuntime;
+use crate::services::discord_events::DiscordEventsRuntime;
 
 pub struct AppState {
     pub config: AppConfig,
     pub db: DatabaseConnection,
     pub s3: S3Client,
     pub auth: AuthRuntime,
+    pub discord_events: DiscordEventsRuntime,
 }
 
 impl AppState {
@@ -21,6 +23,7 @@ impl AppState {
             db,
             s3,
             auth: AuthRuntime::new(),
+            discord_events: DiscordEventsRuntime::new(),
         }
     }
 }

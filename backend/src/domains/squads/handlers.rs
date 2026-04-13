@@ -27,6 +27,9 @@ use crate::services::audit::{
     ACTION_USER_SQUAD_IMAGE_UPDATED, ACTION_USER_SQUAD_INVITE_CREATED, ACTION_USER_SQUAD_KICKED,
     ACTION_USER_SQUAD_LEFT, ACTION_USER_SQUAD_UPDATED, write_audit_log,
 };
+use crate::services::discord_notifications::{
+    queue_squad_invite_notification, queue_squad_kicked_notification,
+};
 use crate::services::restrictions::{RestrictionKind, has_restriction};
 use crate::services::squads::{
     SQUAD_INVITE_TTL_HOURS, SQUAD_MAX_MEMBERS, process_squad_image, squad_image_key,
@@ -837,6 +840,17 @@ pub async fn create_invite(
     .await
     .map_err(|e| HttpError::internal_error(format!("Failed to write audit log: {e}")))?;
 
+    queue_squad_invite_notification(
+        &state.db,
+        invited_user.id,
+        squad.id,
+        invite.id,
+        &squad.name,
+        &user.username,
+    )
+    .await
+    .map_err(|e| HttpError::internal_error(format!("Failed to queue Discord notification: {e}")))?;
+
     Ok(Json(to_invite_response(
         invite,
         squad.name,
@@ -1173,6 +1187,16 @@ pub async fn kick_member(
     )
     .await
     .map_err(|e| HttpError::internal_error(format!("Failed to write audit log: {e}")))?;
+
+    queue_squad_kicked_notification(
+        &state.db,
+        target_user.id,
+        squad.id,
+        &squad.name,
+        &leader.username,
+    )
+    .await
+    .map_err(|e| HttpError::internal_error(format!("Failed to queue Discord notification: {e}")))?;
 
     Ok(Json(SquadActionResponse { status: "ok" }))
 }

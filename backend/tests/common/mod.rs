@@ -96,6 +96,9 @@ impl TestApp {
                 client_secret: "test-secret".to_string(),
                 required_scopes: vec!["identify".to_string()],
                 discord_proxy: None,
+                bot_token: None,
+                events_guild_id: None,
+                http_timeout_ms: 10_000,
             },
             database,
             s3: S3Config {

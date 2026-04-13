@@ -3,7 +3,8 @@ use crate::services::migration::{
     AddAuthRayRegistrationColumns, AddShopOrderPaymentLifecycleColumns,
     AddShopPaymentAttemptProviderIndex, AddUserDeactivationReasonColumn, AddUserSquadIdColumn,
     AddUserSuperuserColumn, CreateAssetDefinitionTable, CreateAuditLogTable, CreateAuthRayTable,
-    CreateDefaultSkinTable, CreateInventoryOperationTable, CreateLootboxDefinitionTable,
+    CreateDefaultSkinTable, CreateDiscordBroadcastTable, CreateDiscordDeliveryTable,
+    CreateInventoryOperationTable, CreateLootboxDefinitionTable,
     CreateLootboxDropDefinitionTable, CreateLootboxOpenOperationTable,
     CreateServiceTokenAuditTable, CreateServiceTokenTable, CreateShopOrderTable,
     CreateShopPaymentAttemptTable, CreateShopProductLocaleTable, CreateShopProductTable,
@@ -50,6 +51,8 @@ pub async fn run_migrations(db: &DatabaseConnection) -> Result<()> {
     CreateShopProductLocaleTable.up(&schema_manager).await?;
     CreateShopOrderTable.up(&schema_manager).await?;
     CreateShopPaymentAttemptTable.up(&schema_manager).await?;
+    CreateDiscordBroadcastTable.up(&schema_manager).await?;
+    CreateDiscordDeliveryTable.up(&schema_manager).await?;
     AddShopOrderPaymentLifecycleColumns
         .up(&schema_manager)
         .await?;

@@ -24,6 +24,7 @@ use crate::services::ownership::inventory::{
 use crate::services::ownership::types::{
     OperationContext, OwnershipActor, OwnershipModel, normalize_metadata, validate_asset_key,
 };
+use crate::services::discord_notifications::queue_shop_purchase_completed_notification;
 
 const ORDER_STATUS_PENDING_PAYMENT: &str = "pending_payment";
 const ORDER_STATUS_PAID: &str = "paid";
@@ -1480,6 +1481,15 @@ async fn fulfill_order_in_tx(
     active.updated_at = Set(chrono::Utc::now());
     active.failure_problem = Set(None);
     active.update(db).await?;
+    queue_shop_purchase_completed_notification(
+        db,
+        order.user_id,
+        order.id,
+        &order.product_key,
+        &order.product_name,
+        order.quantity,
+    )
+    .await?;
     Ok(())
 }
 

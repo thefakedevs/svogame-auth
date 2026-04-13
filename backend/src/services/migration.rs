@@ -2242,3 +2242,196 @@ fn is_duplicate_index_error(error: &DbErr) -> bool {
         || error_text.contains("duplicate")
         || error_text.contains("exists")
 }
+
+pub struct CreateDiscordBroadcastTable;
+
+impl MigrationName for CreateDiscordBroadcastTable {
+    fn name(&self) -> &str {
+        "m20260413_000030_create_discord_broadcast_table"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for CreateDiscordBroadcastTable {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .create_table(
+                Table::create()
+                    .table(DiscordBroadcast::Table)
+                    .if_not_exists()
+                    .col(
+                        ColumnDef::new(DiscordBroadcast::Id)
+                            .uuid()
+                            .not_null()
+                            .primary_key(),
+                    )
+                    .col(ColumnDef::new(DiscordBroadcast::RequestedByUserId).uuid().null())
+                    .col(ColumnDef::new(DiscordBroadcast::TemplateKey).string().not_null())
+                    .col(ColumnDef::new(DiscordBroadcast::Message).text().not_null())
+                    .col(ColumnDef::new(DiscordBroadcast::Status).string().not_null())
+                    .col(ColumnDef::new(DiscordBroadcast::TotalCount).big_integer().not_null())
+                    .col(
+                        ColumnDef::new(DiscordBroadcast::CreatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .col(
+                        ColumnDef::new(DiscordBroadcast::UpdatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .col(
+                        ColumnDef::new(DiscordBroadcast::StartedAt)
+                            .timestamp_with_time_zone()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(DiscordBroadcast::FinishedAt)
+                            .timestamp_with_time_zone()
+                            .null(),
+                    )
+                    .to_owned(),
+            )
+            .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_table(Table::drop().table(DiscordBroadcast::Table).to_owned())
+            .await
+    }
+}
+
+#[derive(DeriveIden)]
+enum DiscordBroadcast {
+    Table,
+    Id,
+    RequestedByUserId,
+    TemplateKey,
+    Message,
+    Status,
+    TotalCount,
+    CreatedAt,
+    UpdatedAt,
+    StartedAt,
+    FinishedAt,
+}
+
+pub struct CreateDiscordDeliveryTable;
+
+impl MigrationName for CreateDiscordDeliveryTable {
+    fn name(&self) -> &str {
+        "m20260413_000031_create_discord_delivery_table"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for CreateDiscordDeliveryTable {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .create_table(
+                Table::create()
+                    .table(DiscordDelivery::Table)
+                    .if_not_exists()
+                    .col(
+                        ColumnDef::new(DiscordDelivery::Id)
+                            .uuid()
+                            .not_null()
+                            .primary_key(),
+                    )
+                    .col(ColumnDef::new(DiscordDelivery::BroadcastId).uuid().null())
+                    .col(ColumnDef::new(DiscordDelivery::UserId).uuid().not_null())
+                    .col(ColumnDef::new(DiscordDelivery::RequestedByUserId).uuid().null())
+                    .col(ColumnDef::new(DiscordDelivery::TemplateKey).string().not_null())
+                    .col(ColumnDef::new(DiscordDelivery::Message).text().not_null())
+                    .col(ColumnDef::new(DiscordDelivery::Status).string().not_null())
+                    .col(ColumnDef::new(DiscordDelivery::ErrorMessage).text().null())
+                    .col(ColumnDef::new(DiscordDelivery::DiscordChannelId).string().null())
+                    .col(ColumnDef::new(DiscordDelivery::DiscordMessageId).string().null())
+                    .col(
+                        ColumnDef::new(DiscordDelivery::AttemptCount)
+                            .integer()
+                            .not_null()
+                            .default(0),
+                    )
+                    .col(ColumnDef::new(DiscordDelivery::Metadata).text().not_null())
+                    .col(
+                        ColumnDef::new(DiscordDelivery::CreatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .col(
+                        ColumnDef::new(DiscordDelivery::UpdatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .col(
+                        ColumnDef::new(DiscordDelivery::LastAttemptAt)
+                            .timestamp_with_time_zone()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(DiscordDelivery::DeliveredAt)
+                            .timestamp_with_time_zone()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(DiscordDelivery::FinishedAt)
+                            .timestamp_with_time_zone()
+                            .null(),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+
+        let backend = manager.get_database_backend();
+        for sql in [
+            r#"CREATE INDEX IF NOT EXISTS "idx_discord_delivery_status_created_at" ON "discord_delivery" ("status", "created_at")"#,
+            r#"CREATE INDEX IF NOT EXISTS "idx_discord_delivery_broadcast_id" ON "discord_delivery" ("broadcast_id")"#,
+        ] {
+            match manager
+                .get_connection()
+                .execute(Statement::from_string(backend, sql.to_string()))
+                .await
+            {
+                Ok(_) => {}
+                Err(error) if is_duplicate_index_error(&error) => {}
+                Err(error) => return Err(error),
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_table(Table::drop().table(DiscordDelivery::Table).to_owned())
+            .await
+    }
+}
+
+#[derive(DeriveIden)]
+enum DiscordDelivery {
+    Table,
+    Id,
+    BroadcastId,
+    UserId,
+    RequestedByUserId,
+    TemplateKey,
+    Message,
+    Status,
+    ErrorMessage,
+    DiscordChannelId,
+    DiscordMessageId,
+    AttemptCount,
+    Metadata,
+    CreatedAt,
+    UpdatedAt,
+    LastAttemptAt,
+    DeliveredAt,
+    FinishedAt,
+}
