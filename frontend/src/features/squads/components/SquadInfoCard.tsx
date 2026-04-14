@@ -270,7 +270,7 @@ export default function SquadInfoCard({ data, isLeader, authToken, onChanged }: 
         </div>
         <div className="profile-inline-card">
           <strong>Создан</strong>
-          <span className="profile-subtle">{formatDate(data.squad?.createdAt)}</span>
+          <span className="profile-subtle">{formatDate(data.squad?.createdAt).replace(', ', ' ')}</span>
         </div>
         <div className="profile-inline-card">
           <strong>Участников</strong>

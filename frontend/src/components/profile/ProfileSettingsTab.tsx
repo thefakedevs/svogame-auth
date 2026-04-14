@@ -141,8 +141,8 @@ export default function ProfileSettingsTab({
         <dl className="profile-kv profile-kv--wide">
           <div><dt>E-mail</dt><dd>{data.user.email ?? 'Не указан'}</dd></div>
           <div><dt>Discord</dt><dd>{data.user.discordId}</dd></div>
-          <div><dt>Дата регистрации</dt><dd>{formatDate(data.user.createdAt)}</dd></div>
-          <div><dt>Последний вход</dt><dd>{formatDateTime(data.user.lastLoginAt)}</dd></div>
+          <div><dt>Дата регистрации</dt><dd>{formatDate(data.user.createdAt).replace(', ', ' ')}</dd></div>
+          <div><dt>Последний вход</dt><dd>{formatDateTime(data.user.lastLoginAt).replace(', ', ' ')}</dd></div>
         </dl>
       </section>
 

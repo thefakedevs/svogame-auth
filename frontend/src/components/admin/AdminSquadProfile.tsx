@@ -300,8 +300,8 @@ export default function AdminSquadProfile({
             </div>
 
             <dl className="admin-kv">
-              <div><dt>Создан</dt><dd>{formatDateTime(squad.createdAt)}</dd></div>
-              <div><dt>Обновлён</dt><dd>{formatDateTime(squad.updatedAt)}</dd></div>
+              <div><dt>Создан</dt><dd>{formatDateTime(squad.createdAt).replace(', ', ' ')}</dd></div>
+              <div><dt>Обновлён</dt><dd>{formatDateTime(squad.updatedAt).replace(', ', ' ')}</dd></div>
               <div><dt>Лидер</dt><dd>{squad.leaderUserId}</dd></div>
             </dl>
 

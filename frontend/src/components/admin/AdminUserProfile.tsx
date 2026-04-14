@@ -306,8 +306,8 @@ export default function AdminUserProfile({
                 <div><dt>Email</dt><dd>{user.email ?? 'Не указан'}</dd></div>
                 <div><dt>Discord ID</dt><dd>{user.discordId}</dd></div>
                 <div><dt>Auth epoch</dt><dd>{user.authEpoch}</dd></div>
-                <div><dt>Последний вход</dt><dd>{formatDateTime(user.lastLoginAt)}</dd></div>
-                <div><dt>Создан</dt><dd>{formatDateTime(user.createdAt)}</dd></div>
+                <div><dt>Последний вход</dt><dd>{formatDateTime(user.lastLoginAt).replace(', ', ' ')}</dd></div>
+                <div><dt>Создан</dt><dd>{formatDateTime(user.createdAt).replace(', ', ' ')}</dd></div>
                 <div>
                   <dt>Статус</dt>
                   <dd>

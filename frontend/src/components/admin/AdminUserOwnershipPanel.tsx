@@ -54,7 +54,7 @@ const dateTimeFormatter = new Intl.DateTimeFormat('ru-RU', {
 function formatDateTime(value?: string | null) {
   if (!value) return 'Нет данных'
   const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? value : dateTimeFormatter.format(date)
+  return Number.isNaN(date.getTime()) ? value : dateTimeFormatter.format(date).replace(', ', ' ')
 }
 
 function formatAmount(value: number) {
