@@ -125,11 +125,20 @@
   color: var(--ui-text);
 }
 
+.ui-kit-page .admin-row .admin-row-badges {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
 .admin-row-user {
   display: inline-flex;
   align-items: center;
   gap: 10px;
   min-width: 0;
+  flex: 1 1 auto;
 }
 
 .ui-kit-page .card-title {
@@ -763,11 +772,13 @@
 }
 
 .admin-asset-image-preview img {
+  display: block;
   width: 100%;
   height: 100%;
   box-sizing: border-box;
-  padding: 6px;
+  padding: 0;
   object-fit: contain;
+  object-position: center;
 }
 
 .admin-asset-image-preview span {
@@ -865,6 +876,11 @@
 
 .admin-skin-wizard__thumb-wrap {
   display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  flex-shrink: 0;
   border: 1px solid var(--ui-border);
   border-radius: 6px;
   overflow: hidden;
@@ -873,9 +889,10 @@
 
 .admin-skin-wizard__thumb {
   display: block;
-  width: 72px;
-  height: 72px;
-  object-fit: cover;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
 }
 
 .admin-skin-wizard__actions {
@@ -968,6 +985,58 @@
   flex-wrap: wrap;
   gap: 8px;
   align-items: flex-end;
+}
+
+.admin-shop-list-controls {
+  display: grid;
+  gap: 14px;
+  margin-top: 10px;
+  width: 100%;
+}
+
+.admin-shop-list-controls-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  align-items: flex-end;
+}
+
+.admin-shop-list-controls-row .ui-input {
+  min-width: 160px;
+  max-width: 280px;
+}
+
+.admin-create-modal.ui-modal,
+.ui-kit-page .ui-modal.admin-create-modal {
+  width: min(720px, calc(100vw - 32px));
+  max-width: min(920px, calc(100vw - 32px));
+}
+
+.admin-create-modal .ui-modal-body {
+  max-height: min(80vh, 720px);
+  overflow-y: auto;
+}
+
+.admin-asset-flag-fieldset {
+  min-width: 0;
+}
+
+.admin-asset-flags--radios {
+  display: grid;
+  gap: 14px;
+  align-items: start;
+}
+
+@media (min-width: 720px) {
+  .admin-asset-flags--radios {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 960px) {
+  .admin-asset-flags--radios {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 .admin-shop-list-toolbar .ui-input {

@@ -192,6 +192,12 @@
   border: 1px solid rgba(250, 166, 26, 0.35);
 }
 
+.ui-kit-page .ui-badge-danger {
+  background: rgba(237, 66, 69, 0.12);
+  color: #fca5a5;
+  border: 1px solid rgba(237, 66, 69, 0.42);
+}
+
 .ui-kit-page .ui-badge-neutral {
   background: rgba(255, 255, 255, 0.06);
   color: rgba(255, 255, 255, 0.75);

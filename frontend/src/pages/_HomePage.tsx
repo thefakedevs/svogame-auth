@@ -8,6 +8,7 @@ import {
   type AssetResponse,
   type SkinRarity,
 } from '../api/inventory'
+import { listDiscordGuildEvents, type DiscordGuildEventResponse } from '../api/discord'
 import { listPublicShopProducts, type ShopProductResponse } from '../api/shop'
 import FooterSection from './landing/sections/FooterSection'
 import './HomePage.css'
@@ -73,6 +74,75 @@ function getOnlineCardCopy(state: OnlineCardState): {
     headline: formatPlayers(state.playersOnline),
     text: 'Онлайн сервера обновляется автоматически.',
   }
+}
+
+type DiscordEventsState =
+  | { status: 'loading' }
+  | { status: 'ready'; events: DiscordGuildEventResponse[] }
+  | { status: 'error' }
+
+function isDiscordGameLive(events: DiscordGuildEventResponse[]): boolean {
+  return events.some((e) => e.status === 'active')
+}
+
+function getGameLiveBadgeCopy(state: DiscordEventsState): { className: string; text: string } {
+  if (state.status === 'loading') {
+    return { className: 'ui-badge ui-badge-neutral', text: 'Ивент: загрузка' }
+  }
+
+  if (state.status === 'error') {
+    return { className: 'ui-badge ui-badge-warning', text: 'Ивент: нет данных' }
+  }
+
+  if (isDiscordGameLive(state.events)) {
+    return { className: 'ui-badge ui-badge-success', text: 'Игра идёт' }
+  }
+
+  return { className: 'ui-badge ui-badge-danger', text: 'Игра не идёт' }
+}
+
+const landingEventDateFormatter = new Intl.DateTimeFormat('ru-RU', {
+  day: 'numeric',
+  month: 'short',
+  hour: '2-digit',
+  minute: '2-digit',
+})
+
+function discordEventStatusLabel(status: string): string {
+  switch (status) {
+    case 'active':
+      return 'Сейчас'
+    case 'scheduled':
+      return 'Скоро'
+    case 'completed':
+      return 'Завершено'
+    case 'canceled':
+      return 'Отменено'
+    default:
+      return 'Ивент'
+  }
+}
+
+function pickLandingScheduleEvents(events: DiscordGuildEventResponse[]): DiscordGuildEventResponse[] {
+  const now = Date.now()
+
+  return events
+    .filter((e) => {
+      if (e.status === 'completed' || e.status === 'canceled') return false
+      if (e.status === 'active') return true
+      const end = e.endsAt ? new Date(e.endsAt).getTime() : null
+      if (e.status === 'scheduled' && end !== null && end < now) return false
+
+      return true
+    })
+    .sort((a, b) => {
+      const priority = (ev: DiscordGuildEventResponse) => (ev.status === 'active' ? 0 : 1)
+      const order = priority(a) - priority(b)
+      if (order !== 0) return order
+
+      return new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime()
+    })
+    .slice(0, 10)
 }
 
 type ShopTickerState =
@@ -239,8 +309,13 @@ function ShopTickerCard({ item, isDuplicate }: { item: ShopProductView; isDuplic
 
 export default function HomePage() {
   const [onlineState, setOnlineState] = useState<OnlineCardState>({ status: 'loading' })
+  const [discordEventsState, setDiscordEventsState] = useState<DiscordEventsState>({ status: 'loading' })
   const [shopState, setShopState] = useState<ShopTickerState>({ status: 'loading' })
   const onlineCopy = getOnlineCardCopy(onlineState)
+  const gameLiveCopy = getGameLiveBadgeCopy(discordEventsState)
+  const scheduleEvents = discordEventsState.status === 'ready'
+    ? pickLandingScheduleEvents(discordEventsState.events)
+    : []
 
   const productViews = useMemo(() => {
     if (shopState.status !== 'ready') return []
@@ -425,8 +500,24 @@ useEffect(() => {
         setShopState({ status: 'error' })
       })
 
+    const loadDiscordEvents = () => {
+      listDiscordGuildEvents()
+        .then((events) => {
+          if (!isMounted) return
+          setDiscordEventsState({ status: 'ready', events })
+        })
+        .catch(() => {
+          if (!isMounted) return
+          setDiscordEventsState({ status: 'error' })
+        })
+    }
+
+    loadDiscordEvents()
+    const discordPoll = window.setInterval(loadDiscordEvents, 45_000)
+
     return () => {
       isMounted = false
+      window.clearInterval(discordPoll)
     }
   }, [])
 
@@ -769,30 +860,83 @@ useEffect(() => {
           </p>
         </div>
         <div className="landing-community-grid">
-          <div className="card landing-online-card" aria-live="polite">
-            <span className={onlineCopy.badgeClassName}>{onlineCopy.badgeText}</span>
-            <strong>{onlineCopy.headline}</strong>
-            <p className="card-text">{onlineCopy.text}</p>
-            <div className="landing-community-actions">
-              <a
-                className="btn primary btn-sm"
-                href="https://discord.gg/UQQK4ykxMa"
-                data-analytics-event="join_discord"
-                data-cta="community-discord"
-                target="_blank"
-                rel="noreferrer"
-              >
-                В Discord
-              </a>
-              <a
-                className="btn btn-sm"
-                href="https://t.me/sv0craft"
-                data-cta="community-telegram"
-                target="_blank"
-                rel="noreferrer"
-              >
-                В Telegram
-              </a>
+          <div className="landing-community-hero">
+            <div className="card landing-online-card" aria-live="polite">
+              <div className="landing-online-card__badges">
+                <span className={onlineCopy.badgeClassName}>{onlineCopy.badgeText}</span>
+                <span className={gameLiveCopy.className}>{gameLiveCopy.text}</span>
+              </div>
+              <strong>{onlineCopy.headline}</strong>
+              <p className="card-text">{onlineCopy.text}</p>
+              <div className="landing-community-actions">
+                <a
+                  className="btn primary btn-sm"
+                  href="https://discord.gg/UQQK4ykxMa"
+                  data-analytics-event="join_discord"
+                  data-cta="community-discord"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  В Discord
+                </a>
+                <a
+                  className="btn btn-sm"
+                  href="https://t.me/sv0craft"
+                  data-cta="community-telegram"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  В Telegram
+                </a>
+              </div>
+            </div>
+            <div className="card landing-events-card" aria-live="polite" aria-label="Расписание игр из Discord">
+              <div className="landing-events-card__head">
+                <h3 className="landing-events-card__title">Расписание игр</h3>
+              </div>
+              {discordEventsState.status === 'loading' && (
+                <p className="card-text landing-events-card__muted">Загружаем ближайшие ивенты…</p>
+              )}
+              {discordEventsState.status === 'error' && (
+                <p className="card-text landing-events-card__muted">
+                  Не удалось загрузить расписание. Загляните в Discord — там всегда актуально.
+                </p>
+              )}
+              {discordEventsState.status === 'ready' && scheduleEvents.length === 0 && (
+                <p className="card-text landing-events-card__muted">
+                  Пока нет запланированных ивентов. Следите за анонсами в Discord.
+                </p>
+              )}
+              {discordEventsState.status === 'ready' && scheduleEvents.length > 0 && (
+                <ul className="landing-events-card__list">
+                  {scheduleEvents.map((ev) => (
+                    <li key={ev.id} className="landing-events-card__row">
+                      <div className="landing-events-card__meta">
+                        <time dateTime={ev.startsAt}>{landingEventDateFormatter.format(new Date(ev.startsAt))}</time>
+                        <span
+                          className={
+                            ev.status === 'active'
+                              ? 'ui-badge ui-badge-success'
+                              : 'ui-badge ui-badge-neutral'
+                          }
+                        >
+                          {discordEventStatusLabel(ev.status)}
+                        </span>
+                      </div>
+                      <div className="landing-events-card__body">
+                        <span className="landing-events-card__name">{ev.name}</span>
+                        {typeof ev.userCount === 'number' && ev.userCount > 0 ? (
+                          <span className="landing-events-card__count">
+                            {ev.userCount}
+                            {' '}
+                            участ.
+                          </span>
+                        ) : null}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           </div>
           <div className="landing-testimonials">
