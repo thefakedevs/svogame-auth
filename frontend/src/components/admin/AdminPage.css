@@ -125,11 +125,20 @@
   color: var(--ui-text);
 }
 
+.ui-kit-page .admin-row .admin-row-badges {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
 .admin-row-user {
   display: inline-flex;
   align-items: center;
   gap: 10px;
   min-width: 0;
+  flex: 1 1 auto;
 }
 
 .ui-kit-page .card-title {

@@ -9,7 +9,6 @@ import AppPortal from '../../shared/ui/portal/AppPortal'
 import { pushUrl } from '../../shared/navigation/history'
 import ErrorState from '../ErrorState'
 import LoadingState from '../LoadingState'
-import './AdminShopPanel.css'
 
 type LocaleRow = { locale: string; name: string; description: string }
 

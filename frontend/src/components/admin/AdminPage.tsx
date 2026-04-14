@@ -597,7 +597,11 @@ function AdminHome({
                     <small>{user.email ?? user.id}</small>
                   </span>
                 </span>
-                {user.isSuperuser ? <span className="ui-badge ui-badge-secondary">Superuser</span> : null}
+                {user.isSuperuser ? (
+                  <span className="admin-row-badges">
+                    <span className="ui-badge ui-badge-secondary">Superuser</span>
+                  </span>
+                ) : null}
               </button>
             ))}
           </div>
@@ -623,7 +627,9 @@ function AdminHome({
                     <small>{squadItem.id}</small>
                   </span>
                 </span>
-                <span className="ui-badge ui-badge-neutral">{squadItem.memberCount}/{squadItem.maxMembers}</span>
+                <span className="admin-row-badges">
+                  <span className="ui-badge ui-badge-neutral">{squadItem.memberCount}/{squadItem.maxMembers}</span>
+                </span>
               </button>
             ))}
           </div>
