@@ -16,10 +16,16 @@ import LoadingState from '../components/LoadingState'
 import SkinDetailsModal from '../components/SkinDetailsModal'
 import { currentAppPath, redirectToAuth } from '../routes/auth'
 import { getAuthToken } from '../shared/session/auth-session'
+import AppPortal from '../shared/ui/portal/AppPortal'
 import './OwnershipPage.css'
 import './ShopPage.css'
+import { skinRarityRank, uniqueSortedWeaponKeys } from './skinInventoryControls'
 
 const SHOP_LOCALE = 'ru-RU'
+
+type ShopSortKey = 'default' | 'price_asc' | 'price_desc' | 'rarity' | 'weapon'
+type ShopRarityFilter = 'all' | 'none' | SkinRarity
+type ShopWeaponFilter = 'all' | string
 
 type ShopState =
   | { status: 'loading' }
@@ -259,6 +265,10 @@ export default function ShopPage() {
   const [confirmProduct, setConfirmProduct] = useState<ShopProductView | null>(null)
   const [buyingProductKey, setBuyingProductKey] = useState<string | null>(null)
   const [isCreatingOrder, setIsCreatingOrder] = useState(false)
+  const [shopSort, setShopSort] = useState<ShopSortKey>('default')
+  const [shopRarityFilter, setShopRarityFilter] = useState<ShopRarityFilter>('all')
+  const [shopWeaponFilter, setShopWeaponFilter] = useState<ShopWeaponFilter>('all')
+  const [isShopFiltersModalOpen, setIsShopFiltersModalOpen] = useState(false)
 
   const load = async () => {
     setState({ status: 'loading' })
@@ -280,7 +290,7 @@ export default function ShopPage() {
     queueMicrotask(() => void load())
   }, [])
 
-  const productViews = useMemo(() => {
+  const baseProductViews = useMemo(() => {
     if (state.status !== 'ready') return []
 
     const assetMap = buildAssetMap(state.assets)
@@ -303,8 +313,54 @@ export default function ShopPage() {
         }
       })
       .filter((item) => isSkinProduct(item.product, item.asset))
-      .sort((left, right) => left.product.sortOrder - right.product.sortOrder || left.title.localeCompare(right.title, 'ru'))
   }, [state])
+
+  const shopWeaponOptions = useMemo(
+    () => uniqueSortedWeaponKeys(baseProductViews.map((item) => item.asset?.weaponKey)),
+    [baseProductViews],
+  )
+
+  const productViews = useMemo(() => {
+    let rows = baseProductViews
+
+    if (shopRarityFilter === 'none') {
+      rows = rows.filter((item) => !item.asset?.rarity)
+    } else if (shopRarityFilter !== 'all') {
+      rows = rows.filter((item) => item.asset?.rarity === shopRarityFilter)
+    }
+
+    if (shopWeaponFilter !== 'all') {
+      rows = rows.filter((item) => (item.asset?.weaponKey ?? '').trim() === shopWeaponFilter)
+    }
+
+    const sorted = [...rows]
+    const tieTitle = (a: ShopProductView, b: ShopProductView) => a.title.localeCompare(b.title, 'ru')
+
+    switch (shopSort) {
+      case 'price_asc':
+        sorted.sort((a, b) => a.product.priceRub - b.product.priceRub || tieTitle(a, b))
+        break
+      case 'price_desc':
+        sorted.sort((a, b) => b.product.priceRub - a.product.priceRub || tieTitle(a, b))
+        break
+      case 'rarity':
+        sorted.sort(
+          (a, b) =>
+            skinRarityRank(a.asset?.rarity) - skinRarityRank(b.asset?.rarity)
+            || tieTitle(a, b),
+        )
+        break
+      case 'weapon': {
+        const w = (item: ShopProductView) => (item.asset?.weaponKey ?? '').trim().toLowerCase()
+        sorted.sort((a, b) => w(a).localeCompare(w(b), 'ru') || tieTitle(a, b))
+        break
+      }
+      default:
+        sorted.sort((a, b) => a.product.sortOrder - b.product.sortOrder || tieTitle(a, b))
+    }
+
+    return sorted
+  }, [baseProductViews, shopSort, shopRarityFilter, shopWeaponFilter])
 
   const openBuyConfirmation = async (item: ShopProductView) => {
     if (item.owned || buyingProductKey || isCreatingOrder) return
@@ -377,7 +433,20 @@ export default function ShopPage() {
           <div className="ownership-section-title">
             <h2 className="card-title">Доступно сейчас</h2>
           </div>
-          <span className="ui-badge ui-badge-neutral">{productViews.length}</span>
+          <div className="ownership-section-head-actions">
+            <span className="ui-badge ui-badge-neutral">{productViews.length}</span>
+            {baseProductViews.length ? (
+              <button
+                type="button"
+                className="btn btn-sm"
+                aria-expanded={isShopFiltersModalOpen}
+                aria-haspopup="dialog"
+                onClick={() => setIsShopFiltersModalOpen(true)}
+              >
+                Фильтры и сортировка
+              </button>
+            ) : null}
+          </div>
         </div>
 
         {productViews.length ? (
@@ -393,9 +462,140 @@ export default function ShopPage() {
             ))}
           </div>
         ) : (
-          <p className="ownership-muted inventory-empty">Скинов в магазине пока нет.</p>
+          <p className="ownership-muted inventory-empty">
+            {baseProductViews.length ? 'Нет скинов по выбранным фильтрам.' : 'Скинов в магазине пока нет.'}
+          </p>
         )}
       </section>
+
+      {isShopFiltersModalOpen ? (
+        <AppPortal>
+          <div
+            className="ui-modal-backdrop"
+            role="presentation"
+            onClick={() => setIsShopFiltersModalOpen(false)}
+          >
+            <div
+              id="shop-filters-modal"
+              className="ui-modal inventory-filters-modal"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="shop-filters-modal-title"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="ui-modal-header">
+                <h2 id="shop-filters-modal-title" className="ui-modal-title">Сортировка и фильтры</h2>
+                <button
+                  type="button"
+                  className="ui-modal-close"
+                  aria-label="Закрыть"
+                  onClick={() => setIsShopFiltersModalOpen(false)}
+                >
+                  ×
+                </button>
+              </div>
+              <div className="ui-modal-body inventory-filters-modal__body">
+                <div className="inventory-toolbar inventory-toolbar--modal" aria-label="Сортировка и фильтры магазина">
+                  <div className="inventory-toolbar__row">
+                    <span className="inventory-toolbar__heading">Сортировка</span>
+                    <fieldset className="ui-radio-group inventory-toolbar__fieldset inventory-toolbar__fieldset--inline">
+                      <legend className="ui-radio-legend">Сортировка</legend>
+                      {(
+                        [
+                          ['default', 'По умолчанию'],
+                          ['price_asc', 'Цена: по возрастанию'],
+                          ['price_desc', 'Цена: по убыванию'],
+                          ['rarity', 'По редкости'],
+                          ['weapon', 'По оружию'],
+                        ] as const
+                      ).map(([value, label]) => (
+                        <label key={value} className="ui-radio">
+                          <input
+                            type="radio"
+                            name="shop-sort"
+                            value={value}
+                            checked={shopSort === value}
+                            onChange={() => setShopSort(value as ShopSortKey)}
+                          />
+                          <span className="ui-radio-mark" aria-hidden />
+                          <span>{label}</span>
+                        </label>
+                      ))}
+                    </fieldset>
+                  </div>
+                  <div className="inventory-toolbar__row inventory-toolbar__row--split">
+                    <div className="inventory-toolbar__col">
+                      <span className="inventory-toolbar__heading">Фильтр: редкость</span>
+                      <fieldset className="ui-radio-group inventory-toolbar__fieldset">
+                        <legend className="ui-radio-legend">Редкость</legend>
+                        <label className="ui-radio">
+                          <input
+                            type="radio"
+                            name="shop-filter-rarity"
+                            value="all"
+                            checked={shopRarityFilter === 'all'}
+                            onChange={() => setShopRarityFilter('all')}
+                          />
+                          <span className="ui-radio-mark" aria-hidden />
+                          <span>Все</span>
+                        </label>
+                        {(Object.keys(skinRarityConfig) as SkinRarity[]).map((rarity) => (
+                          <label key={rarity} className="ui-radio">
+                            <input
+                              type="radio"
+                              name="shop-filter-rarity"
+                              value={rarity}
+                              checked={shopRarityFilter === rarity}
+                              onChange={() => setShopRarityFilter(rarity)}
+                            />
+                            <span className="ui-radio-mark" aria-hidden />
+                            <span>{skinRarityConfig[rarity].label}</span>
+                          </label>
+                        ))}
+                      </fieldset>
+                    </div>
+                    <div className="inventory-toolbar__col">
+                      <span className="inventory-toolbar__heading">Фильтр: оружие</span>
+                      <fieldset className="ui-radio-group inventory-toolbar__fieldset inventory-toolbar__fieldset--wrap">
+                        <legend className="ui-radio-legend">Оружие</legend>
+                        <label className="ui-radio">
+                          <input
+                            type="radio"
+                            name="shop-filter-weapon"
+                            value="all"
+                            checked={shopWeaponFilter === 'all'}
+                            onChange={() => setShopWeaponFilter('all')}
+                          />
+                          <span className="ui-radio-mark" aria-hidden />
+                          <span>Все</span>
+                        </label>
+                        {shopWeaponOptions.map((weaponKey) => (
+                          <label key={weaponKey} className="ui-radio">
+                            <input
+                              type="radio"
+                              name="shop-filter-weapon"
+                              value={weaponKey}
+                              checked={shopWeaponFilter === weaponKey}
+                              onChange={() => setShopWeaponFilter(weaponKey)}
+                            />
+                            <span className="ui-radio-mark" aria-hidden />
+                            <span>{weaponKey}</span>
+                          </label>
+                        ))}
+                      </fieldset>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="ui-modal-footer">
+                <button type="button" className="btn primary" onClick={() => setIsShopFiltersModalOpen(false)}>
+                  Готово
+                </button>
+              </div>
+            </div>
+          </div>
+        </AppPortal>
+      ) : null}
 
       {detailsProduct ? (
         <SkinDetailsModal

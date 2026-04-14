@@ -978,6 +978,58 @@
   align-items: flex-end;
 }
 
+.admin-shop-list-controls {
+  display: grid;
+  gap: 14px;
+  margin-top: 10px;
+  width: 100%;
+}
+
+.admin-shop-list-controls-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  align-items: flex-end;
+}
+
+.admin-shop-list-controls-row .ui-input {
+  min-width: 160px;
+  max-width: 280px;
+}
+
+.admin-create-modal.ui-modal,
+.ui-kit-page .ui-modal.admin-create-modal {
+  width: min(720px, calc(100vw - 32px));
+  max-width: min(920px, calc(100vw - 32px));
+}
+
+.admin-create-modal .ui-modal-body {
+  max-height: min(80vh, 720px);
+  overflow-y: auto;
+}
+
+.admin-asset-flag-fieldset {
+  min-width: 0;
+}
+
+.admin-asset-flags--radios {
+  display: grid;
+  gap: 14px;
+  align-items: start;
+}
+
+@media (min-width: 720px) {
+  .admin-asset-flags--radios {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 960px) {
+  .admin-asset-flags--radios {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
 .admin-shop-list-toolbar .ui-input {
   min-width: 200px;
 }

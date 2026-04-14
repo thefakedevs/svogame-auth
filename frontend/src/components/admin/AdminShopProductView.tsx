@@ -239,15 +239,33 @@ export default function AdminShopProductView({ token, productId }: { token: stri
               </label>
             </div>
 
-            <div className="admin-asset-flags admin-shop-form-flags">
-              <label className="admin-checkbox-row">
-                <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
-                Активен
-              </label>
-              <label className="admin-checkbox-row">
-                <input type="checkbox" checked={isPublic} onChange={(e) => setIsPublic(e.target.checked)} />
-                Публичный
-              </label>
+            <div className="admin-asset-flags admin-shop-form-flags admin-asset-flags--radios">
+              <fieldset className="ui-radio-group admin-asset-flag-fieldset">
+                <legend className="ui-radio-legend">Статус</legend>
+                <label className="ui-radio">
+                  <input type="radio" name="admin-shop-product-active" checked={isActive} onChange={() => setIsActive(true)} />
+                  <span className="ui-radio-mark" aria-hidden />
+                  <span>Активен</span>
+                </label>
+                <label className="ui-radio">
+                  <input type="radio" name="admin-shop-product-active" checked={!isActive} onChange={() => setIsActive(false)} />
+                  <span className="ui-radio-mark" aria-hidden />
+                  <span>Неактивен</span>
+                </label>
+              </fieldset>
+              <fieldset className="ui-radio-group admin-asset-flag-fieldset">
+                <legend className="ui-radio-legend">Видимость</legend>
+                <label className="ui-radio">
+                  <input type="radio" name="admin-shop-product-public" checked={isPublic} onChange={() => setIsPublic(true)} />
+                  <span className="ui-radio-mark" aria-hidden />
+                  <span>Публичный</span>
+                </label>
+                <label className="ui-radio">
+                  <input type="radio" name="admin-shop-product-public" checked={!isPublic} onChange={() => setIsPublic(false)} />
+                  <span className="ui-radio-mark" aria-hidden />
+                  <span>Скрытый</span>
+                </label>
+              </fieldset>
             </div>
 
             <div className="admin-shop-locales">

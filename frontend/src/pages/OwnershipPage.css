@@ -61,6 +61,33 @@
   gap: 12px;
 }
 
+.ownership-section-head-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.inventory-filters-modal {
+  max-width: 520px;
+  width: min(520px, calc(100vw - 32px));
+}
+
+.inventory-filters-modal .ui-modal-body {
+  max-height: min(72vh, 560px);
+  overflow-y: auto;
+}
+
+.inventory-toolbar--modal {
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  display: grid;
+  gap: 16px;
+  text-align: left;
+}
+
 .ownership-section-title {
   display: grid;
   min-width: 0;
@@ -78,6 +105,56 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(156px, 1fr));
   gap: 10px;
+}
+
+.inventory-toolbar.card {
+  margin-bottom: 4px;
+  padding: 14px 16px;
+  display: grid;
+  gap: 16px;
+  text-align: left;
+}
+
+.inventory-toolbar__row {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.inventory-toolbar__row--split {
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 18px;
+}
+
+.inventory-toolbar__col {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.inventory-toolbar__heading {
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ui-text-muted);
+}
+
+.inventory-toolbar__fieldset {
+  min-width: 0;
+}
+
+.inventory-toolbar__fieldset--inline,
+.inventory-toolbar__fieldset--wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  align-items: flex-start;
+}
+
+.inventory-toolbar__fieldset--inline .ui-radio,
+.inventory-toolbar__fieldset--wrap .ui-radio {
+  margin-bottom: 0;
 }
 
 .inventory-compact-grid {
