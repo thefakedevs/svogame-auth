@@ -8,6 +8,7 @@ import { adminShopProductPath } from '../../routes/paths'
 import { pushUrl } from '../../shared/navigation/history'
 import ErrorState from '../ErrorState'
 import LoadingState from '../LoadingState'
+import './AdminShopPanel.css'
 
 type LocaleRow = { locale: string; name: string; description: string }
 
@@ -26,8 +27,8 @@ function buildCreatePayload(
     sortOrder: string
     startsAt: string
     endsAt: string
-    isActive: boolean | null
-    isPublic: boolean | null
+    isActive: boolean
+    isPublic: boolean
     metadataText: string
   },
 ): CreateShopProductInput {
@@ -67,8 +68,8 @@ function buildCreatePayload(
   const ea = extras.endsAt.trim()
   if (ea) body.ends_at = ea
 
-  if (extras.isActive !== null) body.is_active = extras.isActive
-  if (extras.isPublic !== null) body.is_public = extras.isPublic
+  body.is_active = extras.isActive
+  body.is_public = extras.isPublic
 
   const metaTrim = extras.metadataText.trim()
   if (metaTrim) body.metadata = JSON.parse(metaTrim) as unknown
@@ -95,8 +96,8 @@ export default function AdminShopPanel({ token }: { token: string }) {
   const [sortOrder, setSortOrder] = useState('')
   const [startsAt, setStartsAt] = useState('')
   const [endsAt, setEndsAt] = useState('')
-  const [isActive, setIsActive] = useState<boolean | null>(true)
-  const [isPublic, setIsPublic] = useState<boolean | null>(true)
+  const [isActive, setIsActive] = useState(true)
+  const [isPublic, setIsPublic] = useState(true)
   const [metadataText, setMetadataText] = useState('{}')
   const [isCreating, setIsCreating] = useState(false)
 
@@ -283,35 +284,16 @@ export default function AdminShopPanel({ token }: { token: string }) {
             <span>ends_at (ISO 8601)</span>
             <input className="ui-input" value={endsAt} onChange={(e) => setEndsAt(e.target.value)} />
           </label>
-          <label className="admin-shop-field admin-shop-field--checkbox">
-            <span>is_active</span>
-            <select
-              className="ui-input"
-              value={isActive === null ? '' : isActive ? 'true' : 'false'}
-              onChange={(e) => {
-                const v = e.target.value
-                setIsActive(v === '' ? null : v === 'true')
-              }}
-            >
-              <option value="true">true</option>
-              <option value="false">false</option>
-              <option value="">не передавать</option>
-            </select>
+        </div>
+
+        <div className="admin-asset-flags admin-shop-form-flags">
+          <label className="admin-checkbox-row">
+            <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
+            Активен
           </label>
-          <label className="admin-shop-field admin-shop-field--checkbox">
-            <span>is_public</span>
-            <select
-              className="ui-input"
-              value={isPublic === null ? '' : isPublic ? 'true' : 'false'}
-              onChange={(e) => {
-                const v = e.target.value
-                setIsPublic(v === '' ? null : v === 'true')
-              }}
-            >
-              <option value="true">true</option>
-              <option value="false">false</option>
-              <option value="">не передавать</option>
-            </select>
+          <label className="admin-checkbox-row">
+            <input type="checkbox" checked={isPublic} onChange={(e) => setIsPublic(e.target.checked)} />
+            Публичный
           </label>
         </div>
 
@@ -376,8 +358,10 @@ export default function AdminShopPanel({ token }: { token: string }) {
                     </small>
                   </span>
                 </span>
+                <div className="admin-row-badges">
                 <span className={`ui-badge ${p.isActive ? 'ui-badge-success' : 'ui-badge-warning'}`}>{p.isActive ? 'Активен' : 'Выкл'}</span>
                 <span className={`ui-badge ${p.isPublic ? 'ui-badge-neutral' : 'ui-badge-secondary'}`}>{p.isPublic ? 'Публичный' : 'Скрыт'}</span>
+                </div>
               </button>
             ))}
           </div>
