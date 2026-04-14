@@ -110,7 +110,6 @@ function buildCreatePayload(
 export default function AdminShopPanel({ token }: { token: string }) {
   const [items, setItems] = useState<ShopProductResponse[] | null>(null)
   const [listError, setListError] = useState('')
-  const [listLocaleInput, setListLocaleInput] = useState('')
 
   const [catalogAssets, setCatalogAssets] = useState<AssetResponse[] | null>(null)
   const [assetsError, setAssetsError] = useState('')
@@ -237,7 +236,7 @@ export default function AdminShopPanel({ token }: { token: string }) {
     setIsCreating(true)
     try {
       await createAdminShopProduct(token, payload)
-      await loadProducts(listLocaleInput)
+      await loadProducts('')
       toast.success('Товар создан.')
       setProductKey('')
       setAssetKey('')
@@ -274,7 +273,7 @@ export default function AdminShopPanel({ token }: { token: string }) {
         <div className="admin-shop-list-head">
           <h2 className="card-title">Каталог</h2>
           <div className="admin-shop-list-toolbar">
-            <button type="button" className="btn btn-sm" onClick={() => void loadProducts(listLocaleInput)}>
+            <button type="button" className="btn btn-sm" onClick={() => void loadProducts('')}>
               Обновить
             </button>
             <button type="button" className="btn primary btn-sm" onClick={() => setCreateModalOpen(true)}>
