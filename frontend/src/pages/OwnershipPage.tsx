@@ -20,7 +20,9 @@ import LoadingState from '../components/LoadingState'
 import SkinDetailsModal from '../components/SkinDetailsModal'
 import { currentAppPath, redirectToAuth } from '../routes/auth'
 import { getAuthToken } from '../shared/session/auth-session'
+import AppPortal from '../shared/ui/portal/AppPortal'
 import './OwnershipPage.css'
+import { skinRarityRank, uniqueSortedWeaponKeys } from './skinInventoryControls'
 
 type OwnershipState =
   | { status: 'loading' }
@@ -206,17 +208,6 @@ function EmptySection({ text }: { text: string }) {
   return <p className="ownership-muted inventory-empty">{text}</p>
 }
 
-function SectionTitle({ title, count, showCount = true }: { title: string; count: number; showCount?: boolean }) {
-  return (
-    <div className="ownership-section-head">
-      <div className="ownership-section-title">
-        <h2 className="card-title">{title}</h2>
-      </div>
-      {showCount ? <span className="ui-badge ui-badge-neutral">{count}</span> : null}
-    </div>
-  )
-}
-
 type InventoryAssetView = ReturnType<typeof assetView>
 
 type SkinCardItem = InventoryAssetView & {
@@ -373,11 +364,19 @@ void ItemCard
 void AccessCard
 void SubscriptionCard
 
+type InvSortKey = 'default' | 'rarity' | 'weapon'
+type InvRarityFilter = 'all' | 'none' | SkinRarity
+type InvWeaponFilter = 'all' | string
+
 export default function OwnershipPage() {
   const [state, setState] = useState<OwnershipState>({ status: 'loading' })
   const [selectingSkinKey, setSelectingSkinKey] = useState<string | null>(null)
   const [resettingSkinKey, setResettingSkinKey] = useState<string | null>(null)
   const [detailsSkin, setDetailsSkin] = useState<SkinCardItem | null>(null)
+  const [invSort, setInvSort] = useState<InvSortKey>('default')
+  const [invRarityFilter, setInvRarityFilter] = useState<InvRarityFilter>('all')
+  const [invWeaponFilter, setInvWeaponFilter] = useState<InvWeaponFilter>('all')
+  const [isInvFiltersModalOpen, setIsInvFiltersModalOpen] = useState(false)
 
   const load = async () => {
     const token = getAuthToken()
@@ -419,6 +418,66 @@ export default function OwnershipPage() {
     return map
   }, [state])
 
+  const baseSkinEntries = useMemo((): SkinCardItem[] => {
+    if (state.status !== 'ready') return []
+
+    const map = makeAssetMap(state.assets)
+    const stackableEntries = state.inventory.stackables.map((item) => ({
+      ...item,
+      ...assetView(map, item.assetKey, item.assetDefinitionId),
+    }))
+    const entitlementEntries = state.inventory.entitlements.map((item) => ({
+      ...item,
+      ...assetView(map, item.assetKey, item.assetDefinitionId),
+    }))
+
+    return [
+      ...stackableEntries
+        .filter((item) => isSkinAsset(item.asset, item.assetKey))
+        .map((item) => ({ ...item, amount: item.amount, updatedAt: item.updatedAt })),
+      ...entitlementEntries
+        .filter((item) => isSkinAsset(item.asset, item.assetKey))
+        .map((item) => ({ ...item, grantedAt: item.grantedAt, updatedAt: item.updatedAt })),
+    ]
+  }, [state])
+
+  const invWeaponOptions = useMemo(
+    () => uniqueSortedWeaponKeys(baseSkinEntries.map((item) => item.weaponKey)),
+    [baseSkinEntries],
+  )
+
+  const displayedSkinEntries = useMemo(() => {
+    let rows = baseSkinEntries
+
+    if (invRarityFilter === 'none') {
+      rows = rows.filter((item) => !item.rarity)
+    } else if (invRarityFilter !== 'all') {
+      rows = rows.filter((item) => item.rarity === invRarityFilter)
+    }
+
+    if (invWeaponFilter !== 'all') {
+      rows = rows.filter((item) => (item.weaponKey ?? '').trim() === invWeaponFilter)
+    }
+
+    const sorted = [...rows]
+    const tieTitle = (a: SkinCardItem, b: SkinCardItem) => a.title.localeCompare(b.title, 'ru')
+
+    switch (invSort) {
+      case 'rarity':
+        sorted.sort((a, b) => skinRarityRank(a.rarity) - skinRarityRank(b.rarity) || tieTitle(a, b))
+        break
+      case 'weapon': {
+        const w = (item: SkinCardItem) => (item.weaponKey ?? '').trim().toLowerCase()
+        sorted.sort((a, b) => w(a).localeCompare(w(b), 'ru') || tieTitle(a, b))
+        break
+      }
+      default:
+        sorted.sort(tieTitle)
+    }
+
+    return sorted
+  }, [baseSkinEntries, invSort, invRarityFilter, invWeaponFilter])
+
   if (state.status === 'loading') {
     return <LoadingState title="Загружаем инвентарь" />
   }
@@ -442,15 +501,6 @@ export default function OwnershipPage() {
 
   const { inventory } = state
   const stackableEntries = inventory.stackables.map((item) => ({ ...item, ...assetView(assetMap, item.assetKey, item.assetDefinitionId) }))
-  const entitlementEntries = inventory.entitlements.map((item) => ({ ...item, ...assetView(assetMap, item.assetKey, item.assetDefinitionId) }))
-  const skinEntries: SkinCardItem[] = [
-    ...stackableEntries
-      .filter((item) => isSkinAsset(item.asset, item.assetKey))
-      .map((item) => ({ ...item, amount: item.amount, updatedAt: item.updatedAt })),
-    ...entitlementEntries
-      .filter((item) => isSkinAsset(item.asset, item.assetKey))
-      .map((item) => ({ ...item, grantedAt: item.grantedAt, updatedAt: item.updatedAt })),
-  ]
   const itemEntries = stackableEntries.filter((item) => !isSkinAsset(item.asset, item.assetKey))
   const ownedSubscriptionEntries = inventory.expirables.map((item) => ({ ...item, ...assetView(assetMap, item.assetKey, item.assetDefinitionId) }))
   const ownedSubscriptionByKey = new Map(ownedSubscriptionEntries.map((item) => [item.assetKey, item]))
@@ -552,13 +602,29 @@ export default function OwnershipPage() {
       </section>
 
       <section className="ownership-section inventory-section">
-        <SectionTitle
-          title="Скины"
-          count={skinEntries.length}
-        />
-        {skinEntries.length ? (
+        <div className="ownership-section-head">
+          <div className="ownership-section-title">
+            <h2 className="card-title">Скины</h2>
+          </div>
+          <div className="ownership-section-head-actions">
+            <span className="ui-badge ui-badge-neutral">{displayedSkinEntries.length}</span>
+            {baseSkinEntries.length ? (
+              <button
+                type="button"
+                className="btn btn-sm"
+                aria-expanded={isInvFiltersModalOpen}
+                aria-controls="inv-filters-modal"
+                onClick={() => setIsInvFiltersModalOpen(true)}
+              >
+                Фильтры и сортировка
+              </button>
+            ) : null}
+          </div>
+        </div>
+
+        {displayedSkinEntries.length ? (
           <div className="inventory-skin-grid">
-            {skinEntries.map((item) => {
+            {displayedSkinEntries.map((item) => {
               const selected = item.weaponKey ? selectedGunskinByWeapon.get(item.weaponKey) : null
               const requestKey = item.weaponKey ? `${item.weaponKey}:${item.assetKey}` : null
 
@@ -576,8 +642,135 @@ export default function OwnershipPage() {
               )
             })}
           </div>
-        ) : <EmptySection text="Скинов в инвентаре пока нет." />}
+        ) : <EmptySection text={baseSkinEntries.length ? 'Нет скинов по выбранным фильтрам.' : 'Скинов в инвентаре пока нет.'} />}
       </section>
+
+      {isInvFiltersModalOpen ? (
+        <AppPortal>
+          <div
+            className="ui-modal-backdrop"
+            role="presentation"
+            onClick={() => setIsInvFiltersModalOpen(false)}
+          >
+            <div
+              id="inv-filters-modal"
+              className="ui-modal inventory-filters-modal"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="inv-filters-modal-title"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="ui-modal-header">
+                <h2 id="inv-filters-modal-title" className="ui-modal-title">Сортировка и фильтры</h2>
+                <button
+                  type="button"
+                  className="ui-modal-close"
+                  aria-label="Закрыть"
+                  onClick={() => setIsInvFiltersModalOpen(false)}
+                >
+                  ×
+                </button>
+              </div>
+              <div className="ui-modal-body inventory-filters-modal__body">
+                <div className="inventory-toolbar inventory-toolbar--modal" aria-label="Сортировка и фильтры инвентаря">
+                  <div className="inventory-toolbar__row">
+                    <span className="inventory-toolbar__heading">Сортировка</span>
+                    <fieldset className="ui-radio-group inventory-toolbar__fieldset inventory-toolbar__fieldset--inline">
+                      <legend className="ui-radio-legend">Сортировка</legend>
+                      {(
+                        [
+                          ['default', 'По умолчанию'],
+                          ['rarity', 'По редкости'],
+                          ['weapon', 'По оружию'],
+                        ] as const
+                      ).map(([value, label]) => (
+                        <label key={value} className="ui-radio">
+                          <input
+                            type="radio"
+                            name="inv-sort"
+                            value={value}
+                            checked={invSort === value}
+                            onChange={() => setInvSort(value as InvSortKey)}
+                          />
+                          <span className="ui-radio-mark" aria-hidden />
+                          <span>{label}</span>
+                        </label>
+                      ))}
+                    </fieldset>
+                  </div>
+                  <div className="inventory-toolbar__row inventory-toolbar__row--split">
+                    <div className="inventory-toolbar__col">
+                      <span className="inventory-toolbar__heading">Фильтр: редкость</span>
+                      <fieldset className="ui-radio-group inventory-toolbar__fieldset">
+                        <legend className="ui-radio-legend">Редкость</legend>
+                        <label className="ui-radio">
+                          <input
+                            type="radio"
+                            name="inv-filter-rarity"
+                            value="all"
+                            checked={invRarityFilter === 'all'}
+                            onChange={() => setInvRarityFilter('all')}
+                          />
+                          <span className="ui-radio-mark" aria-hidden />
+                          <span>Все</span>
+                        </label>
+                        {(Object.keys(skinRarityConfig) as SkinRarity[]).map((rarity) => (
+                          <label key={rarity} className="ui-radio">
+                            <input
+                              type="radio"
+                              name="inv-filter-rarity"
+                              value={rarity}
+                              checked={invRarityFilter === rarity}
+                              onChange={() => setInvRarityFilter(rarity)}
+                            />
+                            <span className="ui-radio-mark" aria-hidden />
+                            <span>{skinRarityConfig[rarity].label}</span>
+                          </label>
+                        ))}
+                      </fieldset>
+                    </div>
+                    <div className="inventory-toolbar__col">
+                      <span className="inventory-toolbar__heading">Фильтр: оружие</span>
+                      <fieldset className="ui-radio-group inventory-toolbar__fieldset inventory-toolbar__fieldset--wrap">
+                        <legend className="ui-radio-legend">Оружие</legend>
+                        <label className="ui-radio">
+                          <input
+                            type="radio"
+                            name="inv-filter-weapon"
+                            value="all"
+                            checked={invWeaponFilter === 'all'}
+                            onChange={() => setInvWeaponFilter('all')}
+                          />
+                          <span className="ui-radio-mark" aria-hidden />
+                          <span>Все</span>
+                        </label>
+                        {invWeaponOptions.map((weaponKey) => (
+                          <label key={weaponKey} className="ui-radio">
+                            <input
+                              type="radio"
+                              name="inv-filter-weapon"
+                              value={weaponKey}
+                              checked={invWeaponFilter === weaponKey}
+                              onChange={() => setInvWeaponFilter(weaponKey)}
+                            />
+                            <span className="ui-radio-mark" aria-hidden />
+                            <span>{weaponKey}</span>
+                          </label>
+                        ))}
+                      </fieldset>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="ui-modal-footer">
+                <button type="button" className="btn primary" onClick={() => setIsInvFiltersModalOpen(false)}>
+                  Готово
+                </button>
+              </div>
+            </div>
+          </div>
+        </AppPortal>
+      ) : null}
 
       {detailsSkin ? (
         <SkinDetailsModal
@@ -597,12 +790,12 @@ export default function OwnershipPage() {
           )}
         />
       ) : null}
-{/* 
+{/*
       <section className="ownership-section inventory-section">
-        <SectionTitle
-          title="Предметы"
-          count={itemEntries.length}
-        />
+        <div className="ownership-section-head">
+          <div className="ownership-section-title"><h2 className="card-title">Предметы</h2></div>
+          <span className="ui-badge ui-badge-neutral">{itemEntries.length}</span>
+        </div>
         {itemEntries.length ? (
           <div className="inventory-compact-grid">
             {itemEntries.map((item) => <ItemCard key={item.assetKey} item={item} />)}
@@ -611,15 +804,14 @@ export default function OwnershipPage() {
       </section>
 
       <section className="ownership-section inventory-section">
-        <SectionTitle
-          title="Подписки"
-          count={subscriptionEntries.length}
-          showCount={false}
-        />
+        <div className="ownership-section-head">
+          <div className="ownership-section-title"><h2 className="card-title">Подписки</h2></div>
+        </div>
         <div className="inventory-subscription-grid">
           {subscriptionEntries.map((item) => <SubscriptionCard key={item.assetKey} item={item} />)}
         </div>
-      </section> */}
+      </section>
+      */}
     </main>
   )
 }

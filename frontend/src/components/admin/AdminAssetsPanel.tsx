@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
 import toast from 'react-hot-toast'
 import { toDisplayError } from '../../api/http'
 import {
@@ -13,6 +13,7 @@ import {
   type OwnershipModel,
   type SkinRarity,
 } from '../../api/inventory'
+import AppPortal from '../../shared/ui/portal/AppPortal'
 import AdminAssetImage from './AdminAssetImage'
 import ErrorState from '../ErrorState'
 import LoadingState from '../LoadingState'
@@ -93,11 +94,35 @@ function normalizeAssetKey(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9_-]/g, '')
 }
 
+type AdminAssetSortKey = 'key_asc' | 'name_asc' | 'updated_desc' | 'updated_asc'
+
+function sortAdminAssets(items: AssetResponse[], sort: AdminAssetSortKey): AssetResponse[] {
+  const out = [...items]
+  out.sort((a, b) => {
+    switch (sort) {
+      case 'key_asc':
+        return a.key.localeCompare(b.key)
+      case 'name_asc':
+        return a.displayName.localeCompare(b.displayName, 'ru')
+      case 'updated_desc':
+        return b.updatedAt.localeCompare(a.updatedAt)
+      case 'updated_asc':
+        return a.updatedAt.localeCompare(b.updatedAt)
+      default:
+        return 0
+    }
+  })
+  return out
+}
+
 export default function AdminAssetsPanel({ token }: { token: string }) {
   const [state, setState] = useState<AssetsState>({ status: 'loading' })
   const [query, setQuery] = useState('')
   const [draft, setDraft] = useState<CreateAssetDraft>(emptyCreateDraft)
   const [isCreating, setIsCreating] = useState(false)
+  const [createModalOpen, setCreateModalOpen] = useState(false)
+  const [catalogScope, setCatalogScope] = useState<'active_only' | 'all'>('active_only')
+  const [assetSort, setAssetSort] = useState<AdminAssetSortKey>('key_asc')
 
   const loadAssets = useCallback(async () => {
     setState({ status: 'loading' })
@@ -106,30 +131,17 @@ export default function AdminAssetsPanel({ token }: { token: string }) {
         q: query.trim() || undefined,
         page: 1,
         perPage: 100,
+        ...(catalogScope === 'active_only' ? { isActive: true } : {}),
       })
       setState({ status: 'ready', items: response.items, total: response.total })
     } catch (cause) {
       setState({ status: 'error', error: toDisplayError(cause, 'Не удалось загрузить ассеты.') })
     }
-  }, [query, token])
+  }, [catalogScope, query, token])
 
   useEffect(() => {
     queueMicrotask(() => void loadAssets())
   }, [loadAssets])
-
-  const updateCreatedAsset = (asset: AssetResponse) => {
-    setState((prev) => {
-      if (prev.status !== 'ready') return prev
-      const exists = prev.items.some((item) => item.id === asset.id)
-      return {
-        status: 'ready',
-        total: exists ? prev.total : prev.total + 1,
-        items: exists
-          ? prev.items.map((item) => (item.id === asset.id ? asset : item))
-          : [asset, ...prev.items],
-      }
-    })
-  }
 
   const createAsset = async () => {
     if (isCreating) return
@@ -151,7 +163,7 @@ export default function AdminAssetsPanel({ token }: { token: string }) {
 
     setIsCreating(true)
     try {
-      const created = await createAdminAsset(token, {
+      await createAdminAsset(token, {
         key,
         display_name: displayName,
         description: draft.description.trim() || null,
@@ -164,8 +176,9 @@ export default function AdminAssetsPanel({ token }: { token: string }) {
         weaponKey: draft.weaponKey.trim() || null,
         metadata,
       })
-      updateCreatedAsset(created)
       setDraft(emptyCreateDraft)
+      setCreateModalOpen(false)
+      await loadAssets()
       toast.success('Ассет создан.')
     } catch (cause) {
       toast.error(toDisplayError(cause, 'Не удалось создать ассет.'))
@@ -184,125 +197,243 @@ export default function AdminAssetsPanel({ token }: { token: string }) {
     })
   }
 
+  const mergeAsset = (updated: AssetResponse) => {
+    if (catalogScope === 'active_only' && !updated.isActive) {
+      void loadAssets()
+      return
+    }
+    updateAsset(updated)
+  }
+
+  const sortedItems = useMemo(() => {
+    if (state.status !== 'ready') return []
+    return sortAdminAssets(state.items, assetSort)
+  }, [assetSort, state])
+
   return (
     <section className="card admin-card">
       <div className="admin-assets-toolbar">
         <h2 className="card-title">Ассеты</h2>
-        <div className="admin-assets-search">
-          <input
-            className="ui-input"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Поиск по key или названию"
-          />
+        <div className="admin-assets-toolbar">
           <button type="button" className="btn btn-sm" onClick={() => void loadAssets()}>
             Обновить
+          </button>
+          <button type="button" className="btn primary btn-sm" onClick={() => setCreateModalOpen(true)}>
+            Создать ассет…
           </button>
         </div>
       </div>
 
-      <section className="admin-asset-create" aria-label="Создать ассет">
-        <h3 className="card-title">Новый ассет</h3>
-        <div className="admin-asset-form-grid">
-          <input
-            className="ui-input"
-            value={draft.key}
-            onChange={(event) => setDraft((prev) => ({ ...prev, key: normalizeAssetKey(event.target.value) }))}
-            placeholder="key"
-          />
-          <input
-            className="ui-input"
-            value={draft.displayName}
-            onChange={(event) => setDraft((prev) => ({ ...prev, displayName: event.target.value }))}
-            placeholder="Название"
-          />
-          <input
-            className="ui-input"
-            value={draft.assetKind}
-            disabled={draft.isCurrency}
-            onChange={(event) => setDraft((prev) => ({ ...prev, assetKind: event.target.value }))}
-            placeholder="kind"
-          />
-          <select
-            className="ui-input"
-            value={draft.ownershipModel}
-            disabled={draft.isCurrency}
-            onChange={(event) => setDraft((prev) => ({ ...prev, ownershipModel: event.target.value as OwnershipModel }))}
-          >
-            <option value="stackable">stackable</option>
-            <option value="entitlement">entitlement</option>
-            <option value="expirable">expirable</option>
-          </select>
-          <select
-            className="ui-input"
-            value={draft.rarity}
-            onChange={(event) => setDraft((prev) => ({ ...prev, rarity: event.target.value as SkinRarity | '' }))}
-          >
-            <option value="">Без редкости</option>
-            <option value="common">common</option>
-            <option value="rare">rare</option>
-            <option value="legendary">legendary</option>
-          </select>
-          <input
-            className="ui-input"
-            value={draft.weaponKey}
-            onChange={(event) => setDraft((prev) => ({ ...prev, weaponKey: event.target.value }))}
-            placeholder="weaponKey"
-          />
+      <div className="admin-shop-list-controls">
+        <div className="admin-shop-list-controls-row">
+          <label className="admin-shop-field" style={{ marginBottom: 0 }}>
+            <span>Сортировка</span>
+            <select className="ui-input" value={assetSort} onChange={(e) => setAssetSort(e.target.value as AdminAssetSortKey)} aria-label="Сортировка списка ассетов">
+              <option value="key_asc">Ключ (A–Я)</option>
+              <option value="name_asc">Название (A–Я)</option>
+              <option value="updated_desc">Обновление (сначала новые)</option>
+              <option value="updated_asc">Обновление (сначала старые)</option>
+            </select>
+          </label>
+          <fieldset className="ui-radio-group admin-asset-flag-fieldset">
+            <legend className="ui-radio-legend">Состав каталога</legend>
+            <label className="ui-radio">
+              <input
+                type="radio"
+                name="admin-assets-catalog-scope"
+                checked={catalogScope === 'active_only'}
+                onChange={() => setCatalogScope('active_only')}
+              />
+              <span className="ui-radio-mark" aria-hidden />
+              <span>Только активные</span>
+            </label>
+            <label className="ui-radio">
+              <input
+                type="radio"
+                name="admin-assets-catalog-scope"
+                checked={catalogScope === 'all'}
+                onChange={() => setCatalogScope('all')}
+              />
+              <span className="ui-radio-mark" aria-hidden />
+              <span>Все ассеты</span>
+            </label>
+          </fieldset>
         </div>
+      </div>
 
-        <textarea
-          className="ui-input admin-asset-metadata"
-          value={draft.description}
-          onChange={(event) => setDraft((prev) => ({ ...prev, description: event.target.value }))}
-          placeholder="Описание"
-          rows={2}
-        />
+      {createModalOpen ? (
+        <AppPortal>
+          <div
+            className="ui-modal-backdrop"
+            role="presentation"
+            onClick={() => {
+              if (!isCreating) setCreateModalOpen(false)
+            }}
+          >
+            <div className="ui-modal admin-create-modal" role="dialog" aria-modal="true" aria-labelledby="admin-create-asset-title" onClick={(e) => e.stopPropagation()}>
+              <div className="ui-modal-header">
+                <h2 id="admin-create-asset-title" className="ui-modal-title">Новый ассет</h2>
+                <button type="button" className="ui-modal-close" aria-label="Закрыть" disabled={isCreating} onClick={() => setCreateModalOpen(false)}>
+                  ×
+                </button>
+              </div>
+              <div className="ui-modal-body">
+                <section className="admin-asset-create" aria-label="Создать ассет">
+                  <div className="admin-asset-form-grid">
+                    <input
+                      className="ui-input"
+                      value={draft.key}
+                      onChange={(event) => setDraft((prev) => ({ ...prev, key: normalizeAssetKey(event.target.value) }))}
+                      placeholder="key"
+                    />
+                    <input
+                      className="ui-input"
+                      value={draft.displayName}
+                      onChange={(event) => setDraft((prev) => ({ ...prev, displayName: event.target.value }))}
+                      placeholder="Название"
+                    />
+                    <input
+                      className="ui-input"
+                      value={draft.assetKind}
+                      disabled={draft.isCurrency}
+                      onChange={(event) => setDraft((prev) => ({ ...prev, assetKind: event.target.value }))}
+                      placeholder="kind"
+                    />
+                    <select
+                      className="ui-input"
+                      value={draft.ownershipModel}
+                      disabled={draft.isCurrency}
+                      onChange={(event) => setDraft((prev) => ({ ...prev, ownershipModel: event.target.value as OwnershipModel }))}
+                    >
+                      <option value="stackable">stackable</option>
+                      <option value="entitlement">entitlement</option>
+                      <option value="expirable">expirable</option>
+                    </select>
+                    <select
+                      className="ui-input"
+                      value={draft.rarity}
+                      onChange={(event) => setDraft((prev) => ({ ...prev, rarity: event.target.value as SkinRarity | '' }))}
+                    >
+                      <option value="">Без редкости</option>
+                      <option value="common">common</option>
+                      <option value="rare">rare</option>
+                      <option value="legendary">legendary</option>
+                    </select>
+                    <input
+                      className="ui-input"
+                      value={draft.weaponKey}
+                      onChange={(event) => setDraft((prev) => ({ ...prev, weaponKey: event.target.value }))}
+                      placeholder="weaponKey"
+                    />
+                  </div>
 
-        <div className="admin-asset-flags">
-          <label className="admin-checkbox-row">
-            <input
-              type="checkbox"
-              checked={draft.isCurrency}
-              onChange={(event) => setDraft((prev) => ({
-                ...prev,
-                isCurrency: event.target.checked,
-                assetKind: event.target.checked ? 'currency' : prev.assetKind,
-                ownershipModel: event.target.checked ? 'stackable' : prev.ownershipModel,
-              }))}
-            />
-            Валюта
-          </label>
-          <label className="admin-checkbox-row">
-            <input
-              type="checkbox"
-              checked={draft.isPublic}
-              onChange={(event) => setDraft((prev) => ({ ...prev, isPublic: event.target.checked }))}
-            />
-            Публичный
-          </label>
-          <label className="admin-checkbox-row">
-            <input
-              type="checkbox"
-              checked={draft.isUserPurchasable}
-              onChange={(event) => setDraft((prev) => ({ ...prev, isUserPurchasable: event.target.checked }))}
-            />
-            Можно покупать
-          </label>
-        </div>
+                  <textarea
+                    className="ui-input admin-asset-metadata"
+                    value={draft.description}
+                    onChange={(event) => setDraft((prev) => ({ ...prev, description: event.target.value }))}
+                    placeholder="Описание"
+                    rows={2}
+                  />
 
-        <textarea
-          className="ui-input admin-asset-metadata"
-          value={draft.metadataText}
-          onChange={(event) => setDraft((prev) => ({ ...prev, metadataText: event.target.value }))}
-          placeholder="Metadata JSON"
-          rows={4}
-        />
+                  <div className="admin-asset-flags admin-asset-flags--radios">
+                    <fieldset className="ui-radio-group admin-asset-flag-fieldset">
+                      <legend className="ui-radio-legend">Тип</legend>
+                      <label className="ui-radio">
+                        <input
+                          type="radio"
+                          name="admin-create-asset-currency"
+                          checked={!draft.isCurrency}
+                          onChange={() => setDraft((prev) => ({ ...prev, isCurrency: false }))}
+                        />
+                        <span className="ui-radio-mark" aria-hidden />
+                        <span>Игровой ассет</span>
+                      </label>
+                      <label className="ui-radio">
+                        <input
+                          type="radio"
+                          name="admin-create-asset-currency"
+                          checked={draft.isCurrency}
+                          onChange={() =>
+                            setDraft((prev) => ({
+                              ...prev,
+                              isCurrency: true,
+                              assetKind: 'currency',
+                              ownershipModel: 'stackable',
+                            }))}
+                        />
+                        <span className="ui-radio-mark" aria-hidden />
+                        <span>Валюта</span>
+                      </label>
+                    </fieldset>
+                    <fieldset className="ui-radio-group admin-asset-flag-fieldset">
+                      <legend className="ui-radio-legend">Видимость</legend>
+                      <label className="ui-radio">
+                        <input
+                          type="radio"
+                          name="admin-create-asset-public"
+                          checked={draft.isPublic}
+                          onChange={() => setDraft((prev) => ({ ...prev, isPublic: true }))}
+                        />
+                        <span className="ui-radio-mark" aria-hidden />
+                        <span>Публичный</span>
+                      </label>
+                      <label className="ui-radio">
+                        <input
+                          type="radio"
+                          name="admin-create-asset-public"
+                          checked={!draft.isPublic}
+                          onChange={() => setDraft((prev) => ({ ...prev, isPublic: false }))}
+                        />
+                        <span className="ui-radio-mark" aria-hidden />
+                        <span>Скрытый</span>
+                      </label>
+                    </fieldset>
+                    <fieldset className="ui-radio-group admin-asset-flag-fieldset">
+                      <legend className="ui-radio-legend">Покупка</legend>
+                      <label className="ui-radio">
+                        <input
+                          type="radio"
+                          name="admin-create-asset-purchasable"
+                          checked={draft.isUserPurchasable}
+                          onChange={() => setDraft((prev) => ({ ...prev, isUserPurchasable: true }))}
+                        />
+                        <span className="ui-radio-mark" aria-hidden />
+                        <span>Можно покупать</span>
+                      </label>
+                      <label className="ui-radio">
+                        <input
+                          type="radio"
+                          name="admin-create-asset-purchasable"
+                          checked={!draft.isUserPurchasable}
+                          onChange={() => setDraft((prev) => ({ ...prev, isUserPurchasable: false }))}
+                        />
+                        <span className="ui-radio-mark" aria-hidden />
+                        <span>Нельзя покупать</span>
+                      </label>
+                    </fieldset>
+                  </div>
 
-        <button type="button" className="btn primary" disabled={isCreating} onClick={() => void createAsset()}>
-          {isCreating ? 'Создаем...' : 'Создать ассет'}
-        </button>
-      </section>
+                  <textarea
+                    className="ui-input admin-asset-metadata"
+                    value={draft.metadataText}
+                    onChange={(event) => setDraft((prev) => ({ ...prev, metadataText: event.target.value }))}
+                    placeholder="Metadata JSON"
+                    rows={4}
+                  />
+                </section>
+              </div>
+              <div className="ui-modal-footer">
+                <button type="button" className="btn btn-sm" disabled={isCreating} onClick={() => setCreateModalOpen(false)}>
+                  Отмена
+                </button>
+                <button type="button" className="btn primary btn-sm" disabled={isCreating} onClick={() => void createAsset()}>
+                  {isCreating ? 'Создаем...' : 'Создать ассет'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </AppPortal>
+      ) : null}
 
       {state.status === 'loading' ? <LoadingState title="Загружаем ассеты" /> : null}
       {state.status === 'error' ? (
@@ -312,8 +443,8 @@ export default function AdminAssetsPanel({ token }: { token: string }) {
         <>
           <p className="admin-inline-muted">Найдено: {state.total}</p>
           <div className="admin-asset-list">
-            {state.items.map((asset) => (
-              <AdminAssetCard key={asset.id} token={token} asset={asset} onAssetChange={updateAsset} />
+            {sortedItems.map((asset) => (
+              <AdminAssetCard key={asset.id} token={token} asset={asset} onAssetChange={mergeAsset} />
             ))}
           </div>
         </>
@@ -457,7 +588,7 @@ function AdminAssetCard({
               Открыть
             </a>
             <button type="button" className="btn btn-sm danger" disabled={isImageMutating} onClick={() => void deleteImage()}>
-              Удалить
+              Удалить ассет
             </button>
           </div>
         </div>
@@ -495,31 +626,76 @@ function AdminAssetCard({
         />
       </div>
 
-      <div className="admin-asset-flags">
-        <label className="admin-checkbox-row">
-          <input
-            type="checkbox"
-            checked={draft.isActive}
-            onChange={(event) => setDraft((prev) => ({ ...prev, isActive: event.target.checked }))}
-          />
-          Активен
-        </label>
-        <label className="admin-checkbox-row">
-          <input
-            type="checkbox"
-            checked={draft.isPublic}
-            onChange={(event) => setDraft((prev) => ({ ...prev, isPublic: event.target.checked }))}
-          />
-          Публичный
-        </label>
-        <label className="admin-checkbox-row">
-          <input
-            type="checkbox"
-            checked={draft.isUserPurchasable}
-            onChange={(event) => setDraft((prev) => ({ ...prev, isUserPurchasable: event.target.checked }))}
-          />
-          Можно покупать
-        </label>
+      <div className="admin-asset-flags admin-asset-flags--radios">
+        <fieldset className="ui-radio-group admin-asset-flag-fieldset">
+          <legend className="ui-radio-legend">Статус</legend>
+          <label className="ui-radio">
+            <input
+              type="radio"
+              name={`admin-asset-active-${asset.id}`}
+              checked={draft.isActive}
+              onChange={() => setDraft((prev) => ({ ...prev, isActive: true }))}
+            />
+            <span className="ui-radio-mark" aria-hidden />
+            <span>Активен</span>
+          </label>
+          <label className="ui-radio">
+            <input
+              type="radio"
+              name={`admin-asset-active-${asset.id}`}
+              checked={!draft.isActive}
+              onChange={() => setDraft((prev) => ({ ...prev, isActive: false }))}
+            />
+            <span className="ui-radio-mark" aria-hidden />
+            <span>Неактивен</span>
+          </label>
+        </fieldset>
+        <fieldset className="ui-radio-group admin-asset-flag-fieldset">
+          <legend className="ui-radio-legend">Видимость</legend>
+          <label className="ui-radio">
+            <input
+              type="radio"
+              name={`admin-asset-public-${asset.id}`}
+              checked={draft.isPublic}
+              onChange={() => setDraft((prev) => ({ ...prev, isPublic: true }))}
+            />
+            <span className="ui-radio-mark" aria-hidden />
+            <span>Публичный</span>
+          </label>
+          <label className="ui-radio">
+            <input
+              type="radio"
+              name={`admin-asset-public-${asset.id}`}
+              checked={!draft.isPublic}
+              onChange={() => setDraft((prev) => ({ ...prev, isPublic: false }))}
+            />
+            <span className="ui-radio-mark" aria-hidden />
+            <span>Скрытый</span>
+          </label>
+        </fieldset>
+        <fieldset className="ui-radio-group admin-asset-flag-fieldset">
+          <legend className="ui-radio-legend">Покупка</legend>
+          <label className="ui-radio">
+            <input
+              type="radio"
+              name={`admin-asset-purchasable-${asset.id}`}
+              checked={draft.isUserPurchasable}
+              onChange={() => setDraft((prev) => ({ ...prev, isUserPurchasable: true }))}
+            />
+            <span className="ui-radio-mark" aria-hidden />
+            <span>Можно покупать</span>
+          </label>
+          <label className="ui-radio">
+            <input
+              type="radio"
+              name={`admin-asset-purchasable-${asset.id}`}
+              checked={!draft.isUserPurchasable}
+              onChange={() => setDraft((prev) => ({ ...prev, isUserPurchasable: false }))}
+            />
+            <span className="ui-radio-mark" aria-hidden />
+            <span>Нельзя покупать</span>
+          </label>
+        </fieldset>
       </div>
 
       <textarea
