@@ -4,7 +4,7 @@ export default function ContactsPage() {
   return (
     <main className="page contacts-page">
       <section className="contacts-hero card">
-        <h1 className="card-title contacts-hero__title">Связь с SVOCraft</h1>
+        <h1 className="card-title contacts-hero__title">Связь с SvoCraft</h1>
         <p className="card-text">
           Следите за новостями в социальных каналах и пишите в поддержку, если нужна помощь с аккаунтом, лаунчером или
           входом в игру.

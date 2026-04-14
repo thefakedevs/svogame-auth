@@ -552,7 +552,7 @@ useEffect(() => {
               href="/downloads"
               data-analytics-event="download_launcher"
               data-cta="hero-download-launcher"
-              aria-label="Скачать лаунчер SVOCraft"
+              aria-label="Скачать лаунчер SvoCraft"
             >
               Скачать лаунчер
             </a>
@@ -620,7 +620,7 @@ useEffect(() => {
           <h2 id="landing-start-title" className="landing-section-head__title">Четыре шага до первого матча</h2>
           <p className="landing-section-head__text">
             Лаунчер сам держит клиент в актуальном состоянии, а вход через Discord привязывает профиль к аккаунту
-            SVOCraft.
+            SvoCraft.
           </p>
         </div>
         <div className="landing-steps" aria-label="Шаги запуска">
@@ -955,7 +955,7 @@ useEffect(() => {
             </blockquote>
             <blockquote className="card landing-testimonial">
               <p>
-                SVOcraft — Отличный сервер для тех, кто любит PvP. Захват флага держит в напряжении до
+                SvoCraft — Отличный сервер для тех, кто любит PvP. Захват флага держит в напряжении до
                 последней секунды, а дуэли — лучший способ проверить свою реакцию. Заходите, не пожалеете.
               </p>
               <footer>

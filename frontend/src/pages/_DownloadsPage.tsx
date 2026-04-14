@@ -169,7 +169,7 @@ export default function DownloadsPage() {
           title="Windows"
           description="Установщик для Windows 10 и Windows 11. Подходит большинству игроков на ПК."
           image="/icons/windows.svg"
-          alt="Логотип Windows для загрузки лаунчера SVOCraft"
+          alt="Логотип Windows для загрузки лаунчера SvoCraft"
           recommended={recommendedPlatform === 'windows'}
           architectures={[
             {
@@ -184,7 +184,7 @@ export default function DownloadsPage() {
           title="Apple"
           description="Версия для Mac. Выберите Apple Silicon или Intel в зависимости от процессора."
           image="/icons/apple.svg"
-          alt="Символ Apple для загрузки лаунчера SVOCraft на macOS"
+          alt="Символ Apple для загрузки лаунчера SvoCraft на macOS"
           recommended={recommendedPlatform === 'macos'}
           architectures={[
             {
@@ -205,7 +205,7 @@ export default function DownloadsPage() {
           title="Linux"
           description="Сборки для популярных Linux-дистрибутивов."
           image="/icons/linux.svg"
-          alt="Символ Linux для загрузки лаунчера SVOCraft"
+          alt="Символ Linux для загрузки лаунчера SvoCraft"
           recommended={recommendedPlatform === 'linux'}
           architectures={[
             {
