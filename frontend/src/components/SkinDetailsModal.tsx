@@ -84,12 +84,6 @@ export default function SkinDetailsModal({
                     <dd>{item.weaponKey}</dd>
                   </div>
                 ) : null}
-                {item.statusText ? (
-                  <div>
-                    <dt>Статус</dt>
-                    <dd>{item.statusText}</dd>
-                  </div>
-                ) : null}
               </dl>
             </div>
           </div>
