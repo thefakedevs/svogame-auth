@@ -197,7 +197,7 @@ export default function AppHeader({ pageTitle }: Props) {
   return (
     <header className="app-header">
       <div className="app-header__left">
-        <a href={paths.home} className="app-header__brand">SVOCraft</a>
+        <a href={paths.home} className="app-header__brand">SvoCraft</a>
       </div>
       <div className="app-header__center" aria-live="polite">
         {pageTitle ? <span className="app-header__title">{pageTitle}</span> : null}
