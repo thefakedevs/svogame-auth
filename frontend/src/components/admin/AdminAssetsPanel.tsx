@@ -588,7 +588,7 @@ function AdminAssetCard({
               Открыть
             </a>
             <button type="button" className="btn btn-sm danger" disabled={isImageMutating} onClick={() => void deleteImage()}>
-              Удалить
+              Удалить ассет
             </button>
           </div>
         </div>

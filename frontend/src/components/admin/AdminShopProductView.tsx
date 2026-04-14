@@ -281,7 +281,7 @@ export default function AdminShopProductView({ token, productId }: { token: stri
                   <input className="ui-input" value={row.name} onChange={(e) => updateLocaleRow(index, { name: e.target.value })} placeholder="Название" />
                   <input className="ui-input" value={row.description} onChange={(e) => updateLocaleRow(index, { description: e.target.value })} placeholder="Описание" />
                   <button type="button" className="btn btn-sm danger" disabled={localeRows.length <= 1} onClick={() => removeLocaleRow(index)}>
-                    Удалить
+                    Удалить локаль
                   </button>
                 </div>
               ))}
