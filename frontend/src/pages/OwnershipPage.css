@@ -260,14 +260,6 @@
   white-space: nowrap;
 }
 
-.inventory-skin-card__rarity small {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--ui-text-muted);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .inventory-skin-card__selection {
   display: flex;
   justify-content: flex-start;

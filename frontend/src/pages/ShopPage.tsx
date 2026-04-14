@@ -202,7 +202,6 @@ function ProductCard({
         </div>
         <div className="inventory-skin-card__rarity">
           <span>{rarityLabel(item.asset?.rarity)}</span>
-          {item.asset?.weaponKey ? <small>{item.asset.weaponKey}</small> : null}
         </div>
         <div className="shop-product-card__footer">
           <strong>{formatPrice(item.product.priceRub)}</strong>
