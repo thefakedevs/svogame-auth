@@ -237,13 +237,16 @@ export default function AdminShopProductView({ token, productId }: { token: stri
                 <span>ends_at</span>
                 <input className="ui-input" value={endsAt} onChange={(e) => setEndsAt(e.target.value)} />
               </label>
-              <label className="admin-shop-field admin-shop-field--checkbox">
-                <span>is_active</span>
+            </div>
+
+            <div className="admin-asset-flags admin-shop-form-flags">
+              <label className="admin-checkbox-row">
                 <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
+                Активен
               </label>
-              <label className="admin-shop-field admin-shop-field--checkbox">
-                <span>is_public</span>
+              <label className="admin-checkbox-row">
                 <input type="checkbox" checked={isPublic} onChange={(e) => setIsPublic(e.target.checked)} />
+                Публичный
               </label>
             </div>
 

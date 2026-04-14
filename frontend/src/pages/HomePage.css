@@ -201,6 +201,192 @@ body:has(.landing-shell) .ui-kit-page.landing-shell {
   gap: 1rem;
 }
 
+/* ── Shop grid wrapper ───────────────────────────────────── */
+.landing-shop-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.landing-shop-loading,
+.landing-shop-error,
+.landing-shop-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 160px;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.52);
+  font-weight: 600;
+}
+
+/* ── Ticker outer container ──────────────────────────────── */
+.landing-shop-ticker {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  border: 1px solid var(--ui-border);
+  background: rgba(255, 255, 255, 0.03);
+  padding: 1.5rem 0 1.5rem;
+  overflow: hidden;
+}
+
+/* Left + right fade masks */
+.landing-shop-ticker::before,
+.landing-shop-ticker::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 80px;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.landing-shop-ticker::before {
+  left: 0;
+  background: linear-gradient(90deg, #161410 -30%, transparent 70%);
+}
+
+.landing-shop-ticker::after {
+  right: 0;
+  background: linear-gradient(270deg, #161410 -30%, transparent 70%);
+}
+
+/* ── Scrolling track ─────────────────────────────────────── */
+.landing-shop-ticker {
+  overflow: hidden;
+}
+
+.landing-shop-ticker__track {
+  display: flex;
+  width: max-content;
+  align-items: stretch;
+  gap: 0.875rem;
+  padding: 0 1.5rem;
+  white-space: nowrap;
+  will-change: transform;
+  transform: translateX(var(--ticker-x, 0));
+}
+
+/* ── CTA button row ──────────────────────────────────────── */
+.landing-ticker__actions {
+  display: flex;
+  justify-content: center;
+  padding: 0 1.5rem;
+  margin-top: 1rem;
+}
+
+/* ── Individual card ─────────────────────────────────────── */
+.landing-shop-ticker-card {
+  flex: 0 0 auto;
+  width: 190px;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 2px solid var(--inventory-accent, rgba(255, 255, 255, 0.18));
+  background: rgba(0, 0, 0, 0.38);
+  overflow: hidden;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.landing-shop-ticker-card:hover {
+  transform: translateY(-3px);
+  border-color: var(--inventory-accent, rgba(255, 255, 255, 0.28));
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45), 0 0 0 1px var(--inventory-accent, transparent);
+}
+
+/* ── Card image area ─────────────────────────────────────── */
+.landing-shop-ticker-card__visual {
+  height: 156px;
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: radial-gradient(ellipse at 50% 80%, color-mix(in srgb, var(--inventory-accent, #555) 18%, transparent), transparent 70%);
+}
+
+.landing-shop-ticker-card__visual .inventory-visual {
+  width: 100%;
+  height: 100%;
+}
+
+.landing-shop-ticker-card__visual .inventory-visual img {
+  width: auto;
+  height: 100%;
+  max-width: 100%;
+  object-fit: contain;
+  object-position: center -35px;
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.5));
+  z-index: 1;
+}
+
+.landing-shop-ticker-card__visual .inventory-visual span {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Name + rarity overlay at bottom of image */
+.landing-shop-ticker-card__overlay {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 1.5rem 0.6rem 0.45rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  background: linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.72) 100%);
+  z-index: 2;
+}
+
+.landing-shop-ticker-card__content {
+  display: none;
+}
+
+/* ── Card footer (price) ─────────────────────────────────── */
+.landing-shop-ticker-card__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.45rem 0.65rem 0.6rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(0, 0, 0, 0.22);
+}
+
+.landing-shop-ticker-card__title {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1.15;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.landing-shop-ticker-card__rarity {
+  font-size: 0.64rem;
+  color: var(--inventory-accent, rgba(255, 255, 255, 0.7));
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.landing-shop-ticker-card__price {
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: #f7a41d;
+  letter-spacing: 0.01em;
+}
+
+@keyframes landing-shop-ticker-scroll {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
 .landing-mode-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }

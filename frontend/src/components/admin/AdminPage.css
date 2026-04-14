@@ -117,7 +117,6 @@
 
 .admin-row {
   display: flex;
-  justify-content: space-between;
   align-items: center;
   width: 100%;
   padding: 10px 12px;
@@ -680,6 +679,10 @@
   align-items: center;
 }
 
+.admin-shop-form-flags {
+  margin-top: 12px;
+}
+
 .admin-ownership-list-head h4 {
   margin: 0;
 }
@@ -840,6 +843,47 @@
 
 .admin-asset-actions {
   justify-content: flex-end;
+}
+
+.admin-skin-wizard {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-skin-wizard__subtitle {
+  margin-top: 8px;
+  margin-bottom: 0;
+  font-size: 1rem;
+}
+
+.admin-skin-wizard__image-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.admin-skin-wizard__thumb-wrap {
+  display: inline-flex;
+  border: 1px solid var(--ui-border);
+  border-radius: 6px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.admin-skin-wizard__thumb {
+  display: block;
+  width: 72px;
+  height: 72px;
+  object-fit: cover;
+}
+
+.admin-skin-wizard__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-top: 8px;
 }
 
 .admin-shop-layout {
