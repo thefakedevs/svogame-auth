@@ -143,7 +143,7 @@ export default function WalletPage() {
                 </span>
                 <span className="ownership-transaction-main">
                   <strong>{purchase.productName}</strong>
-                  <small>{formatDateTime(purchase.createdAt)}</small>
+                  <small>{formatDateTime(purchase.createdAt).replace(', ', ' ')}</small>
                 </span>
                 <span className="ownership-transaction-balance ownership-transaction-status">
                   <span className={purchaseStatusClass(purchase.status)}>{purchaseStatusText(purchase.status)}</span>
