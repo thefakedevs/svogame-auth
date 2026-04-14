@@ -135,7 +135,7 @@ export default function NoSquadState({ authToken, data, onChanged }: SquadSectio
               <div key={invite.id} className="profile-invite-card">
                 <div className="profile-stack profile-invite-card__content">
                   <strong>{invite.squadName}</strong>
-                  <span className="profile-subtle">Истекает {formatDateTime(invite.expiresAt)}</span>
+                  <span className="profile-subtle">Истекает {formatDateTime(invite.expiresAt).replace(', ', ' ')}</span>
                   <span className="profile-subtle">Пригласил: {invite.inviterUsername}</span>
                 </div>
                 <div className="profile-actions">

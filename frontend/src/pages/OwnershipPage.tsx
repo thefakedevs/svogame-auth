@@ -286,8 +286,8 @@ function SkinCard({
         <div className="inventory-card-meta">
           <span>
             {item.amount !== undefined
-              ? `Обновлено: ${formatDateTime(item.updatedAt)}`
-              : `Выдано: ${formatDateTime(item.grantedAt)}`}
+              ? `Обновлено: ${formatDateTime(item.updatedAt).replace(', ', ' ')}`
+              : `Выдано: ${formatDateTime(item.grantedAt).replace(', ', ' ')}`}
           </span>
         </div>
       </div>
@@ -321,7 +321,7 @@ function AccessCard({ item }: { item: InventoryAssetView & EntitlementResponse }
       </div>
       <div className="inventory-access-state">
         <span className="ui-badge ui-badge-success">Открыт</span>
-        <small>с {formatDateTime(item.grantedAt)}</small>
+        <small>с {formatDateTime(item.grantedAt).replace(', ', ' ')}</small>
       </div>
     </article>
   )
@@ -354,7 +354,7 @@ function SubscriptionCard({ item }: { item: SubscriptionCardItem }) {
       </div>
       <div className="inventory-subscription-status">
         <strong>{remainingText(item.expiresAt, item.isActive)}</strong>
-        <span>{item.isActive && item.expiresAt ? `до ${formatDateTime(item.expiresAt)}` : 'Подписка не подключена'}</span>
+        <span>{item.isActive && item.expiresAt ? `до ${formatDateTime(item.expiresAt).replace(', ', ' ')}` : 'Подписка не подключена'}</span>
       </div>
     </article>
   )

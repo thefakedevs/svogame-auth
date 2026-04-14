@@ -84,7 +84,7 @@ export default function ProfileOverviewTab({
           ) : null}
           <div>
             <dt>Последний вход</dt>
-            <dd>{formatDateTime(data.user.lastLoginAt)}</dd>
+            <dd>{formatDateTime(data.user.lastLoginAt).replace(', ', ' ')}</dd>
           </div>
         </dl>
       </aside>
