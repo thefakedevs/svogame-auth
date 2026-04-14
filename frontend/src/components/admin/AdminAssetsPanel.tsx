@@ -117,7 +117,6 @@ function sortAdminAssets(items: AssetResponse[], sort: AdminAssetSortKey): Asset
 
 export default function AdminAssetsPanel({ token }: { token: string }) {
   const [state, setState] = useState<AssetsState>({ status: 'loading' })
-  const [query, setQuery] = useState('')
   const [draft, setDraft] = useState<CreateAssetDraft>(emptyCreateDraft)
   const [isCreating, setIsCreating] = useState(false)
   const [createModalOpen, setCreateModalOpen] = useState(false)
@@ -128,7 +127,6 @@ export default function AdminAssetsPanel({ token }: { token: string }) {
     setState({ status: 'loading' })
     try {
       const response = await listAdminAssets(token, {
-        q: query.trim() || undefined,
         page: 1,
         perPage: 100,
         ...(catalogScope === 'active_only' ? { isActive: true } : {}),
@@ -137,7 +135,7 @@ export default function AdminAssetsPanel({ token }: { token: string }) {
     } catch (cause) {
       setState({ status: 'error', error: toDisplayError(cause, 'Не удалось загрузить ассеты.') })
     }
-  }, [catalogScope, query, token])
+  }, [catalogScope, token])
 
   useEffect(() => {
     queueMicrotask(() => void loadAssets())
