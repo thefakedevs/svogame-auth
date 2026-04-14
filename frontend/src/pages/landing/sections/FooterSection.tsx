@@ -50,7 +50,7 @@ export default function FooterSection() {
         </div>
       </nav>
       <div className="landing-footer__bottom">
-        <span>© {year} SVOCraft Все права защищены</span>
+        <span>© {year} SvoCraft Все права защищены</span>
         <span>Данный сервер не связан и не поддерживается Mojang AB. Все торговые марки и ресурсы принадлежат их законным владельцам.</span>
       </div>
     </footer>
