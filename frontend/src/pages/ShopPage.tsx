@@ -198,7 +198,6 @@ function ProductCard({
       <div className="inventory-skin-card__body">
         <div className="inventory-card-title">
           <strong>{item.title}</strong>
-          <small>{item.description}</small>
         </div>
         <div className="inventory-skin-card__rarity">
           <span>{rarityLabel(item.asset?.rarity)}</span>
