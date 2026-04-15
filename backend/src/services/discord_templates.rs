@@ -14,47 +14,56 @@ pub struct DiscordTemplate {
 
 pub fn admin_custom(message: String) -> DiscordTemplate {
     DiscordTemplate {
-        title: "Уведомление SVO".to_string(),
+        title: "✨ Уведомление от SVO".to_string(),
         description: message,
         url: SITE_URL.to_string(),
-        footer_text: format!("Открыть сайт: {SITE_URL}"),
+        footer_text: format!("🌐 Тыкай сюда: {SITE_URL}"),
     }
 }
 
 pub fn squad_invite_received(squad_name: &str, inviter_username: &str) -> DiscordTemplate {
     DiscordTemplate {
-        title: "Приглашение в сквад".to_string(),
+        title: "💌 Приглашение в сквадик".to_string(),
         description: format!(
-            "Тебя пригласили в сквад \"{squad_name}\".\nПриглашение отправил: {inviter_username}.\nПерейди на страницу сквадов, чтобы принять или отклонить приглашение."
+            "Тебя позвали в сквад **\"{squad_name}\"**~\n\
+            Приглашение отправил: **{inviter_username}**.\n\
+            Загляни на страницу сквадов, чтобы принять его или вежливо отказаться ✨"
         ),
         url: SQUADS_URL.to_string(),
-        footer_text: format!("Открыть страницу сквадов: {SQUADS_URL}"),
+        footer_text: format!("👥 Открыть сквадики: {SQUADS_URL}"),
     }
 }
 
 pub fn squad_kicked(squad_name: &str, leader_username: &str) -> DiscordTemplate {
     DiscordTemplate {
-        title: "Исключение из сквада".to_string(),
+        title: "💔 Исключение из сквада".to_string(),
         description: format!(
-            "Тебя исключили из сквада \"{squad_name}\".\nДействие выполнил лидер сквада: {leader_username}."
+            "Похоже, тебя исключили из сквада **\"{squad_name}\"**...\n\
+            Это сделал лидер: **{leader_username}**."
         ),
         url: SQUADS_URL.to_string(),
-        footer_text: format!("Открыть страницу сквадов: {SQUADS_URL}"),
+        footer_text: format!("👥 Открыть страницу сквадов: {SQUADS_URL}"),
     }
 }
 
 pub fn shop_purchase_completed(product_name: &str, quantity: i64) -> DiscordTemplate {
     let description = if quantity > 1 {
-        format!("Покупка успешно завершена.\nПолучено: {product_name} x{quantity}.")
+        format!(
+            "Покупка прошла успешно, ура-ура~ ✨\n\
+            Ты получил: **{product_name} x{quantity}**."
+        )
     } else {
-        format!("Покупка успешно завершена.\nПолучено: {product_name}.")
+        format!(
+            "Покупка прошла успешно, ура-ура~ ✨\n\
+            Ты получил: **{product_name}**."
+        )
     };
 
     DiscordTemplate {
-        title: "Покупка завершена".to_string(),
+        title: "🛍️ Покупка завершена".to_string(),
         description,
         url: SHOP_URL.to_string(),
-        footer_text: format!("Открыть профиль: {SHOP_URL}"),
+        footer_text: format!("🌸 Открыть профиль: {SHOP_URL}"),
     }
 }
 
@@ -64,7 +73,7 @@ pub fn render(template_key: &str, message: &str, metadata: &Value) -> DiscordTem
             metadata
                 .get("squadName")
                 .and_then(Value::as_str)
-                .unwrap_or("неизвестный сквад"),
+                .unwrap_or("неизвестный сквадик"),
             metadata
                 .get("inviterUsername")
                 .and_then(Value::as_str)
@@ -74,7 +83,7 @@ pub fn render(template_key: &str, message: &str, metadata: &Value) -> DiscordTem
             metadata
                 .get("squadName")
                 .and_then(Value::as_str)
-                .unwrap_or("неизвестный сквад"),
+                .unwrap_or("неизвестный сквадик"),
             metadata
                 .get("leaderUsername")
                 .and_then(Value::as_str)
@@ -84,7 +93,7 @@ pub fn render(template_key: &str, message: &str, metadata: &Value) -> DiscordTem
             metadata
                 .get("productName")
                 .and_then(Value::as_str)
-                .unwrap_or("неизвестная покупка"),
+                .unwrap_or("неизвестная покупочка"),
             metadata.get("quantity").and_then(Value::as_i64).unwrap_or(1),
         ),
         _ => admin_custom(message.to_string()),
