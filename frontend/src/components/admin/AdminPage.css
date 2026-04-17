@@ -161,6 +161,19 @@
   white-space: nowrap;
 }
 
+.admin-row-inventory-text {
+  display: grid;
+  min-width: 0;
+  text-align: left;
+}
+
+.admin-row-inventory-text strong,
+.admin-row-inventory-text small {
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .admin-row-user small {
   display: block;
   color: var(--ui-text-muted);
@@ -734,6 +747,14 @@
   flex-wrap: wrap;
 }
 
+.admin-assets-result-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 12px;
+}
+
 .admin-assets-search {
   display: grid;
   grid-template-columns: minmax(180px, 320px) auto;
@@ -752,6 +773,132 @@
 .admin-asset-list {
   display: grid;
   gap: 10px;
+}
+
+.admin-asset-table-wrap {
+  margin-top: 12px;
+  overflow-x: auto;
+  border: 1px solid var(--ui-border);
+}
+
+.admin-asset-table {
+  width: 100%;
+  min-width: 900px;
+  border-collapse: collapse;
+}
+
+.admin-asset-table th,
+.admin-asset-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--ui-border);
+  text-align: left;
+  vertical-align: middle;
+  font-size: 0.82rem;
+}
+
+.admin-asset-table th {
+  color: var(--ui-text-muted);
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.admin-asset-table-row {
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.admin-asset-table-row:hover,
+.admin-asset-table-row:focus-within {
+  background: rgba(247, 164, 29, 0.08);
+}
+
+.admin-asset-table-row:focus-visible {
+  outline: 2px solid rgba(247, 164, 29, 0.55);
+  outline-offset: -2px;
+}
+
+.admin-asset-table-row:last-child td {
+  border-bottom: 0;
+}
+
+.admin-asset-table-empty {
+  color: var(--ui-text-muted);
+  text-align: center !important;
+}
+
+.admin-pagination {
+  margin-top: 14px;
+}
+
+.admin-page .ui-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.admin-page .ui-pagination li {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.admin-page .ui-pagination-btn {
+  min-width: 36px;
+  height: 36px;
+  padding: 0 10px;
+  border-radius: 0;
+  border: 1px solid var(--ui-border);
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--ui-text-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.admin-page .ui-pagination-btn:hover:not(:disabled) {
+  border-color: rgba(247, 164, 29, 0.45);
+  color: #f7a41d;
+  background: rgba(247, 164, 29, 0.08);
+}
+
+.admin-page .ui-pagination-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.admin-page .ui-pagination-btn[aria-current='page'] {
+  border-color: #f7a41d;
+  background: rgba(247, 164, 29, 0.15);
+  color: #f7a41d;
+}
+
+.admin-page .ui-pagination-ellipsis {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 36px;
+  color: var(--ui-text-muted);
+  font-size: 0.85rem;
+  user-select: none;
+}
+
+.admin-asset-edit-modal.ui-modal,
+.ui-kit-page .ui-modal.admin-asset-edit-modal {
+  width: min(920px, calc(100vw - 32px));
+  max-width: min(920px, calc(100vw - 32px));
+  max-height: min(90vh, 820px);
+}
+
+.admin-asset-edit-modal-body {
+  max-height: min(70vh, 680px);
+  overflow-y: auto;
 }
 
 .admin-asset-image-panel {
@@ -1041,6 +1188,244 @@
 
 .admin-shop-list-toolbar .ui-input {
   min-width: 200px;
+}
+
+.admin-lootbox-page,
+.admin-lootbox-wizard,
+.admin-lootbox-builder,
+.admin-lootbox-drop-list {
+  display: grid;
+  gap: 14px;
+}
+
+.admin-lootbox-tabs-card {
+  padding: 10px;
+}
+
+.admin-lootbox-table {
+  display: grid;
+  gap: 8px;
+  overflow: visible;
+}
+
+.admin-lootbox-table-head,
+.admin-lootbox-cell {
+  display: grid;
+  grid-template-columns: 64px minmax(240px, 1.5fr) minmax(132px, .55fr) minmax(104px, .45fr) minmax(190px, 1fr) 96px;
+  gap: 10px;
+  align-items: start;
+}
+
+.admin-lootbox-table-head {
+  padding: 0 12px;
+  color: var(--ui-text-muted);
+  font-size: .76rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+
+.admin-lootbox-cell,
+.admin-lootbox-drop-card {
+  position: relative;
+  padding: 12px;
+  border: 1px solid var(--ui-border);
+  background: rgba(0, 0, 0, .24);
+}
+
+.admin-lootbox-drop-card {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-lootbox-cell--empty {
+  border-style: dashed;
+  background: rgba(247, 164, 29, .06);
+}
+
+.admin-lootbox-plus {
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  line-height: 1;
+  border: 1px solid rgba(247, 164, 29, .45);
+  color: #f7a41d;
+  font-size: 1.6rem;
+  font-weight: 800;
+  background: rgba(247, 164, 29, .1);
+}
+
+.admin-lootbox-cell-add {
+  min-height: 50px;
+  display: grid;
+  place-items: center;
+}
+
+.admin-lootbox-row-index {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--ui-border);
+  color: var(--ui-text-muted);
+  background: rgba(0, 0, 0, .2);
+  font-size: .82rem;
+  font-weight: 700;
+}
+
+.admin-lootbox-cell-asset,
+.admin-lootbox-field,
+.admin-lootbox-cell-actions {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.admin-lootbox-field .ui-input {
+  width: 100%;
+  min-width: 0;
+}
+
+.admin-lootbox-field--none {
+  min-height: 42px;
+  align-content: center;
+  padding: 7px 0;
+}
+
+.admin-lootbox-field small,
+.admin-lootbox-field-caption {
+  color: var(--ui-text-muted);
+  font-size: .72rem;
+  line-height: 1.15;
+}
+
+.admin-lootbox-empty-column {
+  min-height: 50px;
+  display: flex;
+  align-items: center;
+}
+
+.admin-lootbox-list select.ui-input {
+  height: 42px;
+  min-height: 42px;
+  padding-top: 0;
+  padding-bottom: 0;
+  line-height: 42px;
+}
+
+.admin-asset-picker {
+  position: relative;
+  z-index: 2;
+}
+
+.admin-asset-picker-trigger,
+.admin-asset-picker-option {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 50px;
+  padding: 8px;
+  border: 1px solid var(--ui-border);
+  background: rgba(0, 0, 0, .34);
+  color: var(--ui-text);
+  text-align: left;
+}
+
+.admin-asset-picker-trigger:hover,
+.admin-asset-picker-trigger:focus-visible,
+.admin-asset-picker-option:hover,
+.admin-asset-picker-option:focus-visible {
+  border-color: rgba(247, 164, 29, .45);
+}
+
+.admin-asset-picker-trigger:disabled {
+  cursor: default;
+  opacity: 1;
+}
+
+.admin-asset-picker-trigger > span,
+.admin-asset-picker-option > span,
+.admin-lootbox-cell-preview > span {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.admin-asset-picker-trigger strong,
+.admin-asset-picker-trigger small,
+.admin-asset-picker-option strong,
+.admin-asset-picker-option small,
+.admin-lootbox-cell-preview strong,
+.admin-lootbox-cell-preview small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-asset-picker-trigger small,
+.admin-asset-picker-option small,
+.admin-lootbox-cell-preview small {
+  color: var(--ui-text-muted);
+}
+
+.admin-asset-picker-menu {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 20;
+  display: grid;
+  gap: 8px;
+  max-height: 360px;
+  padding: 10px;
+  border: 1px solid rgba(247, 164, 29, .35);
+  background: rgba(18, 18, 18, .98);
+  box-shadow: 0 18px 38px rgba(0, 0, 0, .35);
+}
+
+.admin-asset-picker-options {
+  display: grid;
+  gap: 6px;
+  max-height: 280px;
+  overflow: auto;
+}
+
+.admin-lootbox-cell-preview {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  min-height: 50px;
+}
+
+.admin-lootbox-drop-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.admin-lootbox-drop-card--new {
+  border-color: rgba(247, 164, 29, .28);
+}
+
+@media (max-width: 1100px) {
+  .admin-lootbox-table-head {
+    display: none;
+  }
+
+  .admin-lootbox-cell {
+    grid-template-columns: 48px minmax(0, 1fr);
+  }
+
+  .admin-lootbox-cell-preview,
+  .admin-lootbox-field,
+  .admin-lootbox-cell-actions,
+  .admin-lootbox-empty-column {
+    grid-column: 2;
+  }
 }
 
 @media (max-width: 900px) {

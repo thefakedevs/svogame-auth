@@ -8,10 +8,13 @@ export default function FooterSection() {
           <h2>Основное</h2>
           <ul>
             <li>
+              <a href="/profile" data-cta="footer-profile">Профиль</a>
+            </li>
+            <li>
               <a href="/downloads" data-cta="footer-downloads">Скачать лаунчер</a>
             </li>
             <li>
-              <a href="/profile" data-cta="footer-profile">Профиль</a>
+              <a href="/wiki" data-cta="footer-wiki">Вики проекта</a>
             </li>
           </ul>
         </div>

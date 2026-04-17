@@ -1,9 +1,16 @@
 import { useEffect, useState } from 'react'
 import {
   getMyDefaultWalletBalance,
+  getMyWalletTransactions,
   type WalletBalanceResponse,
+  type WalletTransactionResponse,
 } from '../api/inventory'
 import { toDisplayError } from '../api/http'
+import {
+  getMyLootboxOpenHistory,
+  listPublicLootboxes,
+  type LootboxOpenHistoryResponse,
+} from '../api/lootboxes'
 import { listMyShopOrders, type ShopOrderResponse } from '../api/shop'
 import ErrorState from '../components/ErrorState'
 import LoadingState from '../components/LoadingState'
@@ -15,7 +22,12 @@ type WalletState =
   | { status: 'loading' }
   | { status: 'unauthorized' }
   | { status: 'error'; error: string }
-  | { status: 'ready'; balance: WalletBalanceResponse; purchases: ShopOrderResponse[] }
+  | { status: 'ready'; balance: WalletBalanceResponse; history: WalletHistoryItem[] }
+
+type WalletHistoryItem =
+  | { type: 'purchase'; id: string; createdAt: string; purchase: ShopOrderResponse }
+  | { type: 'lootbox'; id: string; createdAt: string; opening: LootboxOpenHistoryResponse; lootboxName: string }
+  | { type: 'wallet'; id: string; createdAt: string; transaction: WalletTransactionResponse }
 
 const numberFormatter = new Intl.NumberFormat('ru-RU')
 const dateTimeFormatter = new Intl.DateTimeFormat('ru-RU', {
@@ -38,6 +50,11 @@ function formatAmount(value: number) {
 
 function formatRubPrice(value: number) {
   return `${formatAmount(Math.abs(value))} ₽`
+}
+
+function formatCoinDelta(value: number) {
+  const sign = value > 0 ? '+' : ''
+  return `${sign}${formatAmount(value)}`
 }
 
 function purchaseStatusText(status: string) {
@@ -69,6 +86,70 @@ function purchaseStatusClass(status: string) {
   return 'ui-badge ui-badge-warning'
 }
 
+function formatLootboxReward(opening: LootboxOpenHistoryResponse) {
+  const reward = opening.reward
+  if (reward.amount != null) return `${reward.displayName} x${formatAmount(reward.amount)}`
+  if (reward.durationSeconds != null) return `${reward.displayName} на ${formatAmount(reward.durationSeconds)} сек.`
+  return reward.displayName
+}
+
+function walletTransactionTitle(transaction: WalletTransactionResponse) {
+  if (transaction.reasonText) return transaction.reasonText
+
+  switch (transaction.operationType) {
+    case 'credit':
+      return 'Начисление'
+    case 'debit':
+      return 'Списание'
+    case 'adjustment':
+      return 'Корректировка баланса'
+    default:
+      return transaction.operationType
+  }
+}
+
+function walletTransactionKind(transaction: WalletTransactionResponse) {
+  switch (transaction.operationType) {
+    case 'credit':
+      return 'Начисление'
+    case 'debit':
+      return 'Списание'
+    case 'adjustment':
+      return 'Корректировка'
+    default:
+      return 'Кошелек'
+  }
+}
+
+function buildWalletHistory(
+  purchases: ShopOrderResponse[],
+  lootboxOpenings: LootboxOpenHistoryResponse[],
+  walletTransactions: WalletTransactionResponse[],
+  lootboxNames: Map<string, string>,
+): WalletHistoryItem[] {
+  return [
+    ...purchases.map((purchase): WalletHistoryItem => ({
+      type: 'purchase',
+      id: `purchase:${purchase.id}`,
+      createdAt: purchase.createdAt,
+      purchase,
+    })),
+    ...lootboxOpenings.map((opening): WalletHistoryItem => ({
+      type: 'lootbox',
+      id: `lootbox:${opening.id}`,
+      createdAt: opening.openedAt,
+      opening,
+      lootboxName: lootboxNames.get(opening.lootboxAssetKey) ?? 'Кейс',
+    })),
+    ...walletTransactions.map((transaction): WalletHistoryItem => ({
+      type: 'wallet',
+      id: `wallet:${transaction.id}`,
+      createdAt: transaction.createdAt,
+      transaction,
+    })),
+  ].sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
+}
+
 export default function WalletPage() {
   const [state, setState] = useState<WalletState>({ status: 'loading' })
 
@@ -81,14 +162,18 @@ export default function WalletPage() {
 
     setState({ status: 'loading' })
     try {
-      const [balance, orders] = await Promise.all([
-        getMyDefaultWalletBalance(token),
+      const balance = await getMyDefaultWalletBalance(token)
+      const [orders, lootboxOpenings, walletTransactions, lootboxes] = await Promise.all([
         listMyShopOrders(token),
+        getMyLootboxOpenHistory(token),
+        getMyWalletTransactions(token, balance.currencyKey),
+        listPublicLootboxes().catch(() => []),
       ])
+      const lootboxNames = new Map(lootboxes.map((item) => [item.assetKey, item.assetDisplayName]))
       setState({
         status: 'ready',
         balance,
-        purchases: orders.slice().sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()),
+        history: buildWalletHistory(orders, lootboxOpenings, walletTransactions, lootboxNames),
       })
     } catch (cause) {
       setState({ status: 'error', error: toDisplayError(cause, 'Не удалось загрузить кошелек.') })
@@ -130,29 +215,68 @@ export default function WalletPage() {
 
       <section className="card ownership-section">
         <div className="ownership-section-head">
-          <h2 className="card-title">Покупки</h2>
-          <span className="ui-badge ui-badge-neutral">{state.purchases.length}</span>
+          <h2 className="card-title">История</h2>
+          <span className="ui-badge ui-badge-neutral">{state.history.length}</span>
         </div>
 
-        {state.purchases.length ? (
+        {state.history.length ? (
           <div className="ownership-transaction-list">
-            {state.purchases.map((purchase) => (
-              <article key={purchase.id} className="ownership-transaction">
-                <span className="ownership-transaction-delta is-negative">
-                  {formatRubPrice(purchase.totalPriceRub)}
-                </span>
-                <span className="ownership-transaction-main">
-                  <strong>{purchase.productName}</strong>
-                  <small>{formatDateTime(purchase.createdAt).replace(', ', ' ')}</small>
-                </span>
-                <span className="ownership-transaction-balance ownership-transaction-status">
-                  <span className={purchaseStatusClass(purchase.status)}>{purchaseStatusText(purchase.status)}</span>
-                </span>
-              </article>
-            ))}
+            {state.history.map((item) => {
+              if (item.type === 'purchase') {
+                const purchase = item.purchase
+                return (
+                  <article key={item.id} className="ownership-transaction">
+                    <span className="ownership-transaction-delta is-negative">
+                      {formatRubPrice(purchase.totalPriceRub)}
+                    </span>
+                    <span className="ownership-transaction-main">
+                      <strong>{purchase.productName}</strong>
+                      <small>Покупка · {formatDateTime(purchase.createdAt).replace(', ', ' ')}</small>
+                    </span>
+                    <span className="ownership-transaction-balance ownership-transaction-status">
+                      <span className={purchaseStatusClass(purchase.status)}>{purchaseStatusText(purchase.status)}</span>
+                    </span>
+                  </article>
+                )
+              }
+
+              if (item.type === 'lootbox') {
+                const opening = item.opening
+                return (
+                  <article key={item.id} className="ownership-transaction">
+                    <span className="ownership-transaction-delta ownership-transaction-kind">
+                      Кейс
+                    </span>
+                    <span className="ownership-transaction-main">
+                      <strong>{item.lootboxName}</strong>
+                      <small>Награда: {formatLootboxReward(opening)}</small>
+                    </span>
+                    <span className="ownership-transaction-balance ownership-transaction-status">
+                      {formatDateTime(opening.openedAt).replace(', ', ' ')}
+                    </span>
+                  </article>
+                )
+              }
+
+              const transaction = item.transaction
+              return (
+                <article key={item.id} className="ownership-transaction">
+                  <span className={`ownership-transaction-delta ${transaction.delta < 0 ? 'is-negative' : ''}`}>
+                    {formatCoinDelta(transaction.delta)}
+                  </span>
+                  <span className="ownership-transaction-main">
+                    <strong>{walletTransactionTitle(transaction)}</strong>
+                    <small>{walletTransactionKind(transaction)} · {formatDateTime(transaction.createdAt).replace(', ', ' ')}</small>
+                  </span>
+                  <span className="ownership-transaction-balance ownership-transaction-status">
+                    Баланс: {formatAmount(transaction.balanceAfter)}
+                  </span>
+                </article>
+              )
+            })}
           </div>
         ) : (
-          <p className="ownership-muted">Покупок пока нет.</p>
+          <p className="ownership-muted">История пока пуста.</p>
         )}
       </section>
     </main>

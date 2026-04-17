@@ -174,7 +174,8 @@
 
   .shop-product-card__buy,
   .shop-callback-actions .btn,
-  .ui-kit-page .shop-modal .ui-modal-footer .btn {
+  .ui-kit-page .shop-modal .ui-modal-footer .btn,
+  .shop-product-card__footer .ui-badge {
     width: 100%;
     justify-content: center;
   }

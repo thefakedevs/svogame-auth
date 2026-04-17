@@ -13,6 +13,7 @@ import LoadingState from '../LoadingState'
 type LocaleRow = { locale: string; name: string; description: string }
 
 const defaultLocaleRows: LocaleRow[] = [{ locale: 'ru-RU', name: '', description: '' }]
+const SHOP_PRODUCTS_PER_PAGE = 20
 
 type ShopAdminSortKey = 'catalog' | 'key' | 'price_asc' | 'price_desc' | 'name' | 'updated_desc'
 
@@ -42,6 +43,52 @@ function sortAdminShopProducts(list: ShopProductResponse[], sort: ShopAdminSortK
       break
   }
   return out
+}
+
+function getPaginationPages(page: number, totalPages: number) {
+  const pages = new Set([1, totalPages, page - 1, page, page + 1].filter((item) => item >= 1 && item <= totalPages))
+  return Array.from(pages).sort((left, right) => left - right)
+}
+
+function AdminPagination({
+  page,
+  totalPages,
+  onPageChange,
+  label,
+}: {
+  page: number
+  totalPages: number
+  onPageChange: (page: number) => void
+  label: string
+}) {
+  const pages = getPaginationPages(page, totalPages)
+
+  return (
+    <nav className="admin-pagination" aria-label={label}>
+      <ul className="ui-pagination">
+        <li>
+          <button type="button" className="ui-pagination-btn" aria-label="Предыдущая страница" disabled={page <= 1} onClick={() => onPageChange(Math.max(1, page - 1))}>‹</button>
+        </li>
+        {pages.map((item, index) => (
+          <li key={item}>
+            {index > 0 && item - pages[index - 1] > 1 ? <span className="ui-pagination-ellipsis">…</span> : null}
+            <button
+              type="button"
+              className="ui-pagination-btn"
+              aria-label={`Страница ${item}`}
+              aria-current={page === item ? 'page' : undefined}
+              onClick={() => onPageChange(item)}
+            >
+              {item}
+            </button>
+          </li>
+        ))}
+        <li>
+          <button type="button" className="ui-pagination-btn" aria-label="Следующая страница" disabled={page >= totalPages} onClick={() => onPageChange(Math.min(totalPages, page + 1))}>›</button>
+        </li>
+      </ul>
+    </nav>
+  )
 }
 
 function buildCreatePayload(
@@ -117,6 +164,8 @@ export default function AdminShopPanel({ token }: { token: string }) {
   const [createModalOpen, setCreateModalOpen] = useState(false)
   const [productCatalogScope, setProductCatalogScope] = useState<'active_only' | 'all'>('active_only')
   const [shopSort, setShopSort] = useState<ShopAdminSortKey>('catalog')
+  const [shopQuery, setShopQuery] = useState('')
+  const [shopPage, setShopPage] = useState(1)
 
   const [productKey, setProductKey] = useState('')
   const [assetKey, setAssetKey] = useState('')
@@ -185,9 +234,32 @@ export default function AdminShopPanel({ token }: { token: string }) {
 
   const displayedProducts = useMemo(() => {
     if (!items) return []
-    const filtered = productCatalogScope === 'active_only' ? items.filter((p) => p.isActive) : items
+    const needle = shopQuery.trim().toLowerCase()
+    const scoped = productCatalogScope === 'active_only' ? items.filter((p) => p.isActive) : items
+    const filtered = needle
+      ? scoped.filter((p) =>
+          `${p.key} ${p.assetKey} ${p.localizedName} ${p.localizedDescription ?? ''}`.toLowerCase().includes(needle),
+        )
+      : scoped
     return sortAdminShopProducts(filtered, shopSort)
-  }, [items, productCatalogScope, shopSort])
+  }, [items, productCatalogScope, shopQuery, shopSort])
+
+  const totalPages = Math.max(1, Math.ceil(displayedProducts.length / SHOP_PRODUCTS_PER_PAGE))
+  const pagedProducts = displayedProducts.slice((shopPage - 1) * SHOP_PRODUCTS_PER_PAGE, shopPage * SHOP_PRODUCTS_PER_PAGE)
+
+  useEffect(() => {
+    setShopPage((current) => Math.min(current, totalPages))
+  }, [totalPages])
+
+  const setShopQueryAndReset = (value: string) => {
+    setShopQuery(value)
+    setShopPage(1)
+  }
+
+  const setProductCatalogScopeAndReset = (value: 'active_only' | 'all') => {
+    setProductCatalogScope(value)
+    setShopPage(1)
+  }
 
   const updateLocaleRow = (index: number, patch: Partial<LocaleRow>) => {
     setLocaleRows((prev) => prev.map((row, i) => (i === index ? { ...row, ...patch } : row)))
@@ -264,8 +336,8 @@ export default function AdminShopPanel({ token }: { token: string }) {
     items == null
       ? ''
       : productCatalogScope === 'active_only'
-        ? `Показано активных: ${displayedProducts.length}${items.length !== displayedProducts.length ? ` из ${items.length} загруженных` : ''}`
-        : `Всего: ${items.length}`
+        ? `Найдено активных: ${displayedProducts.length}${items.length !== displayedProducts.length ? ` из ${items.length} загруженных` : ''}. Страница ${shopPage} из ${totalPages}`
+        : `Найдено: ${displayedProducts.length} из ${items.length}. Страница ${shopPage} из ${totalPages}`
 
   return (
     <div className="admin-shop-layout">
@@ -285,6 +357,15 @@ export default function AdminShopPanel({ token }: { token: string }) {
         <div className="admin-shop-list-controls">
           <div className="admin-shop-list-controls-row">
             <label className="admin-shop-field" style={{ marginBottom: 0 }}>
+              <span>Поиск</span>
+              <input
+                className="ui-input"
+                value={shopQuery}
+                onChange={(event) => setShopQueryAndReset(event.target.value)}
+                placeholder="Название, key или asset"
+              />
+            </label>
+            <label className="admin-shop-field" style={{ marginBottom: 0 }}>
               <span>Сортировка</span>
               <select className="ui-input" value={shopSort} onChange={(e) => setShopSort(e.target.value as ShopAdminSortKey)} aria-label="Сортировка товаров">
                 <option value="catalog">Как в каталоге (sort_order)</option>
@@ -302,7 +383,7 @@ export default function AdminShopPanel({ token }: { token: string }) {
                   type="radio"
                   name="admin-shop-catalog-scope"
                   checked={productCatalogScope === 'active_only'}
-                  onChange={() => setProductCatalogScope('active_only')}
+                  onChange={() => setProductCatalogScopeAndReset('active_only')}
                 />
                 <span className="ui-radio-mark" aria-hidden />
                 <span>Только активные</span>
@@ -312,7 +393,7 @@ export default function AdminShopPanel({ token }: { token: string }) {
                   type="radio"
                   name="admin-shop-catalog-scope"
                   checked={productCatalogScope === 'all'}
-                  onChange={() => setProductCatalogScope('all')}
+                  onChange={() => setProductCatalogScopeAndReset('all')}
                 />
                 <span className="ui-radio-mark" aria-hidden />
                 <span>Все товары</span>
@@ -330,7 +411,7 @@ export default function AdminShopPanel({ token }: { token: string }) {
         ) : null}
         {displayedProducts.length > 0 ? (
           <div className="admin-list">
-            {displayedProducts.map((p) => (
+            {pagedProducts.map((p) => (
               <button key={p.id} type="button" className="admin-row" onClick={() => pushUrl(adminShopProductPath(p.id))}>
                 <span className="admin-row-user">
                   <span className="admin-row-user-text">
@@ -347,6 +428,9 @@ export default function AdminShopPanel({ token }: { token: string }) {
               </button>
             ))}
           </div>
+        ) : null}
+        {displayedProducts.length > 0 ? (
+          <AdminPagination page={shopPage} totalPages={totalPages} onPageChange={setShopPage} label="Нумерация страниц товаров" />
         ) : null}
       </section>
 

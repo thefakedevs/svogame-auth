@@ -4,11 +4,16 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "npm run typecheck && vite build",
+    "dev": "concurrently --kill-others-on-fail \"npm run dev:app\" \"npm run docs:dev\"",
+    "dev:app": "vite",
+    "build": "npm run build:app && npm run docs:build",
+    "build:app": "npm run typecheck && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "typecheck": "tsc -p tsconfig.app.json --noEmit"
+    "typecheck": "tsc -p tsconfig.app.json --noEmit",
+    "docs:dev": "vitepress dev docs --port 5174 --strictPort",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs --port 5174 --strictPort"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.2.2",
@@ -35,6 +40,7 @@
     "globals": "^16.5.0",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.46.4",
-    "vite": "^7.3.2"
+    "vite": "^7.3.2",
+    "vitepress": "^1.6.4"
   }
 }

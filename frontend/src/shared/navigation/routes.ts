@@ -20,6 +20,9 @@ export function pageTitleForPath(pathname: string) {
   if (pathname === paths.downloads) return 'Скачать лаунчер | SvoCraft'
   if (pathname === paths.contacts) return 'Контакты | SvoCraft'
   if (pathname === paths.admin) return 'Админ-панель | SvoCraft'
+  if (pathname.match(/^\/admin\/users\/[^/]+\/lootboxes\/open-history$/)) {
+    return 'Открытые кейсы игрока | Админка | SvoCraft'
+  }
   if (pathname.startsWith(`${paths.admin}/users/`)) return 'Профиль игрока | Админка | SvoCraft'
   if (pathname.startsWith(`${paths.admin}/squads/`)) return 'Профиль сквада | Админка | SvoCraft'
   if (pathname.startsWith(`${paths.admin}/tokens/`) && pathname.endsWith('/audit')) {
@@ -28,6 +31,9 @@ export function pageTitleForPath(pathname: string) {
   if (pathname.startsWith(`${paths.admin}/shop/products/`)) {
     return 'Товар магазина | Админка | SvoCraft'
   }
+  if (pathname.startsWith(`${paths.admin}/lootboxes/`)) {
+    return 'Лутбокс | Админка | SvoCraft'
+  }
   if (pathname === paths.token) return 'Завершение авторизации | SvoCraft'
   if (pathname === paths.uiKit) return 'UI Kit | SvoCraft'
   if (pathname === paths.legal) return 'Правовые документы | SvoCraft'
@@ -35,5 +41,6 @@ export function pageTitleForPath(pathname: string) {
   if (pathname === paths.legalPublicOffer) return 'Публичная оферта | SvoCraft'
   if (pathname === paths.legalRefundPolicy) return 'Политика возвратов | SvoCraft'
   if (pathname === paths.legalUserAgreement) return 'Пользовательское соглашение | SvoCraft'
+  if (pathname.startsWith(paths.wiki)) return 'Вики | SvoCraft'
   return 'Авторизация | SvoCraft'
 }

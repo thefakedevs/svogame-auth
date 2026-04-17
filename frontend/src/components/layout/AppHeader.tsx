@@ -187,6 +187,9 @@ export default function AppHeader({ pageTitle }: Props) {
           <a href={`${paths.profile}?tab=settings`}>Настройки</a>
           {authUser?.isSuperuser ? <a href={paths.admin}>Админка</a> : null}
         </div>
+        <div className="app-header__menu-section app-header__menu-section">
+          <a href={`${paths.wiki}`}>Вики проекта</a>
+        </div>
         <div className="app-header__menu-section app-header__menu-section--danger">
           <a onClick={onLogout}>Выйти</a>
         </div>
