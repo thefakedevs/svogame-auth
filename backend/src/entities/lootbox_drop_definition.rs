@@ -9,6 +9,7 @@ pub struct Model {
     pub reward_asset_definition_id: Uuid,
     pub stackable_amount: Option<i64>,
     pub expirable_duration_seconds: Option<i64>,
+    pub duplicate_compensation_amount: Option<i64>,
     pub weight: i64,
     pub title_i18n: String,
     pub is_active: bool,

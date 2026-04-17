@@ -1,6 +1,7 @@
 use crate::app::config::DatabaseConfig;
 use crate::services::migration::{
     AddAssetDefinitionGunskinColumns, AddAuthRayRegistrationColumns,
+    AddLootboxRewardCompensationColumns,
     AddShopOrderPaymentLifecycleColumns, AddShopPaymentAttemptProviderIndex,
     AddUserDeactivationReasonColumn, AddUserSquadIdColumn, AddUserSuperuserColumn,
     CreateAppKvTable, CreateAssetDefinitionTable, CreateAuditLogTable, CreateAuthRayTable,
@@ -49,6 +50,9 @@ pub async fn run_migrations(db: &DatabaseConnection) -> Result<()> {
     CreateLootboxDefinitionTable.up(&schema_manager).await?;
     CreateLootboxDropDefinitionTable.up(&schema_manager).await?;
     CreateLootboxOpenOperationTable.up(&schema_manager).await?;
+    AddLootboxRewardCompensationColumns
+        .up(&schema_manager)
+        .await?;
     CreateShopProductTable.up(&schema_manager).await?;
     CreateShopProductLocaleTable.up(&schema_manager).await?;
     CreateShopOrderTable.up(&schema_manager).await?;

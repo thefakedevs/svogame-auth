@@ -1511,6 +1511,11 @@ impl MigrationTrait for CreateLootboxDropDefinitionTable {
                             .null(),
                     )
                     .col(
+                        ColumnDef::new(LootboxDropDefinition::DuplicateCompensationAmount)
+                            .big_integer()
+                            .null(),
+                    )
+                    .col(
                         ColumnDef::new(LootboxDropDefinition::Weight)
                             .big_integer()
                             .not_null(),
@@ -1564,6 +1569,7 @@ enum LootboxDropDefinition {
     RewardAssetDefinitionId,
     StackableAmount,
     ExpirableDurationSeconds,
+    DuplicateCompensationAmount,
     Weight,
     TitleI18n,
     IsActive,
@@ -1645,6 +1651,42 @@ impl MigrationTrait for CreateLootboxOpenOperationTable {
                             .string()
                             .not_null(),
                     )
+                    .col(
+                        ColumnDef::new(LootboxOpenOperation::GrantedAssetDefinitionId)
+                            .uuid()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(LootboxOpenOperation::GrantedOwnershipModel)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(LootboxOpenOperation::GrantedAmount)
+                            .big_integer()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(LootboxOpenOperation::GrantedDurationSeconds)
+                            .big_integer()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(LootboxOpenOperation::GrantedExpiresAt)
+                            .timestamp_with_time_zone()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(LootboxOpenOperation::GrantedTitle)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(LootboxOpenOperation::WasCompensated)
+                            .boolean()
+                            .not_null()
+                            .default(false),
+                    )
                     .col(ColumnDef::new(LootboxOpenOperation::Locale).string().null())
                     .col(
                         ColumnDef::new(LootboxOpenOperation::ActorKind)
@@ -1708,6 +1750,13 @@ enum LootboxOpenOperation {
     RewardDurationSeconds,
     RewardExpiresAt,
     RewardTitle,
+    GrantedAssetDefinitionId,
+    GrantedOwnershipModel,
+    GrantedAmount,
+    GrantedDurationSeconds,
+    GrantedExpiresAt,
+    GrantedTitle,
+    WasCompensated,
     Locale,
     ActorKind,
     ActorUserId,
@@ -1719,6 +1768,58 @@ enum LootboxOpenOperation {
 }
 
 pub struct CreateShopProductTable;
+
+pub struct AddLootboxRewardCompensationColumns;
+
+impl MigrationName for AddLootboxRewardCompensationColumns {
+    fn name(&self) -> &str {
+        "m20260417_000036_add_lootbox_reward_compensation_columns"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for AddLootboxRewardCompensationColumns {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        let backend = manager.get_database_backend();
+        let statements = match backend {
+            DatabaseBackend::Postgres | DatabaseBackend::Sqlite => vec![
+                r#"ALTER TABLE "lootbox_drop_definition" ADD COLUMN "duplicate_compensation_amount" bigint NULL"#,
+                r#"ALTER TABLE "lootbox_open_operation" ADD COLUMN "granted_asset_definition_id" uuid NULL"#,
+                r#"ALTER TABLE "lootbox_open_operation" ADD COLUMN "granted_ownership_model" varchar NULL"#,
+                r#"ALTER TABLE "lootbox_open_operation" ADD COLUMN "granted_amount" bigint NULL"#,
+                r#"ALTER TABLE "lootbox_open_operation" ADD COLUMN "granted_duration_seconds" bigint NULL"#,
+                r#"ALTER TABLE "lootbox_open_operation" ADD COLUMN "granted_expires_at" timestamptz NULL"#,
+                r#"ALTER TABLE "lootbox_open_operation" ADD COLUMN "granted_title" varchar NULL"#,
+                r#"ALTER TABLE "lootbox_open_operation" ADD COLUMN "was_compensated" boolean NOT NULL DEFAULT false"#,
+                r#"UPDATE "lootbox_open_operation" SET "granted_asset_definition_id" = "reward_asset_definition_id" WHERE "granted_asset_definition_id" IS NULL"#,
+                r#"UPDATE "lootbox_open_operation" SET "granted_ownership_model" = "reward_ownership_model" WHERE "granted_ownership_model" IS NULL"#,
+                r#"UPDATE "lootbox_open_operation" SET "granted_amount" = "reward_amount" WHERE "granted_amount" IS NULL"#,
+                r#"UPDATE "lootbox_open_operation" SET "granted_duration_seconds" = "reward_duration_seconds" WHERE "granted_duration_seconds" IS NULL"#,
+                r#"UPDATE "lootbox_open_operation" SET "granted_expires_at" = "reward_expires_at" WHERE "granted_expires_at" IS NULL"#,
+                r#"UPDATE "lootbox_open_operation" SET "granted_title" = "reward_title" WHERE "granted_title" IS NULL"#,
+            ],
+            _ => return Ok(()),
+        };
+
+        for sql in statements {
+            match manager
+                .get_connection()
+                .execute(Statement::from_string(backend, sql.to_string()))
+                .await
+            {
+                Ok(_) => {}
+                Err(error) if is_duplicate_column_error(&error) => {}
+                Err(error) => return Err(error),
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn down(&self, _manager: &SchemaManager) -> Result<(), DbErr> {
+        Ok(())
+    }
+}
 
 impl MigrationName for CreateShopProductTable {
     fn name(&self) -> &str {

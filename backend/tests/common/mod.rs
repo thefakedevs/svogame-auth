@@ -2,8 +2,8 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use auth::app::config::{
-    AppConfig, DatabaseConfig, DiscordConfig, S3Config, ShopConfig, ShopPaymentProviderKind,
-    YooKassaConfig,
+    AppConfig, DatabaseConfig, DiscordConfig, ReceiptProviderKind, ReceiptsConfig, S3Config,
+    ShopConfig, ShopPaymentProviderKind, YooKassaConfig,
 };
 use auth::app::router::build_router;
 use auth::app::state::{AppState, SharedAppState};
@@ -110,6 +110,13 @@ impl TestApp {
                 force_path_style: true,
             },
             shop,
+            receipts: ReceiptsConfig {
+                enabled: false,
+                provider: ReceiptProviderKind::MyTax,
+                retry_interval_seconds: 900,
+                failure_after_seconds: 604800,
+                mytax: None,
+            },
             pow_complexity: 1,
             jwt_secret: "test-jwt-secret".to_string(),
             gamervii_compat: None,
