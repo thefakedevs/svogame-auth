@@ -3212,6 +3212,64 @@ async fn service_token_can_open_lootbox_for_user_and_history_keeps_service_actor
         .as_str()
         .expect("plaintext token");
 
+    let inventory = app
+        .get_json(
+            &format!("/api/admin/users/{}/inventory", user.user_id),
+            service_token,
+        )
+        .await;
+    assert!(
+        inventory.status().is_success(),
+        "{}",
+        inventory.text().await.unwrap_or_default()
+    );
+    let inventory_body: serde_json::Value = inventory.json().await.expect("service inventory");
+    assert_eq!(inventory_body["stackables"][0]["assetKey"], "service_case");
+
+    let list_lootboxes = app.get_json("/api/admin/lootboxes", service_token).await;
+    assert!(
+        list_lootboxes.status().is_success(),
+        "{}",
+        list_lootboxes.text().await.unwrap_or_default()
+    );
+    let list_lootboxes_body: serde_json::Value =
+        list_lootboxes.json().await.expect("service lootbox list");
+    assert!(
+        list_lootboxes_body
+            .as_array()
+            .expect("lootbox list")
+            .iter()
+            .any(|item| item["id"] == lootbox_id)
+    );
+
+    let get_lootbox = app
+        .get_json(&format!("/api/admin/lootboxes/{lootbox_id}"), service_token)
+        .await;
+    assert!(
+        get_lootbox.status().is_success(),
+        "{}",
+        get_lootbox.text().await.unwrap_or_default()
+    );
+
+    let patch_lootbox = app
+        .patch_json(
+            &format!("/api/admin/lootboxes/{lootbox_id}"),
+            service_token,
+            serde_json::json!({ "metadata": { "managedBy": "minecraft_plugin" } }),
+        )
+        .await;
+    assert!(
+        patch_lootbox.status().is_success(),
+        "{}",
+        patch_lootbox.text().await.unwrap_or_default()
+    );
+    let patch_lootbox_body: serde_json::Value =
+        patch_lootbox.json().await.expect("service lootbox patch");
+    assert_eq!(
+        patch_lootbox_body["definition"]["metadata"]["managedBy"],
+        "minecraft_plugin"
+    );
+
     let open = app
         .post_json(
             &format!(
@@ -3234,7 +3292,7 @@ async fn service_token_can_open_lootbox_for_user_and_history_keeps_service_actor
     let history = app
         .get_json(
             &format!("/api/admin/users/{}/lootboxes/open-history", user.user_id),
-            &admin.access_token,
+            service_token,
         )
         .await;
     assert!(history.status().is_success());
@@ -3242,6 +3300,17 @@ async fn service_token_can_open_lootbox_for_user_and_history_keeps_service_actor
     assert_eq!(history_body.as_array().expect("history").len(), 1);
     assert_eq!(history_body[0]["actorKind"], "system");
     assert_eq!(history_body[0]["actorServiceName"], "minecraft_plugin");
+
+    let all_history = app
+        .get_json("/api/admin/lootboxes/open-history", service_token)
+        .await;
+    assert!(
+        all_history.status().is_success(),
+        "{}",
+        all_history.text().await.unwrap_or_default()
+    );
+    let all_history_body: serde_json::Value = all_history.json().await.expect("global history");
+    assert_eq!(all_history_body.as_array().expect("history").len(), 1);
     assert_eq!(
         app.audit_log_count("admin.lootbox.opened_for_user").await,
         1
