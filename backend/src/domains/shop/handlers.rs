@@ -1,6 +1,7 @@
 use axum::Json;
 use axum::extract::{Path, Query, State};
 use axum::http::HeaderMap;
+use axum::response::Redirect;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use utoipa::{IntoParams, ToSchema};
@@ -13,6 +14,7 @@ use crate::services::audit::{
     ACTION_ADMIN_SHOP_PRODUCT_CREATED, ACTION_ADMIN_SHOP_PRODUCT_UPDATED,
     ACTION_USER_SHOP_ORDER_CREATED, ACTION_USER_SHOP_ORDER_FULFILLED, write_audit_log,
 };
+use crate::services::receipts;
 use crate::services::shop::{
     self, CreateShopOrderInput, CreateShopProductInput, ShopCatalogQuery, UpdateShopProductInput,
 };
@@ -93,6 +95,35 @@ pub struct ShopPaymentAttemptResponse {
 }
 
 #[derive(Debug, Serialize, ToSchema)]
+pub struct ShopReceiptResponse {
+    pub id: String,
+    pub provider: String,
+    pub status: String,
+    #[schema(rename = "displayStatus")]
+    pub display_status: String,
+    #[schema(rename = "receiptUuid")]
+    pub receipt_uuid: Option<String>,
+    #[schema(rename = "printUrl")]
+    pub print_url: Option<String>,
+    #[schema(rename = "jsonUrl")]
+    pub json_url: Option<String>,
+    #[schema(rename = "failureProblem")]
+    pub failure_problem: Option<String>,
+    #[schema(rename = "attemptCount")]
+    pub attempt_count: i32,
+    #[schema(rename = "nextAttemptAt")]
+    pub next_attempt_at: Option<chrono::DateTime<chrono::Utc>>,
+    #[schema(rename = "deadlineAt")]
+    pub deadline_at: Option<chrono::DateTime<chrono::Utc>>,
+    #[schema(rename = "completedAt")]
+    pub completed_at: Option<chrono::DateTime<chrono::Utc>>,
+    #[schema(rename = "createdAt")]
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    #[schema(rename = "updatedAt")]
+    pub updated_at: chrono::DateTime<chrono::Utc>,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
 pub struct ShopOrderResponse {
     pub id: String,
     #[schema(rename = "userId")]
@@ -136,6 +167,7 @@ pub struct ShopOrderResponse {
     #[schema(rename = "fulfilledAt")]
     pub fulfilled_at: Option<chrono::DateTime<chrono::Utc>>,
     pub payment: Option<ShopPaymentAttemptResponse>,
+    pub receipt: Option<ShopReceiptResponse>,
     pub metadata: Value,
     #[schema(rename = "createdAt")]
     pub created_at: chrono::DateTime<chrono::Utc>,
@@ -275,6 +307,72 @@ pub async fn get_my_order(
         .map_err(map_shop_error)?
         .ok_or_else(|| HttpError::not_found("Shop order not found"))?;
     Ok(Json(order_json(item)))
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/user/me/shop/orders/{order_id}/receipt",
+    params(
+        ("order_id" = String, Path, description = "Shop order UUID.")
+    ),
+    responses(
+        (status = 200, description = "Get receipt status for a completed shop order.", body = ShopReceiptResponse),
+        (status = 404, description = "Receipt or shop order not found.", body = ProblemResponse)
+    ),
+    security(("bearer_auth" = [])),
+    tag = "shop"
+)]
+pub async fn get_my_order_receipt(
+    State(state): AppStateExtractor,
+    headers: HeaderMap,
+    Path(order_id): Path<String>,
+) -> HttpResult<Json<Value>> {
+    let state = state.read().await;
+    let user = get_user_from_headers(&headers, &state).await?;
+    let order_id = parse_uuid(&order_id, "Invalid shop order ID")?;
+    let receipt = receipts::get_receipt_for_user_order(&state.db, user.id, order_id)
+        .await
+        .map_err(map_shop_error)?
+        .ok_or_else(|| HttpError::not_found("Shop receipt not found"))?;
+    Ok(Json(receipt_json(receipt)))
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/user/me/shop/orders/{order_id}/receipt/print",
+    params(
+        ("order_id" = String, Path, description = "Shop order UUID.")
+    ),
+    responses(
+        (status = 307, description = "Redirects to printable receipt URL."),
+        (status = 404, description = "Receipt or shop order not found.", body = ProblemResponse),
+        (status = 409, description = "Receipt is not completed yet.", body = ProblemResponse)
+    ),
+    security(("bearer_auth" = [])),
+    tag = "shop"
+)]
+pub async fn print_my_order_receipt(
+    State(state): AppStateExtractor,
+    headers: HeaderMap,
+    Path(order_id): Path<String>,
+) -> HttpResult<Redirect> {
+    let state = state.read().await;
+    let user = get_user_from_headers(&headers, &state).await?;
+    let order_id = parse_uuid(&order_id, "Invalid shop order ID")?;
+    let receipt = receipts::get_receipt_for_user_order(&state.db, user.id, order_id)
+        .await
+        .map_err(map_shop_error)?
+        .ok_or_else(|| HttpError::not_found("Shop receipt not found"))?;
+    if receipt.status != receipts::RECEIPT_STATUS_COMPLETED {
+        return Err(HttpError::new(
+            axum::http::StatusCode::CONFLICT,
+            "Shop receipt is not completed yet",
+        ));
+    }
+    let print_url = receipt
+        .print_url
+        .ok_or_else(|| HttpError::not_found("Shop receipt print URL not found"))?;
+    Ok(Redirect::temporary(&print_url))
 }
 
 #[utoipa::path(
@@ -586,6 +684,25 @@ fn payment_json(item: shop::ShopPaymentAttemptView) -> Value {
     })
 }
 
+fn receipt_json(item: receipts::ShopReceiptView) -> Value {
+    json!({
+        "id": item.id,
+        "provider": item.provider,
+        "status": item.status,
+        "displayStatus": item.display_status,
+        "receiptUuid": item.receipt_uuid,
+        "printUrl": item.print_url,
+        "jsonUrl": item.json_url,
+        "failureProblem": item.failure_problem,
+        "attemptCount": item.attempt_count,
+        "nextAttemptAt": item.next_attempt_at,
+        "deadlineAt": item.deadline_at,
+        "completedAt": item.completed_at,
+        "createdAt": item.created_at,
+        "updatedAt": item.updated_at
+    })
+}
+
 fn order_json(item: shop::ShopOrderView) -> Value {
     json!({
         "id": item.id,
@@ -611,6 +728,7 @@ fn order_json(item: shop::ShopOrderView) -> Value {
         "paidAt": item.paid_at,
         "fulfilledAt": item.fulfilled_at,
         "payment": item.payment.map(payment_json),
+        "receipt": item.receipt.map(receipt_json),
         "metadata": item.metadata,
         "createdAt": item.created_at,
         "updatedAt": item.updated_at

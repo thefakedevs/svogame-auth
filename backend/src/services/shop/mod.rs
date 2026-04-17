@@ -16,15 +16,17 @@ use crate::entities::{
     ShopOrderColumn, ShopOrderModel, ShopPaymentAttempt, ShopPaymentAttemptActiveModel,
     ShopPaymentAttemptColumn, ShopPaymentAttemptModel, ShopProduct, ShopProductActiveModel,
     ShopProductColumn, ShopProductLocale, ShopProductLocaleActiveModel, ShopProductLocaleColumn,
-    ShopProductLocaleModel, ShopProductModel, User, UserEntitlement, UserStackableAsset,
+    ShopProductLocaleModel, ShopProductModel, ShopReceipt, ShopReceiptColumn, User,
+    UserEntitlement, UserStackableAsset,
 };
+use crate::services::discord_notifications::queue_shop_purchase_completed_notification;
 use crate::services::ownership::inventory::{
     self, EntitlementMutation, ProlongExpirableMutation, StackableMutation, grant_entitlement_in_tx,
 };
 use crate::services::ownership::types::{
     OperationContext, OwnershipActor, OwnershipModel, normalize_metadata, validate_asset_key,
 };
-use crate::services::discord_notifications::queue_shop_purchase_completed_notification;
+use crate::services::receipts::{self, ShopReceiptView};
 
 const ORDER_STATUS_PENDING_PAYMENT: &str = "pending_payment";
 const ORDER_STATUS_PAID: &str = "paid";
@@ -122,6 +124,7 @@ pub struct ShopOrderView {
     pub paid_at: Option<chrono::DateTime<chrono::Utc>>,
     pub fulfilled_at: Option<chrono::DateTime<chrono::Utc>>,
     pub payment: Option<ShopPaymentAttemptView>,
+    pub receipt: Option<ShopReceiptView>,
     pub metadata: Value,
     pub created_at: chrono::DateTime<chrono::Utc>,
     pub updated_at: chrono::DateTime<chrono::Utc>,
@@ -1558,8 +1561,16 @@ async fn map_orders_with_attempts(
         Vec::new()
     } else {
         ShopPaymentAttempt::find()
-            .filter(ShopPaymentAttemptColumn::OrderId.is_in(order_ids))
+            .filter(ShopPaymentAttemptColumn::OrderId.is_in(order_ids.clone()))
             .order_by_desc(ShopPaymentAttemptColumn::CreatedAt)
+            .all(db)
+            .await?
+    };
+    let receipts = if order_ids.is_empty() {
+        Vec::new()
+    } else {
+        ShopReceipt::find()
+            .filter(ShopReceiptColumn::OrderId.is_in(order_ids))
             .all(db)
             .await?
     };
@@ -1571,7 +1582,12 @@ async fn map_orders_with_attempts(
             .find(|attempt| attempt.order_id == order.id)
             .cloned()
             .map(map_payment_attempt_view);
-        result.push(map_order_view(order, payment, shop_config)?);
+        let receipt = receipts
+            .iter()
+            .find(|receipt| receipt.order_id == order.id)
+            .cloned()
+            .map(receipts::map_receipt_view);
+        result.push(map_order_view(order, payment, receipt, shop_config)?);
     }
     Ok(result)
 }
@@ -1642,6 +1658,7 @@ fn map_payment_attempt_view(item: ShopPaymentAttemptModel) -> ShopPaymentAttempt
 fn map_order_view(
     order: ShopOrderModel,
     payment: Option<ShopPaymentAttemptView>,
+    receipt: Option<ShopReceiptView>,
     shop_config: &ShopConfig,
 ) -> Result<ShopOrderView> {
     let ownership_model = OwnershipModel::parse(&order.ownership_model)
@@ -1678,6 +1695,7 @@ fn map_order_view(
         paid_at: order.paid_at,
         fulfilled_at: order.fulfilled_at,
         payment,
+        receipt,
         metadata: serde_json::from_str(&order.metadata)?,
         created_at: order.created_at,
         updated_at: order.updated_at,
