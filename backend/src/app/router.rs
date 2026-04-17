@@ -2,6 +2,7 @@ use axum::Router;
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace;
 use tower_http::trace::{HttpMakeClassifier, TraceLayer};
+use tracing_subscriber::EnvFilter;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
@@ -42,11 +43,16 @@ fn build_cors_layer() -> CorsLayer {
 }
 
 fn prepare_tracing() -> TraceLayer<HttpMakeClassifier> {
+    let filter = EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| EnvFilter::new("info,tower_http=debug"))
+        .add_directive("sqlx=warn".parse().expect("valid sqlx log directive"))
+        .add_directive("sea_orm=warn".parse().expect("valid sea_orm log directive"));
+
     let _ = tracing_subscriber::fmt()
         .with_target(false)
         .with_timer(tracing_subscriber::fmt::time::uptime())
         .with_level(true)
-        .with_env_filter("info,tower_http=debug")
+        .with_env_filter(filter)
         .try_init();
 
     TraceLayer::new_for_http()
