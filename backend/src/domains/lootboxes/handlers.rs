@@ -6,9 +6,7 @@ use serde_json::{Value, json};
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 
-use crate::app::auth::{
-    PrivilegedActor, get_user_from_headers, require_human_superuser, require_privileged_actor,
-};
+use crate::app::auth::{PrivilegedActor, get_user_from_headers, require_privileged_actor};
 use crate::app::http::{HttpError, HttpResult};
 use crate::app::state::AppStateExtractor;
 use crate::services::audit::{
@@ -331,7 +329,7 @@ pub async fn open_my_lootbox(
     responses(
         (status = 200, description = "Administrative list of all lootbox definitions, including inactive ones.", body = [LootboxDefinitionResponse]),
         (status = 401, description = "Missing bearer token."),
-        (status = 403, description = "Human superuser required.")
+        (status = 403, description = "Human superuser or service token required.")
     ),
     security(("bearer_auth" = [])),
     tag = "lootboxes-admin"
@@ -341,7 +339,7 @@ pub async fn list_admin_lootboxes(
     headers: HeaderMap,
 ) -> HttpResult<Json<Value>> {
     let state = state.read().await;
-    require_human_superuser(&headers, &state).await?;
+    require_privileged_actor(&headers, &state).await?;
     let items = lootboxes::list_lootboxes(&state.db, false)
         .await
         .map_err(map_domain_error)?;
@@ -361,7 +359,7 @@ pub async fn list_admin_lootboxes(
         (status = 200, description = "Lootbox definition created.", body = LootboxDetailResponse),
         (status = 400, description = "Invalid asset key, invalid target asset, or a definition already exists for that asset."),
         (status = 401, description = "Missing bearer token."),
-        (status = 403, description = "Human superuser required.")
+        (status = 403, description = "Human superuser or service token required.")
     ),
     security(("bearer_auth" = [])),
     tag = "lootboxes-admin"
@@ -372,20 +370,23 @@ pub async fn create_lootbox(
     Json(body): Json<CreateLootboxDefinitionInput>,
 ) -> HttpResult<Json<Value>> {
     let state = state.read().await;
-    let actor = require_human_superuser(&headers, &state).await?;
+    let actor = require_privileged_actor(&headers, &state).await?;
     let lootbox = lootboxes::create_lootbox_definition(&state.db, body)
         .await
         .map_err(map_domain_error)?;
     write_audit_log(
         &state.db,
         ACTION_ADMIN_LOOTBOX_CREATED,
-        Some(actor.id),
+        actor.actor_user_id(),
         None,
         None,
-        Some(json!({
-            "lootboxId": lootbox.definition.id,
-            "assetKey": lootbox.definition.asset_key,
-        })),
+        Some(with_actor_metadata(
+            json!({
+                "lootboxId": lootbox.definition.id,
+                "assetKey": lootbox.definition.asset_key,
+            }),
+            &actor,
+        )),
     )
     .await
     .map_err(|error| HttpError::internal_error(format!("Failed to write audit log: {error}")))?;
@@ -402,7 +403,7 @@ pub async fn create_lootbox(
         (status = 200, description = "Admin-only detailed lootbox definition view.", body = LootboxDetailResponse),
         (status = 400, description = "Invalid lootbox ID."),
         (status = 401, description = "Missing bearer token."),
-        (status = 403, description = "Human superuser required."),
+        (status = 403, description = "Human superuser or service token required."),
         (status = 404, description = "Lootbox not found.")
     ),
     security(("bearer_auth" = [])),
@@ -414,7 +415,7 @@ pub async fn get_admin_lootbox(
     Path(lootbox_id): Path<String>,
 ) -> HttpResult<Json<Value>> {
     let state = state.read().await;
-    require_human_superuser(&headers, &state).await?;
+    require_privileged_actor(&headers, &state).await?;
     let lootbox_id = parse_uuid(&lootbox_id, "Invalid lootbox ID")?;
     let lootbox = lootboxes::get_lootbox_by_id(&state.db, lootbox_id)
         .await
@@ -437,7 +438,7 @@ pub async fn get_admin_lootbox(
         (status = 200, description = "Lootbox definition updated.", body = LootboxDetailResponse),
         (status = 400, description = "Invalid lootbox ID or invalid patch payload."),
         (status = 401, description = "Missing bearer token."),
-        (status = 403, description = "Human superuser required."),
+        (status = 403, description = "Human superuser or service token required."),
         (status = 404, description = "Lootbox not found.")
     ),
     security(("bearer_auth" = [])),
@@ -450,7 +451,7 @@ pub async fn patch_lootbox(
     Json(body): Json<UpdateLootboxDefinitionInput>,
 ) -> HttpResult<Json<Value>> {
     let state = state.read().await;
-    let actor = require_human_superuser(&headers, &state).await?;
+    let actor = require_privileged_actor(&headers, &state).await?;
     let lootbox_id = parse_uuid(&lootbox_id, "Invalid lootbox ID")?;
     let lootbox = lootboxes::update_lootbox_definition(&state.db, lootbox_id, body)
         .await
@@ -458,13 +459,16 @@ pub async fn patch_lootbox(
     write_audit_log(
         &state.db,
         ACTION_ADMIN_LOOTBOX_UPDATED,
-        Some(actor.id),
+        actor.actor_user_id(),
         None,
         None,
-        Some(json!({
-            "lootboxId": lootbox.definition.id,
-            "assetKey": lootbox.definition.asset_key,
-        })),
+        Some(with_actor_metadata(
+            json!({
+                "lootboxId": lootbox.definition.id,
+                "assetKey": lootbox.definition.asset_key,
+            }),
+            &actor,
+        )),
     )
     .await
     .map_err(|error| HttpError::internal_error(format!("Failed to write audit log: {error}")))?;
@@ -485,7 +489,7 @@ pub async fn patch_lootbox(
         (status = 200, description = "Drop entry created.", body = LootboxDetailResponse),
         (status = 400, description = "Invalid lootbox ID, invalid reward asset, invalid amount or duration, or non-positive weight."),
         (status = 401, description = "Missing bearer token."),
-        (status = 403, description = "Human superuser required."),
+        (status = 403, description = "Human superuser or service token required."),
         (status = 404, description = "Lootbox not found.")
     ),
     security(("bearer_auth" = [])),
@@ -498,7 +502,7 @@ pub async fn create_lootbox_drop(
     Json(body): Json<CreateLootboxDropInput>,
 ) -> HttpResult<Json<Value>> {
     let state = state.read().await;
-    let actor = require_human_superuser(&headers, &state).await?;
+    let actor = require_privileged_actor(&headers, &state).await?;
     let lootbox_id = parse_uuid(&lootbox_id, "Invalid lootbox ID")?;
     let lootbox = lootboxes::create_lootbox_drop(&state.db, lootbox_id, body)
         .await
@@ -506,13 +510,16 @@ pub async fn create_lootbox_drop(
     write_audit_log(
         &state.db,
         ACTION_ADMIN_LOOTBOX_DROP_CREATED,
-        Some(actor.id),
+        actor.actor_user_id(),
         None,
         None,
-        Some(json!({
-            "lootboxId": lootbox.definition.id,
-            "assetKey": lootbox.definition.asset_key,
-        })),
+        Some(with_actor_metadata(
+            json!({
+                "lootboxId": lootbox.definition.id,
+                "assetKey": lootbox.definition.asset_key,
+            }),
+            &actor,
+        )),
     )
     .await
     .map_err(|error| HttpError::internal_error(format!("Failed to write audit log: {error}")))?;
@@ -534,7 +541,7 @@ pub async fn create_lootbox_drop(
         (status = 200, description = "Drop entry updated.", body = LootboxDetailResponse),
         (status = 400, description = "Invalid identifiers or invalid updated payload."),
         (status = 401, description = "Missing bearer token."),
-        (status = 403, description = "Human superuser required."),
+        (status = 403, description = "Human superuser or service token required."),
         (status = 404, description = "Lootbox or drop not found.")
     ),
     security(("bearer_auth" = [])),
@@ -547,7 +554,7 @@ pub async fn patch_lootbox_drop(
     Json(body): Json<UpdateLootboxDropInput>,
 ) -> HttpResult<Json<Value>> {
     let state = state.read().await;
-    let actor = require_human_superuser(&headers, &state).await?;
+    let actor = require_privileged_actor(&headers, &state).await?;
     let lootbox_id = parse_uuid(&lootbox_id, "Invalid lootbox ID")?;
     let drop_id = parse_uuid(&drop_id, "Invalid drop ID")?;
     let lootbox = lootboxes::update_lootbox_drop(&state.db, lootbox_id, drop_id, body)
@@ -556,14 +563,17 @@ pub async fn patch_lootbox_drop(
     write_audit_log(
         &state.db,
         ACTION_ADMIN_LOOTBOX_DROP_UPDATED,
-        Some(actor.id),
+        actor.actor_user_id(),
         None,
         None,
-        Some(json!({
-            "lootboxId": lootbox.definition.id,
-            "dropId": drop_id,
-            "assetKey": lootbox.definition.asset_key,
-        })),
+        Some(with_actor_metadata(
+            json!({
+                "lootboxId": lootbox.definition.id,
+                "dropId": drop_id,
+                "assetKey": lootbox.definition.asset_key,
+            }),
+            &actor,
+        )),
     )
     .await
     .map_err(|error| HttpError::internal_error(format!("Failed to write audit log: {error}")))?;
@@ -581,7 +591,7 @@ pub async fn patch_lootbox_drop(
         (status = 200, description = "Drop entry deleted.", body = Value),
         (status = 400, description = "Invalid identifiers."),
         (status = 401, description = "Missing bearer token."),
-        (status = 403, description = "Human superuser required."),
+        (status = 403, description = "Human superuser or service token required."),
         (status = 404, description = "Lootbox or drop not found.")
     ),
     security(("bearer_auth" = [])),
@@ -593,7 +603,7 @@ pub async fn delete_lootbox_drop(
     Path((lootbox_id, drop_id)): Path<(String, String)>,
 ) -> HttpResult<Json<Value>> {
     let state = state.read().await;
-    let actor = require_human_superuser(&headers, &state).await?;
+    let actor = require_privileged_actor(&headers, &state).await?;
     let lootbox_id = parse_uuid(&lootbox_id, "Invalid lootbox ID")?;
     let drop_id = parse_uuid(&drop_id, "Invalid drop ID")?;
     lootboxes::delete_lootbox_drop(&state.db, lootbox_id, drop_id)
@@ -602,13 +612,16 @@ pub async fn delete_lootbox_drop(
     write_audit_log(
         &state.db,
         ACTION_ADMIN_LOOTBOX_DROP_DELETED,
-        Some(actor.id),
+        actor.actor_user_id(),
         None,
         None,
-        Some(json!({
-            "lootboxId": lootbox_id,
-            "dropId": drop_id,
-        })),
+        Some(with_actor_metadata(
+            json!({
+                "lootboxId": lootbox_id,
+                "dropId": drop_id,
+            }),
+            &actor,
+        )),
     )
     .await
     .map_err(|error| HttpError::internal_error(format!("Failed to write audit log: {error}")))?;
@@ -683,7 +696,7 @@ pub async fn open_user_lootbox(
         (status = 200, description = "Administrative view of one player's lootbox opening history.", body = [LootboxOpenHistoryResponse]),
         (status = 400, description = "Invalid user ID."),
         (status = 401, description = "Missing bearer token."),
-        (status = 403, description = "Human superuser required."),
+        (status = 403, description = "Human superuser or service token required."),
         (status = 404, description = "User not found.")
     ),
     security(("bearer_auth" = [])),
@@ -695,7 +708,7 @@ pub async fn get_user_lootbox_open_history(
     Path(user_id): Path<String>,
 ) -> HttpResult<Json<Value>> {
     let state = state.read().await;
-    require_human_superuser(&headers, &state).await?;
+    require_privileged_actor(&headers, &state).await?;
     let user_id = parse_uuid(&user_id, "Invalid user ID")?;
     let items = lootboxes::get_open_history(&state.db, user_id)
         .await
@@ -711,7 +724,7 @@ pub async fn get_user_lootbox_open_history(
     responses(
         (status = 200, description = "Global administrative view of lootbox opening history across all users.", body = [LootboxOpenHistoryResponse]),
         (status = 401, description = "Missing bearer token."),
-        (status = 403, description = "Human superuser required.")
+        (status = 403, description = "Human superuser or service token required.")
     ),
     security(("bearer_auth" = [])),
     tag = "lootboxes-admin"
@@ -721,7 +734,7 @@ pub async fn get_all_lootbox_open_history(
     headers: HeaderMap,
 ) -> HttpResult<Json<Value>> {
     let state = state.read().await;
-    require_human_superuser(&headers, &state).await?;
+    require_privileged_actor(&headers, &state).await?;
     let items = lootboxes::get_all_open_history(&state.db)
         .await
         .map_err(map_domain_error)?;
