@@ -2,7 +2,7 @@ use anyhow::{Result, anyhow, bail};
 use rand::Rng;
 use sea_orm::{
     ActiveModelTrait, ActiveValue::NotSet, ActiveValue::Set, ColumnTrait, ConnectionTrait,
-    DatabaseConnection, EntityTrait, QueryFilter, QueryOrder, TransactionTrait,
+    DatabaseConnection, EntityTrait, QueryFilter, QueryOrder, TransactionTrait, TryIntoModel,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -11,19 +11,21 @@ use uuid::Uuid;
 
 use crate::entities::{
     AssetDefinition, AssetDefinitionColumn, AssetDefinitionModel, LootboxDefinition,
-    LootboxDefinitionActiveModel, LootboxDefinitionColumn, LootboxDefinitionModel,
-    LootboxDropDefinition, LootboxDropDefinitionActiveModel, LootboxDropDefinitionColumn,
-    LootboxDropDefinitionModel, LootboxOpenOperation, LootboxOpenOperationActiveModel,
-    LootboxOpenOperationColumn, LootboxOpenOperationModel, User, UserStackableAsset,
-    UserStackableAssetColumn,
+    AssetDefinitionActiveModel, LootboxDefinitionActiveModel, LootboxDefinitionColumn,
+    LootboxDefinitionModel, LootboxDropDefinition, LootboxDropDefinitionActiveModel,
+    LootboxDropDefinitionColumn, LootboxDropDefinitionModel, LootboxOpenOperation,
+    LootboxOpenOperationActiveModel, LootboxOpenOperationColumn, LootboxOpenOperationModel, User,
+    UserEntitlement, UserStackableAsset, UserStackableAssetColumn,
 };
+use crate::services::ownership::catalog::DEFAULT_COIN_ASSET_KEY;
 use crate::services::ownership::inventory::{
-    self, ProlongExpirableMutation, StackableMutation, StackableView,
+    self, EntitlementMutation, ProlongExpirableMutation, StackableMutation, StackableView,
 };
 use crate::services::ownership::types::{
     AssetKind, OperationContext, OwnershipActor, OwnershipModel, normalize_metadata,
     validate_asset_key,
 };
+use crate::services::ownership::wallet::{self, WalletMutation};
 
 const DEFAULT_FEED_LENGTH: usize = 100;
 const MAX_FEED_LENGTH: usize = 200;
@@ -51,6 +53,7 @@ pub struct LootboxDropView {
     pub reward_ownership_model: OwnershipModel,
     pub stackable_amount: Option<i64>,
     pub expirable_duration_seconds: Option<i64>,
+    pub duplicate_compensation_amount: Option<i64>,
     pub weight: i64,
     pub total_weight: i64,
     pub title_i18n: Value,
@@ -87,6 +90,7 @@ pub struct OpenFeedEntryView {
 
 #[derive(Clone, Debug, Serialize)]
 pub struct OpenRewardView {
+    pub asset_definition_id: Uuid,
     pub asset_key: String,
     pub display_name: String,
     pub title: String,
@@ -101,7 +105,9 @@ pub struct LootboxOpenResultView {
     pub operation_id: i64,
     pub lootbox_asset_key: String,
     pub opened_at: chrono::DateTime<chrono::Utc>,
+    pub selected_reward: OpenRewardView,
     pub reward: OpenRewardView,
+    pub was_compensated: bool,
     pub feed: Vec<OpenFeedEntryView>,
     pub winner_index: usize,
 }
@@ -111,7 +117,9 @@ pub struct LootboxOpenHistoryView {
     pub id: i64,
     pub user_id: Uuid,
     pub lootbox_asset_key: String,
+    pub selected_reward: OpenRewardView,
     pub reward: OpenRewardView,
+    pub was_compensated: bool,
     pub actor_kind: String,
     pub actor_user_id: Option<Uuid>,
     pub actor_service_name: Option<String>,
@@ -122,35 +130,56 @@ pub struct LootboxOpenHistoryView {
 
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct CreateLootboxDefinitionInput {
+    #[serde(alias = "assetKey")]
     pub asset_key: String,
+    #[serde(alias = "isActive")]
     pub is_active: Option<bool>,
     pub metadata: Option<Value>,
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct UpdateLootboxDefinitionInput {
+    #[serde(alias = "displayName")]
+    pub display_name: Option<String>,
+    pub description: Option<Option<String>>,
+    #[serde(alias = "isPublic")]
+    pub is_public: Option<bool>,
+    #[serde(alias = "isActive")]
     pub is_active: Option<bool>,
     pub metadata: Option<Value>,
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct CreateLootboxDropInput {
+    #[serde(alias = "rewardAssetKey")]
     pub reward_asset_key: String,
     pub amount: Option<i64>,
+    #[serde(alias = "durationSeconds")]
     pub duration_seconds: Option<i64>,
+    #[serde(alias = "duplicateCompensationAmount")]
+    pub duplicate_compensation_amount: Option<i64>,
     pub weight: i64,
+    #[serde(alias = "titleI18n")]
     pub title_i18n: Option<Value>,
+    #[serde(alias = "isActive")]
     pub is_active: Option<bool>,
+    #[serde(alias = "sortOrder")]
     pub sort_order: Option<i32>,
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct UpdateLootboxDropInput {
     pub amount: Option<Option<i64>>,
+    #[serde(alias = "durationSeconds")]
     pub duration_seconds: Option<Option<i64>>,
+    #[serde(alias = "duplicateCompensationAmount")]
+    pub duplicate_compensation_amount: Option<Option<i64>>,
     pub weight: Option<i64>,
+    #[serde(alias = "titleI18n")]
     pub title_i18n: Option<Value>,
+    #[serde(alias = "isActive")]
     pub is_active: Option<bool>,
+    #[serde(alias = "sortOrder")]
     pub sort_order: Option<i32>,
 }
 
@@ -198,13 +227,17 @@ pub async fn get_lootbox_by_id(
     }
 }
 
-pub async fn get_public_lootbox_by_asset_key(
+pub async fn get_public_lootbox_by_id(
     db: &DatabaseConnection,
-    asset_key: &str,
+    lootbox_id: Uuid,
 ) -> Result<Option<LootboxDetailView>> {
-    let Some((definition, asset)) = get_lootbox_and_asset_by_key(db, asset_key).await? else {
+    let Some(definition) = LootboxDefinition::find_by_id(lootbox_id).one(db).await? else {
         return Ok(None);
     };
+    let asset = AssetDefinition::find_by_id(definition.asset_definition_id)
+        .one(db)
+        .await?
+        .ok_or_else(|| anyhow!("Asset not found"))?;
     if !definition.is_active || !asset.is_active || !asset.is_public {
         return Ok(None);
     }
@@ -257,6 +290,35 @@ pub async fn update_lootbox_definition(
         .await?
         .ok_or_else(|| anyhow!("Asset not found"))?;
 
+    let mut asset_active: AssetDefinitionActiveModel = asset.into();
+    let mut should_update_asset = false;
+    if let Some(display_name) = input.display_name {
+        let normalized = display_name.trim();
+        if normalized.is_empty() {
+            bail!("Display name cannot be empty");
+        }
+        asset_active.display_name = Set(normalized.to_string());
+        should_update_asset = true;
+    }
+    if let Some(description) = input.description {
+        asset_active.description = Set(description
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty()));
+        should_update_asset = true;
+    }
+    if let Some(is_public) = input.is_public {
+        asset_active.is_public = Set(is_public);
+        should_update_asset = true;
+    }
+    if should_update_asset {
+        asset_active.updated_at = Set(chrono::Utc::now());
+    }
+    let asset = if should_update_asset {
+        asset_active.update(db).await?
+    } else {
+        asset_active.try_into_model()?
+    };
+
     let mut active: LootboxDefinitionActiveModel = definition.into();
     if let Some(is_active) = input.is_active {
         active.is_active = Set(is_active);
@@ -286,9 +348,11 @@ pub async fn create_lootbox_drop(
     let reward_asset_key = validate_asset_key(&input.reward_asset_key)?;
     let reward_asset = get_valid_lootbox_reward_asset_by_key(db, &reward_asset_key).await?;
     validate_drop_payload(
+        &reward_asset,
         OwnershipModel::parse(&reward_asset.ownership_model)?,
         input.amount,
         input.duration_seconds,
+        input.duplicate_compensation_amount,
         input.weight,
     )?;
 
@@ -298,6 +362,7 @@ pub async fn create_lootbox_drop(
         reward_asset_definition_id: Set(reward_asset.id),
         stackable_amount: Set(input.amount),
         expirable_duration_seconds: Set(input.duration_seconds),
+        duplicate_compensation_amount: Set(input.duplicate_compensation_amount),
         weight: Set(input.weight),
         title_i18n: Set(normalize_title_i18n(input.title_i18n)?.to_string()),
         is_active: Set(input.is_active.unwrap_or(true)),
@@ -342,11 +407,16 @@ pub async fn update_lootbox_drop(
     let next_duration = input
         .duration_seconds
         .unwrap_or(drop.expirable_duration_seconds);
+    let next_duplicate_compensation_amount = input
+        .duplicate_compensation_amount
+        .unwrap_or(drop.duplicate_compensation_amount);
     let next_weight = input.weight.unwrap_or(drop.weight);
     validate_drop_payload(
+        &reward_asset,
         reward_ownership_model,
         next_amount,
         next_duration,
+        next_duplicate_compensation_amount,
         next_weight,
     )?;
 
@@ -356,6 +426,9 @@ pub async fn update_lootbox_drop(
     }
     if let Some(duration_seconds) = input.duration_seconds {
         active.expirable_duration_seconds = Set(duration_seconds);
+    }
+    if let Some(duplicate_compensation_amount) = input.duplicate_compensation_amount {
+        active.duplicate_compensation_amount = Set(duplicate_compensation_amount);
     }
     if let Some(weight) = input.weight {
         active.weight = Set(weight);
@@ -502,7 +575,7 @@ pub async fn open_lootbox(
     )
     .await?;
 
-    let reward = apply_reward(
+    let reward_application = apply_reward(
         &tx,
         user_id,
         &winner,
@@ -515,12 +588,12 @@ pub async fn open_lootbox(
     let winner_index = choose_winner_index(feed_length);
     let mut feed = generate_feed(&weighted_drops, feed_length, locale.as_deref())?;
     feed[winner_index] = OpenFeedEntryView {
-        asset_key: reward.asset_key.clone(),
-        display_name: reward.display_name.clone(),
-        title: reward.title.clone(),
-        ownership_model: reward.ownership_model.clone(),
-        amount: reward.amount,
-        duration_seconds: reward.duration_seconds,
+        asset_key: reward_application.selected.asset_key.clone(),
+        display_name: reward_application.selected.display_name.clone(),
+        title: reward_application.selected.title.clone(),
+        ownership_model: reward_application.selected.ownership_model.clone(),
+        amount: reward_application.selected.amount,
+        duration_seconds: reward_application.selected.duration_seconds,
     };
 
     let operation = LootboxOpenOperationActiveModel {
@@ -530,11 +603,18 @@ pub async fn open_lootbox(
         lootbox_asset_definition_id: Set(lootbox_asset.id),
         selected_drop_definition_id: Set(winner.drop.id),
         reward_asset_definition_id: Set(winner.reward_asset.id),
-        reward_ownership_model: Set(reward.ownership_model.clone()),
-        reward_amount: Set(reward.amount),
-        reward_duration_seconds: Set(reward.duration_seconds),
-        reward_expires_at: Set(reward.expires_at),
-        reward_title: Set(reward.title.clone()),
+        reward_ownership_model: Set(reward_application.selected.ownership_model.clone()),
+        reward_amount: Set(reward_application.selected.amount),
+        reward_duration_seconds: Set(reward_application.selected.duration_seconds),
+        reward_expires_at: Set(reward_application.selected.expires_at),
+        reward_title: Set(reward_application.selected.title.clone()),
+        granted_asset_definition_id: Set(reward_application.granted.asset_definition_id),
+        granted_ownership_model: Set(reward_application.granted.ownership_model.clone()),
+        granted_amount: Set(reward_application.granted.amount),
+        granted_duration_seconds: Set(reward_application.granted.duration_seconds),
+        granted_expires_at: Set(reward_application.granted.expires_at),
+        granted_title: Set(reward_application.granted.title.clone()),
+        was_compensated: Set(reward_application.was_compensated),
         locale: Set(locale.clone()),
         actor_kind: Set(actor.kind.as_str().to_string()),
         actor_user_id: Set(actor.user_id),
@@ -553,7 +633,9 @@ pub async fn open_lootbox(
         operation_id: operation.id,
         lootbox_asset_key: lootbox_asset.key,
         opened_at: operation.created_at,
-        reward,
+        selected_reward: reward_application.selected,
+        reward: reward_application.granted,
+        was_compensated: reward_application.was_compensated,
         feed,
         winner_index,
     })
@@ -574,19 +656,52 @@ async fn map_open_history(
             .iter()
             .find(|asset| asset.id == item.reward_asset_definition_id)
             .ok_or_else(|| anyhow!("Reward asset not found"))?;
+        let granted_asset_id = if item.granted_asset_definition_id.is_nil() {
+            item.reward_asset_definition_id
+        } else {
+            item.granted_asset_definition_id
+        };
+        let granted_asset = assets
+            .iter()
+            .find(|asset| asset.id == granted_asset_id)
+            .unwrap_or(reward_asset);
+        let selected_reward = OpenRewardView {
+            asset_definition_id: reward_asset.id,
+            asset_key: reward_asset.key.clone(),
+            display_name: reward_asset.display_name.clone(),
+            title: item.reward_title,
+            ownership_model: item.reward_ownership_model,
+            amount: item.reward_amount,
+            duration_seconds: item.reward_duration_seconds,
+            expires_at: item.reward_expires_at,
+        };
+        let granted_reward = OpenRewardView {
+            asset_definition_id: granted_asset.id,
+            asset_key: granted_asset.key.clone(),
+            display_name: granted_asset.display_name.clone(),
+            title: if item.granted_title.trim().is_empty() {
+                selected_reward.title.clone()
+            } else {
+                item.granted_title
+            },
+            ownership_model: if item.granted_ownership_model.trim().is_empty() {
+                selected_reward.ownership_model.clone()
+            } else {
+                item.granted_ownership_model
+            },
+            amount: item.granted_amount.or(selected_reward.amount),
+            duration_seconds: item
+                .granted_duration_seconds
+                .or(selected_reward.duration_seconds),
+            expires_at: item.granted_expires_at.or(selected_reward.expires_at),
+        };
         result.push(LootboxOpenHistoryView {
             id: item.id,
             user_id: item.user_id,
             lootbox_asset_key: lootbox_asset.key.clone(),
-            reward: OpenRewardView {
-                asset_key: reward_asset.key.clone(),
-                display_name: reward_asset.display_name.clone(),
-                title: item.reward_title,
-                ownership_model: item.reward_ownership_model,
-                amount: item.reward_amount,
-                duration_seconds: item.reward_duration_seconds,
-                expires_at: item.reward_expires_at,
-            },
+            selected_reward,
+            reward: granted_reward,
+            was_compensated: item.was_compensated,
             actor_kind: item.actor_kind,
             actor_user_id: item.actor_user_id,
             actor_service_name: item.actor_service_name,
@@ -605,7 +720,17 @@ async fn apply_reward(
     reward_title: String,
     actor: OwnershipActor,
     lootbox_asset_key: &str,
-) -> Result<OpenRewardView> {
+) -> Result<RewardApplication> {
+    let selected_reward = OpenRewardView {
+        asset_definition_id: winner.reward_asset.id,
+        asset_key: winner.reward_asset.key.clone(),
+        display_name: winner.reward_asset.display_name.clone(),
+        title: reward_title.clone(),
+        ownership_model: winner.reward_ownership_model.as_str().to_string(),
+        amount: winner.drop.stackable_amount,
+        duration_seconds: winner.drop.expirable_duration_seconds,
+        expires_at: None,
+    };
     let reward_context = OperationContext {
         reason_code: Some("lootbox_reward".to_string()),
         reason_text: Some(format!("Reward from lootbox '{}'", lootbox_asset_key)),
@@ -614,6 +739,36 @@ async fn apply_reward(
             "rewardAssetKey": winner.reward_asset.key,
         }),
     };
+
+    if winner.reward_asset.is_currency {
+        let amount = winner
+            .drop
+            .stackable_amount
+            .ok_or_else(|| anyhow!("Missing currency amount"))?;
+        wallet::credit_in_tx(
+            db,
+            WalletMutation {
+                user_id,
+                currency_key: winner.reward_asset.key.clone(),
+                amount,
+                actor,
+                context: reward_context,
+            },
+        )
+        .await?;
+
+        return Ok(RewardApplication {
+            granted: OpenRewardView {
+                amount: Some(amount),
+                ..selected_reward.clone()
+            },
+            selected: OpenRewardView {
+                amount: Some(amount),
+                ..selected_reward
+            },
+            was_compensated: false,
+        });
+    }
 
     match winner.reward_ownership_model {
         OwnershipModel::Stackable => {
@@ -633,14 +788,15 @@ async fn apply_reward(
             )
             .await?;
 
-            Ok(OpenRewardView {
-                asset_key: winner.reward_asset.key.clone(),
-                display_name: winner.reward_asset.display_name.clone(),
-                title: reward_title,
-                ownership_model: OwnershipModel::Stackable.as_str().to_string(),
-                amount: Some(amount),
-                duration_seconds: None,
-                expires_at: None,
+            Ok(RewardApplication {
+                selected: selected_reward.clone(),
+                granted: OpenRewardView {
+                    amount: Some(amount),
+                    duration_seconds: None,
+                    expires_at: None,
+                    ..selected_reward
+                },
+                was_compensated: false,
             })
         }
         OwnershipModel::Expirable => {
@@ -660,17 +816,87 @@ async fn apply_reward(
             )
             .await?;
 
-            Ok(OpenRewardView {
-                asset_key: winner.reward_asset.key.clone(),
-                display_name: winner.reward_asset.display_name.clone(),
-                title: reward_title,
-                ownership_model: OwnershipModel::Expirable.as_str().to_string(),
-                amount: None,
-                duration_seconds: Some(duration_seconds),
-                expires_at: Some(expirable.expires_at),
+            Ok(RewardApplication {
+                selected: selected_reward.clone(),
+                granted: OpenRewardView {
+                    amount: None,
+                    duration_seconds: Some(duration_seconds),
+                    expires_at: Some(expirable.expires_at),
+                    ..selected_reward
+                },
+                was_compensated: false,
             })
         }
-        OwnershipModel::Entitlement => bail!("Entitlement rewards are not supported"),
+        OwnershipModel::Entitlement => {
+            let already_owned = UserEntitlement::find_by_id((user_id, winner.reward_asset.id))
+                .one(db)
+                .await?
+                .is_some();
+            if already_owned {
+                let compensation_amount = winner
+                    .drop
+                    .duplicate_compensation_amount
+                    .ok_or_else(|| anyhow!("Missing duplicate compensation amount"))?;
+                let compensation_asset = AssetDefinition::find()
+                    .filter(AssetDefinitionColumn::Key.eq(DEFAULT_COIN_ASSET_KEY))
+                    .one(db)
+                    .await?
+                    .ok_or_else(|| anyhow!("Default currency asset not found"))?;
+                wallet::credit_in_tx(
+                    db,
+                    WalletMutation {
+                        user_id,
+                        currency_key: DEFAULT_COIN_ASSET_KEY.to_string(),
+                        amount: compensation_amount,
+                        actor,
+                        context: OperationContext {
+                            reason_code: Some("lootbox_duplicate_compensation".to_string()),
+                            reason_text: Some(format!(
+                                "Duplicate reward '{}' from lootbox '{}'",
+                                winner.reward_asset.key, lootbox_asset_key
+                            )),
+                            metadata: json!({
+                                "lootboxAssetKey": lootbox_asset_key,
+                                "selectedRewardAssetKey": winner.reward_asset.key,
+                                "compensationCurrencyKey": DEFAULT_COIN_ASSET_KEY,
+                            }),
+                        },
+                    },
+                )
+                .await?;
+                return Ok(RewardApplication {
+                    selected: selected_reward,
+                    granted: OpenRewardView {
+                        asset_definition_id: compensation_asset.id,
+                        asset_key: compensation_asset.key,
+                        display_name: compensation_asset.display_name,
+                        title: "Duplicate compensation".to_string(),
+                        ownership_model: OwnershipModel::Stackable.as_str().to_string(),
+                        amount: Some(compensation_amount),
+                        duration_seconds: None,
+                        expires_at: None,
+                    },
+                    was_compensated: true,
+                });
+            }
+
+            inventory::grant_entitlement_in_tx(
+                db,
+                EntitlementMutation {
+                    user_id,
+                    asset_key: winner.reward_asset.key.clone(),
+                    actor,
+                    context: reward_context,
+                },
+            )
+            .await?;
+
+            Ok(RewardApplication {
+                selected: selected_reward.clone(),
+                granted: selected_reward,
+                was_compensated: false,
+            })
+        }
     }
 }
 
@@ -769,6 +995,7 @@ async fn load_lootbox_detail_from_parts(
                 reward_ownership_model: OwnershipModel::parse(&reward_asset.ownership_model)?,
                 stackable_amount: drop.stackable_amount,
                 expirable_duration_seconds: drop.expirable_duration_seconds,
+                duplicate_compensation_amount: drop.duplicate_compensation_amount,
                 weight: drop.weight,
                 total_weight,
                 title_i18n: serde_json::from_str(&drop.title_i18n)?,
@@ -919,19 +1146,19 @@ fn validate_reward_asset(asset: &AssetDefinitionModel) -> Result<()> {
     if !asset.is_active {
         bail!("Reward asset is inactive");
     }
-    if asset.is_currency {
-        bail!("Currency rewards are not supported in lootboxes");
-    }
     match OwnershipModel::parse(&asset.ownership_model)? {
-        OwnershipModel::Stackable | OwnershipModel::Expirable => Ok(()),
-        OwnershipModel::Entitlement => bail!("Only stackable and expirable rewards are supported"),
+        OwnershipModel::Stackable | OwnershipModel::Expirable | OwnershipModel::Entitlement => {
+            Ok(())
+        }
     }
 }
 
 fn validate_drop_payload(
+    reward_asset: &AssetDefinitionModel,
     reward_ownership_model: OwnershipModel,
     amount: Option<i64>,
     duration_seconds: Option<i64>,
+    duplicate_compensation_amount: Option<i64>,
     weight: i64,
 ) -> Result<()> {
     if weight <= 0 {
@@ -947,6 +1174,12 @@ fn validate_drop_payload(
             if duration_seconds.is_some() {
                 bail!("durationSeconds is not allowed for stackable rewards");
             }
+            if duplicate_compensation_amount.is_some() {
+                bail!("duplicateCompensationAmount is allowed only for entitlement rewards");
+            }
+            if reward_asset.is_currency && reward_asset.asset_kind != AssetKind::Currency.as_str() {
+                bail!("Currency reward asset must use asset_kind = currency");
+            }
         }
         OwnershipModel::Expirable => {
             let duration_seconds = duration_seconds
@@ -957,8 +1190,21 @@ fn validate_drop_payload(
             if amount.is_some() {
                 bail!("amount is not allowed for expirable rewards");
             }
+            if duplicate_compensation_amount.is_some() {
+                bail!("duplicateCompensationAmount is allowed only for entitlement rewards");
+            }
         }
-        OwnershipModel::Entitlement => bail!("Entitlement rewards are not supported"),
+        OwnershipModel::Entitlement => {
+            if amount.is_some() || duration_seconds.is_some() {
+                bail!("amount and durationSeconds are not allowed for entitlement rewards");
+            }
+            let compensation = duplicate_compensation_amount.ok_or_else(|| {
+                anyhow!("duplicateCompensationAmount is required for entitlement rewards")
+            })?;
+            if compensation <= 0 {
+                bail!("duplicateCompensationAmount must be positive");
+            }
+        }
     }
     Ok(())
 }
@@ -1014,4 +1260,10 @@ struct ResolvedDrop {
     reward_asset: AssetDefinitionModel,
     reward_ownership_model: OwnershipModel,
     title_i18n: Value,
+}
+
+struct RewardApplication {
+    selected: OpenRewardView,
+    granted: OpenRewardView,
+    was_compensated: bool,
 }

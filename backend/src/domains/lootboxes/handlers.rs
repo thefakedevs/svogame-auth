@@ -68,6 +68,8 @@ pub struct LootboxDropResponse {
     pub amount: Option<i64>,
     #[schema(rename = "durationSeconds")]
     pub duration_seconds: Option<i64>,
+    #[schema(rename = "duplicateCompensationAmount")]
+    pub duplicate_compensation_amount: Option<i64>,
     pub weight: i64,
     #[schema(rename = "totalWeight")]
     pub total_weight: i64,
@@ -140,7 +142,11 @@ pub struct LootboxOpenResultResponse {
     pub lootbox_asset_key: String,
     #[schema(rename = "openedAt")]
     pub opened_at: chrono::DateTime<chrono::Utc>,
+    #[schema(rename = "selectedReward")]
+    pub selected_reward: LootboxRewardResponse,
     pub reward: LootboxRewardResponse,
+    #[schema(rename = "wasCompensated")]
+    pub was_compensated: bool,
     pub feed: Vec<LootboxFeedEntryResponse>,
     #[schema(rename = "winnerIndex")]
     pub winner_index: usize,
@@ -153,7 +159,11 @@ pub struct LootboxOpenHistoryResponse {
     pub user_id: String,
     #[schema(rename = "lootboxAssetKey")]
     pub lootbox_asset_key: String,
+    #[schema(rename = "selectedReward")]
+    pub selected_reward: LootboxRewardResponse,
     pub reward: LootboxRewardResponse,
+    #[schema(rename = "wasCompensated")]
+    pub was_compensated: bool,
     #[schema(rename = "actorKind")]
     pub actor_kind: String,
     #[schema(rename = "actorUserId")]
@@ -188,23 +198,24 @@ pub async fn list_public_lootboxes(State(state): AppStateExtractor) -> HttpResul
 
 #[utoipa::path(
     get,
-    path = "/api/lootboxes/{asset_key}",
+    path = "/api/lootboxes/{lootbox_id}",
     params(
-        ("asset_key" = String, Path, description = "Lootbox asset key in lowercase URL-safe format.")
+        ("lootbox_id" = String, Path, description = "Lootbox definition UUID.")
     ),
     responses(
         (status = 200, description = "Get one public lootbox definition together with its configured drop entries. Amount and duration are exact constants per drop entry.", body = LootboxDetailResponse),
-        (status = 400, description = "Invalid asset key."),
+        (status = 400, description = "Invalid lootbox ID."),
         (status = 404, description = "Lootbox not found, inactive, or not public.")
     ),
     tag = "lootboxes"
 )]
 pub async fn get_public_lootbox(
     State(state): AppStateExtractor,
-    Path(asset_key): Path<String>,
+    Path(lootbox_id): Path<String>,
 ) -> HttpResult<Json<Value>> {
     let state = state.read().await;
-    let lootbox = lootboxes::get_public_lootbox_by_asset_key(&state.db, &asset_key)
+    let lootbox_id = parse_uuid(&lootbox_id, "Invalid lootbox ID")?;
+    let lootbox = lootboxes::get_public_lootbox_by_id(&state.db, lootbox_id)
         .await
         .map_err(map_domain_error)?
         .ok_or_else(|| HttpError::not_found("Lootbox not found"))?;
@@ -420,7 +431,7 @@ pub async fn get_admin_lootbox(
     ),
     request_body(
         content = UpdateLootboxDefinitionInput,
-        description = "Patch mutable lootbox configuration fields such as active flag and metadata."
+        description = "Patch mutable lootbox fields. Asset presentation fields such as displayName, description, and isPublic are applied to the underlying lootbox asset; isActive and metadata are applied to the lootbox definition."
     ),
     responses(
         (status = 200, description = "Lootbox definition updated.", body = LootboxDetailResponse),
@@ -743,6 +754,7 @@ fn lootbox_drop_json(item: LootboxDropView) -> Value {
         "rewardOwnershipModel": item.reward_ownership_model.as_str(),
         "amount": item.stackable_amount,
         "durationSeconds": item.expirable_duration_seconds,
+        "duplicateCompensationAmount": item.duplicate_compensation_amount,
         "weight": item.weight,
         "totalWeight": item.total_weight,
         "titleI18n": item.title_i18n,
@@ -798,7 +810,9 @@ fn open_result_json(item: LootboxOpenResultView) -> Value {
         "operationId": item.operation_id,
         "lootboxAssetKey": item.lootbox_asset_key,
         "openedAt": item.opened_at,
+        "selectedReward": reward_json(item.selected_reward),
         "reward": reward_json(item.reward),
+        "wasCompensated": item.was_compensated,
         "feed": item.feed.into_iter().map(feed_entry_json).collect::<Vec<_>>(),
         "winnerIndex": item.winner_index
     })
@@ -809,7 +823,9 @@ fn open_history_json(item: LootboxOpenHistoryView) -> Value {
         "id": item.id,
         "userId": item.user_id,
         "lootboxAssetKey": item.lootbox_asset_key,
+        "selectedReward": reward_json(item.selected_reward),
         "reward": reward_json(item.reward),
+        "wasCompensated": item.was_compensated,
         "actorKind": item.actor_kind,
         "actorUserId": item.actor_user_id,
         "actorServiceName": item.actor_service_name,
