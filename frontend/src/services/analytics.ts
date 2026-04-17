@@ -90,9 +90,11 @@ function compactEventData(data: UmamiPayload) {
 function normalizeDynamicPathname(pathname: string) {
   return pathname
     .replace(/^\/admin\/users\/[^/]+$/, '/admin/users/:userId')
+    .replace(/^\/admin\/users\/[^/]+\/lootboxes\/open-history$/, '/admin/users/:userId/lootboxes/open-history')
     .replace(/^\/admin\/squads\/[^/]+$/, '/admin/squads/:squadId')
     .replace(/^\/admin\/tokens\/[^/]+\/audit$/, '/admin/tokens/:tokenId/audit')
     .replace(/^\/admin\/shop\/products\/[^/]+$/, '/admin/shop/products/:productId')
+    .replace(/^\/admin\/lootboxes\/[^/]+$/, '/admin/lootboxes/:lootboxId')
 }
 
 export function buildAnalyticsPath(pathname: string, search = '') {

@@ -15,6 +15,13 @@ import {
   type StackableResponse,
 } from '../api/inventory'
 import { toDisplayError } from '../api/http'
+import {
+  getMyLootboxes,
+  getPublicLootbox,
+  type LootboxDetailResponse,
+  type LootboxDropResponse,
+  type OwnedLootboxResponse,
+} from '../api/lootboxes'
 import ErrorState from '../components/ErrorState'
 import LoadingState from '../components/LoadingState'
 import SkinDetailsModal from '../components/SkinDetailsModal'
@@ -28,7 +35,7 @@ type OwnershipState =
   | { status: 'loading' }
   | { status: 'unauthorized' }
   | { status: 'error'; error: string }
-  | { status: 'ready'; inventory: InventoryResponse; assets: AssetResponse[]; selectedGunskins: SelectedGunskinResponse[] }
+  | { status: 'ready'; inventory: InventoryResponse; assets: AssetResponse[]; selectedGunskins: SelectedGunskinResponse[]; lootboxes: OwnedLootboxResponse[] }
 
 const defaultSubscriptions = [
   {
@@ -188,11 +195,12 @@ type InventoryVisualItem = {
   title: string
   imageUrl: string | null
   accent: string
+  fallbackLabel?: string
 }
 
 function InventoryVisual({ item, compact = false }: { item: InventoryVisualItem; compact?: boolean }) {
   const [failedImageUrl, setFailedImageUrl] = useState<string | null>(null)
-  const fallback = item.title.trim().slice(0, 1).toUpperCase() || 'I'
+  const fallback = item.fallbackLabel ?? (item.title.trim().slice(0, 1).toUpperCase() || 'I')
   const showImage = Boolean(item.imageUrl) && failedImageUrl !== item.imageUrl
 
   return (
@@ -217,6 +225,14 @@ type SkinCardItem = InventoryAssetView & {
   grantedAt?: string
   updatedAt?: string
 }
+
+type LootboxCardItem = InventoryAssetView & OwnedLootboxResponse
+  & Pick<StackableResponse, 'assetDefinitionId' | 'updatedAt'>
+
+type LootboxDetailsState =
+  | { status: 'loading'; item: LootboxCardItem }
+  | { status: 'ready'; item: LootboxCardItem; detail: LootboxDetailResponse }
+  | { status: 'error'; item: LootboxCardItem; error: string }
 
 function SkinCard({
   item,
@@ -289,6 +305,145 @@ function SkinCard({
               ? `Обновлено: ${formatDateTime(item.updatedAt).replace(', ', ' ')}`
               : `Выдано: ${formatDateTime(item.grantedAt).replace(', ', ' ')}`}
           </span>
+        </div>
+      </div>
+    </article>
+  )
+}
+
+function formatDropAmount(drop: LootboxDropResponse) {
+  if (drop.amount !== null && drop.amount !== undefined) return `${drop.amount} шт`
+  if (drop.durationSeconds !== null && drop.durationSeconds !== undefined) {
+    const days = Math.floor(drop.durationSeconds / 86_400)
+    if (days > 0) return `${days} д.`
+
+    const hours = Math.max(1, Math.floor(drop.durationSeconds / 3_600))
+    return `${hours} ч.`
+  }
+  return '1 шт'
+}
+
+function formatDropChance(drop: LootboxDropResponse) {
+  if (drop.totalWeight <= 0) return null
+  const chance = drop.weight / drop.totalWeight * 100
+  return `${chance >= 10 ? chance.toFixed(0) : chance.toFixed(1)}%`
+}
+
+function LootboxDetailsModal({
+  state,
+  assetMap,
+  onClose,
+}: {
+  state: LootboxDetailsState
+  assetMap: Map<string, AssetResponse>
+  onClose: () => void
+}) {
+  const { item } = state
+  const accent = assetAccent(item.asset, item.assetKey)
+  const drops = state.status === 'ready'
+    ? state.detail.drops.filter((drop) => drop.isActive).sort((left, right) => left.sortOrder - right.sortOrder)
+    : []
+
+  return (
+    <AppPortal>
+      <div className="ui-modal-backdrop" role="presentation" onClick={onClose}>
+        <div className="ui-modal skin-details-modal lootbox-details-modal" role="dialog" aria-modal="true" aria-labelledby="inventory-lootbox-details-title" onClick={(event) => event.stopPropagation()}>
+          <div className="ui-modal-header">
+            <h2 id="inventory-lootbox-details-title" className="ui-modal-title">{item.title}</h2>
+            <button className="ui-modal-close" type="button" aria-label="Закрыть" onClick={onClose}>
+              ×
+            </button>
+          </div>
+          <div className="ui-modal-body">
+            <div className="skin-details-modal__body">
+              <InventoryVisual item={{ ...item, accent, fallbackLabel: 'Кейс' }} />
+              <div className="skin-details-modal__content">
+                <p>{item.description || 'Описание кейса пока не заполнено.'}</p>
+                <dl className="skin-details-modal__meta">
+                  <div>
+                    <dt>Тип</dt>
+                    <dd>Кейс</dd>
+                  </div>
+                  <div>
+                    <dt>В инвентаре</dt>
+                    <dd>{item.amount} шт</dd>
+                  </div>
+                  <div>
+                    <dt>Выдано</dt>
+                    <dd>{formatDateTime(item.updatedAt).replace(', ', ' ')}</dd>
+                  </div>
+                </dl>
+
+                <section className="lootbox-details-modal__drops" aria-label="Содержимое кейса">
+                  <h3>Может выпасть</h3>
+                  {state.status === 'loading' ? (
+                    <p className="ownership-muted">Загружаем содержимое...</p>
+                  ) : null}
+                  {state.status === 'error' ? (
+                    <p className="ownership-muted">{state.error}</p>
+                  ) : null}
+                  {state.status === 'ready' && drops.length === 0 ? (
+                    <p className="ownership-muted">Активные награды не указаны.</p>
+                  ) : null}
+                  {drops.length ? (
+                    <div className="lootbox-details-modal__drop-list">
+                      {drops.map((drop) => {
+                        const reward = assetView(assetMap, drop.rewardAssetKey, drop.rewardAssetDefinitionId)
+                        const chance = formatDropChance(drop)
+
+                        return (
+                          <article key={drop.id} className="lootbox-details-modal__drop" style={cardStyle(reward.accent)}>
+                            <InventoryVisual item={reward} compact />
+                            <div className="lootbox-details-modal__drop-main">
+                              <strong>{drop.rewardAssetDisplayName || reward.title}</strong>
+                              <span>{formatDropAmount(drop)}</span>
+                            </div>
+                            {chance ? <span className="lootbox-details-modal__drop-chance">{chance}</span> : null}
+                          </article>
+                        )
+                      })}
+                    </div>
+                  ) : null}
+                </section>
+              </div>
+            </div>
+          </div>
+          <div className="ui-modal-footer">
+            <button className="btn" type="button" onClick={onClose}>Закрыть</button>
+          </div>
+        </div>
+      </div>
+    </AppPortal>
+  )
+}
+
+function LootboxCard({ item, onOpenDetails }: { item: LootboxCardItem; onOpenDetails: (item: LootboxCardItem) => void }) {
+  const accent = assetAccent(item.asset, item.assetKey)
+
+  return (
+    <article
+      className="inventory-skin-card inventory-lootbox-card"
+      data-rarity="none"
+      style={cardStyle(accent)}
+    >
+      <button className="inventory-skin-card__preview" type="button" onClick={() => onOpenDetails(item)}>
+        <InventoryVisual item={{ ...item, accent, fallbackLabel: 'Кейс' }} />
+      </button>
+      <div className="inventory-skin-card__body">
+        <div className="inventory-card-title">
+          <strong>{item.title}</strong>
+        </div>
+        <div className="inventory-skin-card__rarity inventory-lootbox-card__badges">
+          <span>Кейс</span>
+          <span>{item.amount} шт</span>
+        </div>
+        <div className="inventory-skin-card__selection">
+          <span className={`inventory-skin-card__action ${item.isOpenable ? 'is-selected' : ''}`}>
+            {item.isOpenable ? 'Можно открыть' : 'Недоступен'}
+          </span>
+        </div>
+        <div className="inventory-card-meta">
+          <span>Выдано: {formatDateTime(item.updatedAt).replace(', ', ' ')}</span>
         </div>
       </div>
     </article>
@@ -373,6 +528,7 @@ export default function OwnershipPage() {
   const [selectingSkinKey, setSelectingSkinKey] = useState<string | null>(null)
   const [resettingSkinKey, setResettingSkinKey] = useState<string | null>(null)
   const [detailsSkin, setDetailsSkin] = useState<SkinCardItem | null>(null)
+  const [detailsLootbox, setDetailsLootbox] = useState<LootboxDetailsState | null>(null)
   const [invSort, setInvSort] = useState<InvSortKey>('default')
   const [invRarityFilter, setInvRarityFilter] = useState<InvRarityFilter>('all')
   const [invWeaponFilter, setInvWeaponFilter] = useState<InvWeaponFilter>('all')
@@ -387,13 +543,14 @@ export default function OwnershipPage() {
 
     setState({ status: 'loading' })
     try {
-      const [inventory, assets, selectedGunskinItems] = await Promise.all([
+      const [inventory, assets, selectedGunskinItems, lootboxes] = await Promise.all([
         getMyInventory(token),
         listAllPublicAssets().catch(() => [] as AssetResponse[]),
         listMyGunskinSelections(token),
+        getMyLootboxes(token),
       ])
       const selectedGunskins = selectedGunskinItems.map((item) => item.selected).filter(Boolean)
-      setState({ status: 'ready', inventory, assets, selectedGunskins })
+      setState({ status: 'ready', inventory, assets, selectedGunskins, lootboxes })
     } catch (cause) {
       setState({ status: 'error', error: toDisplayError(cause, 'Не удалось загрузить инвентарь.') })
     }
@@ -441,6 +598,29 @@ export default function OwnershipPage() {
     ]
   }, [state])
 
+  const lootboxEntries = useMemo((): LootboxCardItem[] => {
+    if (state.status !== 'ready') return []
+
+    const stackablesByKey = new Map(state.inventory.stackables.map((item) => [item.assetKey, item]))
+
+    return state.lootboxes
+      .filter((item) => item.amount > 0)
+      .filter((item) => stackablesByKey.has(item.assetKey))
+      .map((item) => {
+        const stackable = stackablesByKey.get(item.assetKey)!
+        const view = assetView(assetMap, item.assetKey, stackable.assetDefinitionId)
+        return {
+          ...item,
+          assetDefinitionId: stackable.assetDefinitionId,
+          updatedAt: stackable.updatedAt,
+          ...view,
+          title: view.asset?.displayName ?? item.displayName,
+          description: view.asset?.description ?? 'Кейс',
+        }
+      })
+      .sort((left, right) => left.title.localeCompare(right.title, 'ru'))
+  }, [assetMap, state])
+
   const invWeaponOptions = useMemo(
     () => uniqueSortedWeaponKeys(baseSkinEntries.map((item) => item.weaponKey)),
     [baseSkinEntries],
@@ -477,6 +657,9 @@ export default function OwnershipPage() {
 
     return sorted
   }, [baseSkinEntries, invSort, invRarityFilter, invWeaponFilter])
+
+  const displayedInventoryCount = displayedSkinEntries.length + lootboxEntries.length
+  const baseInventoryCount = baseSkinEntries.length + lootboxEntries.length
 
   if (state.status === 'loading') {
     return <LoadingState title="Загружаем инвентарь" />
@@ -594,6 +777,20 @@ export default function OwnershipPage() {
     }
   }
 
+  const openLootboxDetails = async (item: LootboxCardItem) => {
+    setDetailsLootbox({ status: 'loading', item })
+    try {
+      const detail = await getPublicLootbox(item.assetKey)
+      setDetailsLootbox({ status: 'ready', item, detail })
+    } catch (cause) {
+      setDetailsLootbox({
+        status: 'error',
+        item,
+        error: toDisplayError(cause, 'Не удалось загрузить содержимое кейса.'),
+      })
+    }
+  }
+
   return (
     <main className="page ownership-page">
       <section className="card ownership-hero">
@@ -604,10 +801,10 @@ export default function OwnershipPage() {
       <section className="ownership-section inventory-section">
         <div className="ownership-section-head">
           <div className="ownership-section-title">
-            <h2 className="card-title">Скины</h2>
+            <h2 className="card-title">Ваш инвентарь</h2>
           </div>
           <div className="ownership-section-head-actions">
-            <span className="ui-badge ui-badge-neutral">{displayedSkinEntries.length}</span>
+            <span className="ui-badge ui-badge-neutral">{displayedInventoryCount}</span>
             {baseSkinEntries.length ? (
               <button
                 type="button"
@@ -622,7 +819,7 @@ export default function OwnershipPage() {
           </div>
         </div>
 
-        {displayedSkinEntries.length ? (
+        {displayedInventoryCount ? (
           <div className="inventory-skin-grid">
             {displayedSkinEntries.map((item) => {
               const selected = item.weaponKey ? selectedGunskinByWeapon.get(item.weaponKey) : null
@@ -641,8 +838,11 @@ export default function OwnershipPage() {
                 />
               )
             })}
+            {lootboxEntries.map((item) => (
+              <LootboxCard key={item.lootboxId} item={item} onOpenDetails={(selected) => void openLootboxDetails(selected)} />
+            ))}
           </div>
-        ) : <EmptySection text={baseSkinEntries.length ? 'Нет скинов по выбранным фильтрам.' : 'Скинов в инвентаре пока нет.'} />}
+        ) : <EmptySection text={baseInventoryCount ? 'Нет предметов по выбранным фильтрам.' : 'Инвентарь пока пуст.'} />}
       </section>
 
       {isInvFiltersModalOpen ? (
@@ -674,7 +874,6 @@ export default function OwnershipPage() {
               <div className="ui-modal-body inventory-filters-modal__body">
                 <div className="inventory-toolbar inventory-toolbar--modal" aria-label="Сортировка и фильтры инвентаря">
                   <div className="inventory-toolbar__row">
-                    <span className="inventory-toolbar__heading">Сортировка</span>
                     <fieldset className="ui-radio-group inventory-toolbar__fieldset inventory-toolbar__fieldset--inline">
                       <legend className="ui-radio-legend">Сортировка</legend>
                       {(
@@ -700,7 +899,6 @@ export default function OwnershipPage() {
                   </div>
                   <div className="inventory-toolbar__row inventory-toolbar__row--split">
                     <div className="inventory-toolbar__col">
-                      <span className="inventory-toolbar__heading">Фильтр: редкость</span>
                       <fieldset className="ui-radio-group inventory-toolbar__fieldset">
                         <legend className="ui-radio-legend">Редкость</legend>
                         <label className="ui-radio">
@@ -788,6 +986,14 @@ export default function OwnershipPage() {
           footer={(
             <button className="btn" type="button" onClick={() => setDetailsSkin(null)}>Закрыть</button>
           )}
+        />
+      ) : null}
+
+      {detailsLootbox ? (
+        <LootboxDetailsModal
+          state={detailsLootbox}
+          assetMap={assetMap}
+          onClose={() => setDetailsLootbox(null)}
         />
       ) : null}
 {/*

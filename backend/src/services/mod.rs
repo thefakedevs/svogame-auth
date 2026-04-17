@@ -10,6 +10,7 @@ pub mod lootboxes;
 pub mod migration;
 pub mod ownership;
 pub mod pow;
+pub mod receipts;
 pub mod restrictions;
 pub mod service_tokens;
 pub mod shop;

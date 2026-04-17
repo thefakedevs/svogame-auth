@@ -1,0 +1,450 @@
+/* ============================================================
+   VitePress Theme Override — VHS Dark + Orange Accent
+   ============================================================ */
+
+/* ── 1. Цветовые токены ─────────────────────────────────── */
+:root {
+  /* Бренд: оранжевый вместо фиолетового */
+  --vp-c-brand-1: #f7a41d;
+  --vp-c-brand-2: #e2961c;
+  --vp-c-brand-3: #c97d10;
+  --vp-c-brand-soft: rgba(247, 164, 29, 0.14);
+
+  /* Фон */
+  --vp-c-bg:        #121212;
+  --vp-c-bg-soft:   #1a1a1a;
+  --vp-c-bg-alt:    #0e0e0e;
+  --vp-c-bg-elv:    #1e1e1e;
+
+  /* Текст */
+  --vp-c-text-1: rgba(255, 255, 255, 0.92);
+  --vp-c-text-2: rgba(255, 255, 255, 0.55);
+  --vp-c-text-3: rgba(255, 255, 255, 0.32);
+
+  /* Границы */
+  --vp-c-divider:     rgba(255, 255, 255, 0.10);
+  --vp-c-border:      rgba(255, 255, 255, 0.12);
+  --vp-c-gutter:      #0e0e0e;
+
+  /* Скруглений нет — острые края везде */
+  --vp-border-radius: 0px;
+
+  /* Код */
+  --vp-code-block-bg:      #0e0e0e;
+  --vp-code-line-highlight-color: rgba(247, 164, 29, 0.08);
+
+  /* Hero */
+  --vp-home-hero-name-color:      transparent;
+  --vp-home-hero-name-background: linear-gradient(120deg, #f7a41d 30%, #e26a1c);
+
+  /* Навигация */
+  --vp-nav-bg-color:            rgba(18, 18, 18, 0.92);
+  --vp-nav-screen-bg-color:     #121212;
+  --vp-sidebar-bg-color:        rgba(14, 14, 14, 0.96);
+
+  /* Кнопки */
+  --vp-button-brand-border:  transparent;
+  --vp-button-brand-text:    #121212;
+  --vp-button-brand-bg:      #f7a41d;
+  --vp-button-brand-hover-border: transparent;
+  --vp-button-brand-hover-text:   #121212;
+  --vp-button-brand-hover-bg:     #e2961c;
+  --vp-button-brand-active-bg:    #c97d10;
+
+  color-scheme: dark;
+}
+
+/* Светлая тема — принудительно тоже тёмная */
+.dark,
+:root {
+  color-scheme: dark;
+}
+
+/* ── 2. Глобальный фон ──────────────────────────────────── */
+html,
+body {
+  min-height: 100%;
+  background-color: #121212 !important;
+}
+
+body {
+  color: rgba(255, 255, 255, 0.92);
+  background-color: #121212;
+  background-image: linear-gradient(
+    180deg,
+    rgba(226, 150, 28, 0)    0%,
+    rgba(226, 150, 28, 0.18) 40%,
+    rgba(247, 164, 29, 0.32) 100%
+  );
+  background-attachment: fixed;
+  position: relative;
+}
+
+/* Приглушаем оранжевый снизу */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: #121212;
+  opacity: 0.70;
+}
+
+/* ── 3. VHS-оверлей (сканлайны + мерцание + полоса) ────── */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  overflow: hidden;
+  mix-blend-mode: multiply;
+  opacity: 0.52;
+
+  /* Горизонтальные сканлайны + вертикальные + скользящая полоса */
+  background-image:
+    /* Горизонтальные линии */
+    repeating-linear-gradient(
+      0deg,
+      rgba(0, 0, 0, 0.22) 0px,
+      rgba(0, 0, 0, 0.22) 1px,
+      transparent 1px,
+      transparent 4px
+    ),
+    /* Вертикальная сетка */
+    repeating-linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.025) 0px,
+      rgba(255, 255, 255, 0.025) 1px,
+      transparent 1px,
+      transparent 3px
+    ),
+    /* Скользящая светлая полоса */
+    linear-gradient(
+      180deg,
+      transparent 0%,
+      transparent 38%,
+      rgba(255, 255, 255, 0.04) 50%,
+      transparent 62%,
+      transparent 100%
+    );
+  background-size:
+    100% 4px,
+    3px 100%,
+    100% 160%;
+  background-repeat:
+    repeat,
+    repeat,
+    no-repeat;
+  background-position:
+    0 0,
+    0 0,
+    0 0;
+
+  animation:
+    vhs-flicker  3.2s steps(1, end)  infinite,
+    vhs-jitter   4.5s steps(1, end)  infinite,
+    vhs-band    11.0s ease-in-out    infinite;
+}
+
+@keyframes vhs-flicker {
+  0%,  100% { opacity: 0.52; }
+  5%         { opacity: 0.47; }
+  10%        { opacity: 0.55; }
+  15%        { opacity: 0.50; }
+  52%        { opacity: 0.52; }
+  53%        { opacity: 0.40; }
+  54%        { opacity: 0.52; }
+  88%        { opacity: 0.49; }
+  90%        { opacity: 0.57; }
+}
+
+@keyframes vhs-band {
+  0%   { background-position: 0 0, 0 0, 0 -30%; }
+  50%  { background-position: 0 0, 0 0, 0  50%; }
+  100% { background-position: 0 0, 0 0, 0 130%; }
+}
+
+@keyframes vhs-jitter {
+  0%,  100% { transform: translate3d(0, 0, 0); }
+  10%        { transform: translate3d( 0.5px, -0.3px, 0); }
+  20%        { transform: translate3d(-0.4px,  0.2px, 0); }
+  30%        { transform: translate3d( 0.3px,  0.4px, 0); }
+  40%        { transform: translate3d(-0.5px, -0.2px, 0); }
+  50%        { transform: translate3d( 0.2px,  0.1px, 0); }
+  60%        { transform: translate3d(-0.3px,  0.35px, 0); }
+  70%        { transform: translate3d( 0.45px,-0.25px, 0); }
+  80%        { transform: translate3d(-0.2px, -0.35px, 0); }
+  90%        { transform: translate3d( 0.35px, 0.15px, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body::after {
+    animation: none;
+    opacity: 0.40;
+    /* Оставляем только статичные сканлайны */
+    background-image:
+      repeating-linear-gradient(
+        0deg,
+        rgba(0, 0, 0, 0.18) 0px,
+        rgba(0, 0, 0, 0.18) 1px,
+        transparent 1px,
+        transparent 4px
+      );
+    background-size: 100% 4px;
+  }
+}
+
+/* ── 4. VitePress layout: z-index над VHS-слоем ─────────── */
+.VPNav,
+.VPSidebar,
+.VPContent,
+.VPFooter,
+#app {
+  position: relative;
+  z-index: 2;
+}
+
+/* ── 5. Навигация ───────────────────────────────────────── */
+.VPNavBar, .content-body {
+  background-color: rgba(14, 14, 14, 0.88) !important;
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(247, 164, 29, 0.18) !important;
+  border-radius: 0 !important;
+}
+
+.VPNavBar .title {
+  color: #f7a41d !important;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.VPNavBarMenuLink.active,
+.VPNavBarMenuLink:hover {
+  color: #f7a41d !important;
+}
+
+.appearance, .aside {
+  display: none !important;
+}
+
+/* ── 6. Сайдбар — острый, без скруглений ───────────────── */
+.VPSidebar {
+  background-color: rgba(12, 12, 12, 0.96) !important;
+  backdrop-filter: blur(10px);
+  border-right: 1px solid rgba(247, 164, 29, 0.14) !important;
+  border-radius: 0 !important;
+  padding-top: 1rem;
+}
+
+/* Группы в сайдбаре */
+.VPSidebarItem .text {
+  border-radius: 0 !important;
+  padding-left: 10px;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.VPSidebarItem.is-active > .item .link .text {
+  color: #f7a41d !important;
+}
+
+.VPSidebarItem .link:hover .text {
+  color: #f7a41d !important;
+  background-color: rgba(247, 164, 29, 0.06) !important;
+}
+
+/* Заголовок группы */
+.VPSidebarItem.level-0 > .item > .text {
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.40);
+}
+
+/* Активный пункт — левая полоска вместо бэкграунда */
+.VPSidebarItem.is-active > .item {
+  border-left: 2px solid #f7a41d;
+  padding-left: calc(var(--vp-sidebar-item-indent, 0px));
+  background-color: rgba(247, 164, 29, 0.06);
+  border-radius: 0 !important;
+}
+
+.VPSidebar .group + .group {
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+}
+
+/* ── 7. Контентная область ──────────────────────────────── */
+.VPDoc {
+  background: transparent !important;
+}
+
+.VPContent {
+  background: transparent !important;
+}
+
+/* ── 8. Карточки / блоки (custom-block) ─────────────────── */
+.custom-block {
+  border-radius: 0 !important;
+  border-left: 3px solid #f7a41d;
+  background-color: rgba(247, 164, 29, 0.06) !important;
+}
+
+.custom-block.tip    { border-left-color: #f7a41d; }
+.custom-block.warning{ border-left-color: #e2961c; }
+.custom-block.danger { border-left-color: #e24a1c; }
+.custom-block.info   { border-left-color: rgba(255,255,255,0.30); }
+
+/* ── 9. Код ─────────────────────────────────────────────── */
+.vp-code-group .tabs {
+  border-radius: 0 !important;
+  border-bottom: 1px solid rgba(247, 164, 29, 0.18);
+}
+
+.vp-code-group .tabs button.active {
+  color: #f7a41d;
+  border-bottom-color: #f7a41d;
+  border-radius: 0 !important;
+}
+
+div[class*="language-"] {
+  border-radius: 0 !important;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+/* ── 10. Кнопки ─────────────────────────────────────────── */
+.VPButton {
+  border-radius: 0 !important;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-size: 0.8rem;
+}
+
+.VPButton.medium.brand {
+  background-color: #f7a41d;
+  color: #121212;
+  border-color: transparent;
+}
+
+.VPButton.medium.brand:hover {
+  background-color: #e2961c;
+}
+
+.VPButton.medium.alt {
+  border: 1px solid rgba(247, 164, 29, 0.4);
+  color: #f7a41d;
+  background: transparent;
+  border-radius: 0 !important;
+}
+
+.VPButton.medium.alt:hover {
+  border-color: #f7a41d;
+  background-color: rgba(247, 164, 29, 0.08);
+}
+
+/* ── 11. Ссылки ─────────────────────────────────────────── */
+.vp-doc a {
+  color: #f7a41d;
+  text-decoration: underline;
+  text-decoration-color: rgba(247, 164, 29, 0.35);
+  text-underline-offset: 3px;
+  transition: color 0.15s ease, text-decoration-color 0.15s ease;
+}
+
+.vp-doc a:hover {
+  color: #e2961c;
+  text-decoration-color: #e2961c;
+}
+
+/* ── 12. Поиск ──────────────────────────────────────────── */
+.DocSearch-Button {
+  border-radius: 0 !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid rgba(255, 255, 255, 0.10) !important;
+}
+
+.DocSearch-Button:hover {
+  border-color: rgba(247, 164, 29, 0.40) !important;
+}
+
+/* ── 13. Таблицы ────────────────────────────────────────── */
+.vp-doc table {
+  border-radius: 0 !important;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  overflow: hidden;
+}
+
+.vp-doc thead tr {
+  background-color: rgba(247, 164, 29, 0.10);
+}
+
+.vp-doc th {
+  color: #f7a41d;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-size: 0.78rem;
+}
+
+.vp-doc tr:hover {
+  background-color: rgba(247, 164, 29, 0.04) !important;
+}
+
+/* ── 14. ToC (оглавление) ───────────────────────────────── */
+.VPDocAside .outline-link.active {
+  color: #f7a41d !important;
+}
+
+.VPDocAside .outline-link:hover {
+  color: #f7a41d !important;
+}
+
+/* ── 15. Теги / Badge ───────────────────────────────────── */
+.VPBadge {
+  border-radius: 0 !important;
+}
+
+/* ── 16. Локальный поиск ────────────────────────────────── */
+.VPLocalSearchBox {
+  border-radius: 0 !important;
+}
+
+.VPLocalSearchBox .search-input {
+  border-radius: 0 !important;
+}
+
+/* ── 17. Hero — градиент на заголовке ──────────────────── */
+.VPHero .name {
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* ── 18. Footer ─────────────────────────────────────────── */
+.VPFooter {
+  border-top: 1px solid rgba(247, 164, 29, 0.14) !important;
+  background: rgba(14, 14, 14, 0.80) !important;
+}
+
+/* ── 19. Скроллбар (Webkit) ─────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0e0e0e;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(247, 164, 29, 0.35);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(247, 164, 29, 0.60);
+}

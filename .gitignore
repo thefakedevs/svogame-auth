@@ -1,7 +1,7 @@
 /target
 /backend/target
 /frontend/node_modules
-/frontend/.astro
+/frontend/docs/.vitepress/cache
 /node_modules
 /frontend/dist
 /db.sqlite

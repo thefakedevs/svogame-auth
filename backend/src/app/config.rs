@@ -10,6 +10,7 @@ pub struct AppConfig {
     pub database: DatabaseConfig,
     pub s3: S3Config,
     pub shop: ShopConfig,
+    pub receipts: ReceiptsConfig,
     pub pow_complexity: i16,
     pub jwt_secret: String,
     pub gamervii_compat: Option<GamerviiCompatConfig>,
@@ -58,6 +59,29 @@ pub struct ShopConfig {
 }
 
 #[derive(Debug, Clone)]
+pub struct ReceiptsConfig {
+    pub enabled: bool,
+    pub provider: ReceiptProviderKind,
+    pub retry_interval_seconds: i64,
+    pub failure_after_seconds: i64,
+    pub mytax: Option<MyTaxConfig>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ReceiptProviderKind {
+    MyTax,
+}
+
+#[derive(Debug, Clone)]
+pub struct MyTaxConfig {
+    pub inn: String,
+    pub password: String,
+    pub api_base_url: String,
+    pub device_prefix: String,
+    pub zone_offset: String,
+}
+
+#[derive(Debug, Clone)]
 pub struct YooKassaConfig {
     pub shop_id: String,
     pub secret_key: String,
@@ -80,6 +104,7 @@ impl AppConfig {
         let database = DatabaseConfig::from_env()?;
         let s3 = S3Config::from_env()?;
         let shop = ShopConfig::from_env()?;
+        let receipts = ReceiptsConfig::from_env()?;
         let pow_complexity = std::env::var("POW_COMPLEXITY")
             .unwrap_or_else(|_| "19".to_string())
             .parse::<i16>()
@@ -93,6 +118,7 @@ impl AppConfig {
             database,
             s3,
             shop,
+            receipts,
             pow_complexity,
             jwt_secret,
             gamervii_compat,
@@ -225,6 +251,94 @@ impl ShopConfig {
             yookassa,
             pending_payment_ttl_seconds,
             reconciliation_interval_seconds,
+        })
+    }
+}
+
+impl ReceiptsConfig {
+    fn from_env() -> Result<Self> {
+        let enabled = std::env::var("SHOP_RECEIPTS_ENABLED")
+            .unwrap_or_else(|_| "false".to_string())
+            == "true";
+        let provider = ReceiptProviderKind::from_env()?;
+        let retry_interval_seconds = std::env::var("MYTAX_RECEIPT_RETRY_INTERVAL_SECONDS")
+            .unwrap_or_else(|_| "900".to_string())
+            .parse::<i64>()
+            .context("MYTAX_RECEIPT_RETRY_INTERVAL_SECONDS must be a valid integer")?;
+        if retry_interval_seconds <= 0 {
+            anyhow::bail!("MYTAX_RECEIPT_RETRY_INTERVAL_SECONDS must be positive");
+        }
+        let failure_after_seconds = std::env::var("MYTAX_RECEIPT_FAILURE_AFTER_SECONDS")
+            .unwrap_or_else(|_| "604800".to_string())
+            .parse::<i64>()
+            .context("MYTAX_RECEIPT_FAILURE_AFTER_SECONDS must be a valid integer")?;
+        if failure_after_seconds <= 0 {
+            anyhow::bail!("MYTAX_RECEIPT_FAILURE_AFTER_SECONDS must be positive");
+        }
+
+        let mytax = if enabled && provider == ReceiptProviderKind::MyTax {
+            Some(MyTaxConfig::from_env()?)
+        } else {
+            None
+        };
+
+        Ok(Self {
+            enabled,
+            provider,
+            retry_interval_seconds,
+            failure_after_seconds,
+            mytax,
+        })
+    }
+}
+
+impl ReceiptProviderKind {
+    fn from_env() -> Result<Self> {
+        let value = std::env::var("SHOP_RECEIPTS_PROVIDER")
+            .unwrap_or_else(|_| "mytax".to_string())
+            .trim()
+            .to_lowercase();
+        match value.as_str() {
+            "mytax" | "my_tax" | "my-tax" => Ok(Self::MyTax),
+            _ => anyhow::bail!("SHOP_RECEIPTS_PROVIDER must be one of: mytax"),
+        }
+    }
+
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::MyTax => "mytax",
+        }
+    }
+}
+
+impl MyTaxConfig {
+    fn from_env() -> Result<Self> {
+        let inn = std::env::var("MYTAX_INN").context("MYTAX_INN not set")?;
+        let password = std::env::var("MYTAX_PASSWORD").context("MYTAX_PASSWORD not set")?;
+        let api_base_url = std::env::var("MYTAX_API_BASE_URL")
+            .unwrap_or_else(|_| "https://lknpd.nalog.ru/api/v1".to_string())
+            .trim()
+            .trim_end_matches('/')
+            .to_string();
+        if api_base_url.is_empty() {
+            anyhow::bail!("MYTAX_API_BASE_URL must not be empty");
+        }
+        let device_prefix = std::env::var("MYTAX_DEVICE_PREFIX")
+            .unwrap_or_else(|_| "svogame_".to_string())
+            .trim()
+            .to_string();
+        if device_prefix.len() > 20 {
+            anyhow::bail!("MYTAX_DEVICE_PREFIX must be at most 20 characters");
+        }
+        let zone_offset =
+            std::env::var("MYTAX_ZONE_OFFSET").unwrap_or_else(|_| "+03:00".to_string());
+
+        Ok(Self {
+            inn,
+            password,
+            api_base_url,
+            device_prefix,
+            zone_offset,
         })
     }
 }

@@ -497,7 +497,6 @@ export default function ShopPage() {
               <div className="ui-modal-body inventory-filters-modal__body">
                 <div className="inventory-toolbar inventory-toolbar--modal" aria-label="Сортировка и фильтры магазина">
                   <div className="inventory-toolbar__row">
-                    <span className="inventory-toolbar__heading">Сортировка</span>
                     <fieldset className="ui-radio-group inventory-toolbar__fieldset inventory-toolbar__fieldset--inline">
                       <legend className="ui-radio-legend">Сортировка</legend>
                       {(
@@ -525,7 +524,6 @@ export default function ShopPage() {
                   </div>
                   <div className="inventory-toolbar__row inventory-toolbar__row--split">
                     <div className="inventory-toolbar__col">
-                      <span className="inventory-toolbar__heading">Фильтр: редкость</span>
                       <fieldset className="ui-radio-group inventory-toolbar__fieldset">
                         <legend className="ui-radio-legend">Редкость</legend>
                         <label className="ui-radio">
