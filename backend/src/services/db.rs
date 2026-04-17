@@ -1,18 +1,17 @@
 use crate::app::config::DatabaseConfig;
 use crate::services::migration::{
     AddAssetDefinitionGunskinColumns, AddAuthRayRegistrationColumns,
-    AddShopOrderPaymentLifecycleColumns,
-    AddShopPaymentAttemptProviderIndex, AddUserDeactivationReasonColumn, AddUserSquadIdColumn,
-    AddUserSuperuserColumn, CreateAssetDefinitionTable, CreateAuditLogTable, CreateAuthRayTable,
+    AddShopOrderPaymentLifecycleColumns, AddShopPaymentAttemptProviderIndex,
+    AddUserDeactivationReasonColumn, AddUserSquadIdColumn, AddUserSuperuserColumn,
+    CreateAppKvTable, CreateAssetDefinitionTable, CreateAuditLogTable, CreateAuthRayTable,
     CreateDefaultSkinTable, CreateDiscordBroadcastTable, CreateDiscordDeliveryTable,
-    CreateInventoryOperationTable, CreateLootboxDefinitionTable,
-    CreateLootboxDropDefinitionTable, CreateLootboxOpenOperationTable,
-    CreateServiceTokenAuditTable, CreateServiceTokenTable, CreateShopOrderTable,
-    CreateShopPaymentAttemptTable, CreateShopProductLocaleTable, CreateShopProductTable,
-    CreateSquadInviteTable, CreateSquadTable, CreateUserEntitlementTable,
-    CreateUserExpirableAssetTable, CreateUserRestrictionTable, CreateUserStackableAssetTable,
-    CreateUserSelectedGunskinTable, CreateUserTable, CreateWalletBalanceTable,
-    CreateWalletTransactionTable,
+    CreateInventoryOperationTable, CreateLootboxDefinitionTable, CreateLootboxDropDefinitionTable,
+    CreateLootboxOpenOperationTable, CreateServiceTokenAuditTable, CreateServiceTokenTable,
+    CreateShopOrderTable, CreateShopPaymentAttemptTable, CreateShopProductLocaleTable,
+    CreateShopProductTable, CreateShopReceiptTable, CreateSquadInviteTable, CreateSquadTable,
+    CreateUserEntitlementTable, CreateUserExpirableAssetTable, CreateUserRestrictionTable,
+    CreateUserSelectedGunskinTable, CreateUserStackableAssetTable, CreateUserTable,
+    CreateWalletBalanceTable, CreateWalletTransactionTable,
 };
 use anyhow::Result;
 use sea_orm::{Database, DatabaseConnection};
@@ -26,6 +25,7 @@ pub async fn connect_db(config: &DatabaseConfig) -> Result<DatabaseConnection> {
 
 pub async fn run_migrations(db: &DatabaseConnection) -> Result<()> {
     let schema_manager = SchemaManager::new(db);
+    CreateAppKvTable.up(&schema_manager).await?;
     CreateAuthRayTable.up(&schema_manager).await?;
     AddAuthRayRegistrationColumns.up(&schema_manager).await?;
     CreateUserTable.up(&schema_manager).await?;
@@ -53,6 +53,7 @@ pub async fn run_migrations(db: &DatabaseConnection) -> Result<()> {
     CreateShopProductLocaleTable.up(&schema_manager).await?;
     CreateShopOrderTable.up(&schema_manager).await?;
     CreateShopPaymentAttemptTable.up(&schema_manager).await?;
+    CreateShopReceiptTable.up(&schema_manager).await?;
     CreateDiscordBroadcastTable.up(&schema_manager).await?;
     CreateDiscordDeliveryTable.up(&schema_manager).await?;
     AddShopOrderPaymentLifecycleColumns
@@ -61,11 +62,7 @@ pub async fn run_migrations(db: &DatabaseConnection) -> Result<()> {
     AddShopPaymentAttemptProviderIndex
         .up(&schema_manager)
         .await?;
-    AddAssetDefinitionGunskinColumns
-        .up(&schema_manager)
-        .await?;
-    CreateUserSelectedGunskinTable
-        .up(&schema_manager)
-        .await?;
+    AddAssetDefinitionGunskinColumns.up(&schema_manager).await?;
+    CreateUserSelectedGunskinTable.up(&schema_manager).await?;
     Ok(())
 }

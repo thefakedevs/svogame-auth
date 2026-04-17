@@ -23,6 +23,14 @@ pub fn router() -> Router<crate::app::state::SharedAppState> {
             get(handlers::get_my_order),
         )
         .route(
+            "/api/user/me/shop/orders/{order_id}/receipt",
+            get(handlers::get_my_order_receipt),
+        )
+        .route(
+            "/api/user/me/shop/orders/{order_id}/receipt/print",
+            get(handlers::print_my_order_receipt),
+        )
+        .route(
             "/api/user/me/shop/orders/{order_id}/mock/complete",
             post(handlers::complete_my_mock_order),
         )
