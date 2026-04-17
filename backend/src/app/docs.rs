@@ -1,7 +1,7 @@
 use crate::app::http::ProblemDetails;
 use crate::app::http::ProblemResponse;
-use crate::domains::admin::handlers as admin_handlers;
 use crate::domains::admin::discord as admin_discord;
+use crate::domains::admin::handlers as admin_handlers;
 use crate::domains::admin::service_tokens as admin_service_tokens;
 use crate::domains::admin::squads as admin_squads;
 use crate::domains::auth::handlers as auth_handlers;
@@ -144,6 +144,8 @@ use utoipa::OpenApi;
         shop_handlers::get_public_product,
         shop_handlers::list_my_orders,
         shop_handlers::get_my_order,
+        shop_handlers::get_my_order_receipt,
+        shop_handlers::print_my_order_receipt,
         shop_handlers::create_my_order,
         shop_handlers::yookassa_webhook,
         shop_handlers::complete_my_mock_order,
@@ -257,6 +259,7 @@ use utoipa::OpenApi;
             shop_handlers::ShopProductLocaleResponse,
             shop_handlers::ShopProductResponse,
             shop_handlers::ShopPaymentAttemptResponse,
+            shop_handlers::ShopReceiptResponse,
             shop_handlers::ShopOrderResponse,
             shop_handlers::ShopWebhookAckResponse,
             shop_handlers::YooKassaWebhookRequest,
