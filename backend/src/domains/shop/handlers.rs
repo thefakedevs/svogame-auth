@@ -273,7 +273,8 @@ pub async fn list_my_orders(
 ) -> HttpResult<Json<Value>> {
     let state = state.read().await;
     let user = get_user_from_headers(&headers, &state).await?;
-    let items = shop::list_orders_for_user(&state.db, user.id, &state.config.shop)
+    let items =
+        shop::list_orders_for_user(&state.db, user.id, &state.config.shop, &state.config.receipts)
         .await
         .map_err(map_shop_error)?;
     Ok(Json(Value::Array(
@@ -302,10 +303,16 @@ pub async fn get_my_order(
     let state = state.read().await;
     let user = get_user_from_headers(&headers, &state).await?;
     let order_id = parse_uuid(&order_id, "Invalid shop order ID")?;
-    let item = shop::get_order_for_user(&state.db, user.id, order_id, &state.config.shop)
-        .await
-        .map_err(map_shop_error)?
-        .ok_or_else(|| HttpError::not_found("Shop order not found"))?;
+    let item = shop::get_order_for_user(
+        &state.db,
+        user.id,
+        order_id,
+        &state.config.shop,
+        &state.config.receipts,
+    )
+    .await
+    .map_err(map_shop_error)?
+    .ok_or_else(|| HttpError::not_found("Shop order not found"))?;
     Ok(Json(order_json(item)))
 }
 
@@ -400,9 +407,15 @@ pub async fn create_my_order(
 ) -> HttpResult<Json<Value>> {
     let state = state.read().await;
     let user = get_user_from_headers(&headers, &state).await?;
-    let item = shop::create_order(&state.db, user.id, body, state.config.shop.clone())
-        .await
-        .map_err(map_shop_error)?;
+    let item = shop::create_order(
+        &state.db,
+        user.id,
+        body,
+        state.config.shop.clone(),
+        state.config.receipts.clone(),
+    )
+    .await
+    .map_err(map_shop_error)?;
     write_audit_log(
         &state.db,
         ACTION_USER_SHOP_ORDER_CREATED,
@@ -436,9 +449,15 @@ pub async fn yookassa_webhook(
     body: String,
 ) -> HttpResult<Json<Value>> {
     let state = state.read().await;
-    let ack = shop::handle_yookassa_webhook(&state.db, &state.config.shop, &headers, &body)
-        .await
-        .map_err(map_shop_error)?;
+    let ack = shop::handle_yookassa_webhook(
+        &state.db,
+        &state.config.shop,
+        &state.config.receipts,
+        &headers,
+        &body,
+    )
+    .await
+    .map_err(map_shop_error)?;
     Ok(Json(webhook_ack_json(ack)))
 }
 
@@ -465,9 +484,15 @@ pub async fn complete_my_mock_order(
     let state = state.read().await;
     let user = get_user_from_headers(&headers, &state).await?;
     let order_id = parse_uuid(&order_id, "Invalid shop order ID")?;
-    let item = shop::complete_mock_order_payment(&state.db, user.id, order_id, &state.config.shop)
-        .await
-        .map_err(map_shop_error)?;
+    let item = shop::complete_mock_order_payment(
+        &state.db,
+        user.id,
+        order_id,
+        &state.config.shop,
+        &state.config.receipts,
+    )
+    .await
+    .map_err(map_shop_error)?;
     if item.status == "fulfilled" {
         write_audit_log(
             &state.db,

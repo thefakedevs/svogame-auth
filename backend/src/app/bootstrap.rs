@@ -133,12 +133,21 @@ fn spawn_shop_reconciliation_worker(state: SharedAppState) {
         let mut interval = tokio::time::interval(std::time::Duration::from_secs(interval_seconds));
         loop {
             interval.tick().await;
-            let (db, shop_config) = {
+            let (db, shop_config, receipts_config) = {
                 let state_guard = state.read().await;
-                (state_guard.db.clone(), state_guard.config.shop.clone())
+                (
+                    state_guard.db.clone(),
+                    state_guard.config.shop.clone(),
+                    state_guard.config.receipts.clone(),
+                )
             };
             if let Err(error) =
-                crate::services::shop::reconcile_pending_orders(&db, &shop_config).await
+                crate::services::shop::reconcile_pending_orders(
+                    &db,
+                    &shop_config,
+                    &receipts_config,
+                )
+                .await
             {
                 warn!("Shop reconciliation failed: {error}");
             }

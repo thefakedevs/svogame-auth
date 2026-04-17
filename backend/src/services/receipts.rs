@@ -14,7 +14,7 @@ use uuid::Uuid;
 
 use crate::app::config::{MyTaxConfig, ReceiptProviderKind, ReceiptsConfig};
 use crate::entities::{
-    AppKv, AppKvActiveModel, ShopOrder, ShopOrderColumn, ShopOrderModel, ShopPaymentAttempt,
+    AppKv, AppKvActiveModel, ShopOrder, ShopOrderModel, ShopPaymentAttempt,
     ShopPaymentAttemptColumn, ShopReceipt, ShopReceiptActiveModel, ShopReceiptColumn,
     ShopReceiptModel,
 };
@@ -425,8 +425,6 @@ pub async fn process_due_receipts(
         return Ok(());
     }
 
-    ensure_missing_receipts(db, config).await?;
-
     let now = chrono::Utc::now();
     let receipt_ids = ShopReceipt::find()
         .filter(ShopReceiptColumn::Status.is_in([
@@ -455,20 +453,6 @@ pub async fn process_due_receipts(
         if let Err(error) = process_one_receipt(db, config, runtime, receipt_id).await {
             tracing::warn!("Receipt processing failed for {receipt_id}: {error}");
         }
-    }
-
-    Ok(())
-}
-
-async fn ensure_missing_receipts(db: &DatabaseConnection, config: &ReceiptsConfig) -> Result<()> {
-    let fulfilled_orders = ShopOrder::find()
-        .filter(ShopOrderColumn::Status.eq("fulfilled"))
-        .order_by_asc(ShopOrderColumn::FulfilledAt)
-        .all(db)
-        .await?;
-
-    for order in fulfilled_orders {
-        ensure_receipt_for_order_in_tx(db, &order, config).await?;
     }
 
     Ok(())
