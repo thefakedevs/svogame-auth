@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
-import { toDisplayError } from '../api/http'
-import { getMyShopOrder, type ShopOrderResponse } from '../api/shop'
+import { ApiError, toDisplayError } from '../api/http'
+import {
+  getMyShopOrder,
+  getMyShopOrderReceipt,
+  getMyShopOrderReceiptPrintImage,
+  type ShopOrderResponse,
+  type ShopReceiptResponse,
+} from '../api/shop'
 import ErrorState from '../components/ErrorState'
 import LoadingState from '../components/LoadingState'
 import { currentAppPath, redirectToAuth } from '../routes/auth'
@@ -17,6 +23,13 @@ type CallbackState =
   | { status: 'failed'; order: ShopOrderResponse; error: string }
   | { status: 'error'; error: string }
 
+type ReceiptState =
+  | { status: 'idle' }
+  | { status: 'polling'; receipt: ShopReceiptResponse | null; message: string }
+  | { status: 'ready'; receipt: ShopReceiptResponse; imageUrl: string }
+  | { status: 'unavailable'; receipt: ShopReceiptResponse | null; message: string }
+  | { status: 'failed'; receipt: ShopReceiptResponse | null; error: string }
+
 const priceFormatter = new Intl.NumberFormat('ru-RU', {
   style: 'currency',
   currency: 'RUB',
@@ -30,6 +43,7 @@ const terminalFailureStatuses = new Set([
   'payment_expired',
   'payment_validation_failed',
 ])
+const terminalReceiptUnavailableStatuses = new Set(['not_required', 'test_payment'])
 
 function formatPrice(value: number) {
   return priceFormatter.format(value)
@@ -58,12 +72,121 @@ function statusText(status: string) {
   }
 }
 
+function receiptStatusText(receipt: ShopReceiptResponse | null) {
+  if (!receipt) {
+    return 'Ждем статус чека.'
+  }
+
+  switch (receipt.status) {
+    case 'pending':
+    case 'forming':
+      return receipt.displayStatus || 'Чек формируется.'
+    case 'completed':
+      return receipt.displayStatus || 'Чек готов.'
+    case 'failed':
+      return receipt.failureProblem || receipt.displayStatus || 'Чек не удалось сформировать.'
+    case 'not_required':
+      return 'Для этого платежа чек не требуется.'
+    case 'test_payment':
+      return 'Это тестовый платеж, печатный чек недоступен.'
+    default:
+      return receipt.displayStatus || 'Статус чека неизвестен.'
+  }
+}
+
 function OrderSummary({ order }: { order: ShopOrderResponse }) {
   return (
     <div className="shop-callback-summary">
       <strong>{order.productName}</strong>
       <span>{formatPrice(order.totalPriceRub)}</span>
       <small>Заказ {order.id}</small>
+    </div>
+  )
+}
+
+function printReceiptImage(imageUrl: string) {
+  const printWindow = window.open('', '_blank')
+  if (!printWindow) {
+    window.open(imageUrl, '_blank')
+    return
+  }
+
+  printWindow.document.write(`
+    <!doctype html>
+    <html>
+      <head>
+        <title>Чек</title>
+        <style>
+          html, body { margin: 0; min-height: 100%; background: #fff; }
+          body { display: grid; place-items: start center; padding: 24px; }
+          img { max-width: 100%; height: auto; }
+        </style>
+      </head>
+      <body>
+        <img src="${imageUrl}" alt="Чек" onload="window.focus(); window.print();" />
+      </body>
+    </html>
+  `)
+  printWindow.document.close()
+}
+
+function ReceiptPanel({ state }: { state: ReceiptState }) {
+  if (state.status === 'idle') {
+    return null
+  }
+
+  if (state.status === 'ready') {
+    return (
+      <div className="shop-receipt-panel">
+        <div className="shop-receipt-panel__content">
+          <span className="ui-badge ui-badge-success">Чек готов</span>
+          <h2>Чек по заказу</h2>
+          <p>{receiptStatusText(state.receipt)}</p>
+        </div>
+        <img className="shop-receipt-panel__image" src={state.imageUrl} alt="Чек по заказу" />
+        <div className="shop-callback-actions">
+          <a className="btn primary" href={state.imageUrl} download={`receipt-${state.receipt.id}.png`}>
+            Скачать чек
+          </a>
+          <button className="btn" type="button" onClick={() => printReceiptImage(state.imageUrl)}>
+            Распечатать чек
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (state.status === 'failed') {
+    return (
+      <div className="shop-receipt-panel">
+        <div className="shop-receipt-panel__content">
+          <span className="ui-badge ui-badge-warning">Чек</span>
+          <h2>Чек пока недоступен</h2>
+          <p>{state.error}</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (state.status === 'unavailable') {
+    return (
+      <div className="shop-receipt-panel">
+        <div className="shop-receipt-panel__content">
+          <span className="ui-badge">Чек</span>
+          <h2>Печатный чек недоступен</h2>
+          <p>{state.message}</p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="shop-receipt-panel">
+      <div className="shop-receipt-panel__content">
+        <span className="ui-badge">Чек</span>
+        <h2>Готовим чек</h2>
+        <p>{state.message || receiptStatusText(state.receipt)}</p>
+      </div>
     </div>
   )
 }
@@ -81,6 +204,13 @@ export default function ShopCheckoutReturnPage() {
   const query = useQueryParams()
   const orderId = useMemo(() => query.get('orderId')?.trim() ?? '', [query])
   const [state, setState] = useState<CallbackState>({ status: 'polling', order: null })
+  const [receiptState, setReceiptState] = useState<ReceiptState>({ status: 'idle' })
+  const [isTabVisible, setIsTabVisible] = useState(() => {
+    if (typeof document === 'undefined') {
+      return true
+    }
+    return document.visibilityState === 'visible'
+  })
 
   useEffect(() => {
     const token = getAuthToken()
@@ -130,6 +260,129 @@ export default function ShopCheckoutReturnPage() {
     }
   }, [orderId])
 
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      setIsTabVisible(document.visibilityState === 'visible')
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (state.status !== 'success') {
+      return
+    }
+
+    const token = getAuthToken()
+    if (!token) {
+      return
+    }
+
+    let cancelled = false
+    let timer: number | undefined
+    let imageUrl: string | undefined
+
+    const scheduleNextPoll = () => {
+      timer = window.setTimeout(poll, 5000)
+    }
+
+    const poll = async () => {
+      try {
+        const receipt = await getMyShopOrderReceipt(token, state.order.id)
+        if (cancelled) return
+
+        if (receipt.status === 'completed') {
+          setReceiptState({
+            status: 'polling',
+            receipt,
+            message: 'Загружаем изображение чека.',
+          })
+
+          try {
+            const image = await getMyShopOrderReceiptPrintImage(token, state.order.id)
+            if (cancelled) return
+
+            imageUrl = URL.createObjectURL(image)
+            setReceiptState({ status: 'ready', receipt, imageUrl })
+          } catch (cause) {
+            if (cancelled) return
+
+            setReceiptState({
+              status: 'unavailable',
+              receipt,
+              message: toDisplayError(cause, 'Чек готов, но изображение для печати пока недоступно.'),
+            })
+          }
+          return
+        }
+
+        if (receipt.status === 'failed') {
+          setReceiptState({
+            status: 'failed',
+            receipt,
+            error: receiptStatusText(receipt),
+          })
+          return
+        }
+
+        if (terminalReceiptUnavailableStatuses.has(receipt.status)) {
+          setReceiptState({
+            status: 'unavailable',
+            receipt,
+            message: receiptStatusText(receipt),
+          })
+          return
+        }
+
+        setReceiptState({
+          status: 'polling',
+          receipt,
+          message: receiptStatusText(receipt),
+        })
+        scheduleNextPoll()
+      } catch (cause) {
+        if (cancelled) return
+
+        if (cause instanceof ApiError && cause.status === 404) {
+          setReceiptState({
+            status: 'polling',
+            receipt: null,
+            message: 'Чек еще не появился. Проверим еще раз через несколько секунд.',
+          })
+          scheduleNextPoll()
+          return
+        }
+
+        setReceiptState({
+          status: 'failed',
+          receipt: null,
+          error: toDisplayError(cause, 'Не удалось проверить статус чека.'),
+        })
+      }
+    }
+
+    queueMicrotask(() => {
+      if (!cancelled) {
+        setReceiptState({
+          status: 'polling',
+          receipt: state.order.receipt ?? null,
+          message: receiptStatusText(state.order.receipt ?? null),
+        })
+      }
+    })
+    void poll()
+
+    return () => {
+      cancelled = true
+      if (timer) window.clearTimeout(timer)
+      if (imageUrl) URL.revokeObjectURL(imageUrl)
+    }
+  }, [state])
+
   if (!orderId) {
     return (
       <main className="page ownership-page shop-page">
@@ -161,23 +414,6 @@ export default function ShopCheckoutReturnPage() {
     )
   }
 
-  // 1. Track if the tab is currently focused/visible
-  const [isTabVisible, setIsTabVisible] = useState(true);
-
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      setIsTabVisible(document.visibilityState === 'visible');
-    };
-
-    // Add event listener for tab switching
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    // Cleanup listener on unmount
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, []);
-
   if (state.status === 'success') {
     return (
       <main className="page ownership-page shop-page">
@@ -186,6 +422,7 @@ export default function ShopCheckoutReturnPage() {
           <h1 className="card-title">Скин добавлен в инвентарь</h1>
           <p className="card-text">{statusText(state.order.status)}</p>
           <OrderSummary order={state.order} />
+          <ReceiptPanel state={receiptState} />
           <CallbackActions />
         </section>
         {isTabVisible && (
