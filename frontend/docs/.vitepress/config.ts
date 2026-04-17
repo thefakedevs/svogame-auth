@@ -5,7 +5,7 @@ export default defineConfig({
   description: 'Страница знаний сервера SvoCraft',
   lang: 'ru-RU',
   base: '/wiki/',
-  lastUpdated: true,
+  lastUpdated: false,
   themeConfig: {
     nav: [
       { text: 'Home', link: '/' },
