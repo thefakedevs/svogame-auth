@@ -10,7 +10,7 @@ body:has(.landing-shell) {
 }
 
 body:has(.landing-shell) #root,
-body:has(.landing-shell) .astro-app-root {
+body:has(.landing-shell) {
   max-width: none;
   padding: 0 !important;
 }

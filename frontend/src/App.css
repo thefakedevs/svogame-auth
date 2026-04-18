@@ -1,34 +1,4 @@
-/* App Root */
-#root,
-.astro-app-root {
-  width: 100%;
-  max-width: 480px;
-  margin: 0 auto;
-  padding: 20px;
-}
-
-#root:has(.ui-kit-page),
-.astro-app-root:has(.ui-kit-page) {
-  max-width: min(1000px, 100%);
-}
-
-#root:has(.app-shell),
-.astro-app-root:has(.app-shell) {
-  max-width: min(1180px, 100%);
-}
-
-#root:has(.landing-shell),
-.astro-app-root:has(.landing-shell) {
-  max-width: none;
-  padding: 0;
-}
-
-/* PoW / проверка на бота: полная ширина экрана для полоски 50vw */
-#root:has(.auth-pow-fullbleed),
-.astro-app-root:has(.auth-pow-fullbleed) {
-  max-width: none;
-}
-
+/* Global Styles */
 body:has(.ui-kit-page) {
   align-items: flex-start;
 }

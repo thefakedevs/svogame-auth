@@ -134,6 +134,32 @@ export async function request<T>(input: string, options: RequestOptions = {}): P
   return body as T
 }
 
+export async function requestBlob(input: string, options: RequestInit = {}): Promise<Blob> {
+  let response: Response
+  try {
+    response = await fetch(input, options)
+  } catch (error) {
+    throw new ApiError({
+      kind: 'network',
+      message: 'Не удалось связаться с сервером. Проверьте подключение и попробуйте еще раз.',
+      details: error,
+    })
+  }
+
+  if (!response.ok) {
+    const body = await readResponseBody(response)
+    throw new ApiError({
+      kind: 'http',
+      status: response.status,
+      statusText: response.statusText,
+      message: extractErrorMessage(body) ?? buildFallbackMessage(response.status, response.statusText),
+      details: body,
+    })
+  }
+
+  return response.blob()
+}
+
 export async function requestNullable<T>(input: string, options: RequestOptions = {}): Promise<T | null> {
   try {
     return await request<T>(input, options)

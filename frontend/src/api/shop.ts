@@ -1,4 +1,4 @@
-import { authHeaders, request } from './http'
+import { authHeaders, request, requestBlob } from './http'
 
 export interface ShopProductLocaleResponse {
   locale: string
@@ -49,6 +49,23 @@ export interface ShopPaymentAttemptResponse {
   updatedAt: string
 }
 
+export interface ShopReceiptResponse {
+  id: string
+  provider: string
+  status: string
+  displayStatus: string
+  receiptUuid?: string | null
+  printUrl?: string | null
+  jsonUrl?: string | null
+  failureProblem?: string | null
+  attemptCount: number
+  nextAttemptAt?: string | null
+  deadlineAt?: string | null
+  completedAt?: string | null
+  createdAt: string
+  updatedAt: string
+}
+
 export interface ShopOrderResponse {
   id: string
   userId: string
@@ -73,6 +90,7 @@ export interface ShopOrderResponse {
   paidAt?: string | null
   fulfilledAt?: string | null
   payment?: ShopPaymentAttemptResponse | null
+  receipt?: ShopReceiptResponse | null
   metadata: unknown
   createdAt: string
   updatedAt: string
@@ -116,5 +134,19 @@ export function getMyShopOrder(token: string, orderId: string): Promise<ShopOrde
     headers: authHeaders(token, {
       'Content-Type': 'application/json',
     }),
+  })
+}
+
+export function getMyShopOrderReceipt(token: string, orderId: string): Promise<ShopReceiptResponse> {
+  return request<ShopReceiptResponse>(`/api/user/me/shop/orders/${encodeURIComponent(orderId)}/receipt`, {
+    headers: authHeaders(token, {
+      'Content-Type': 'application/json',
+    }),
+  })
+}
+
+export function getMyShopOrderReceiptPrintImage(token: string, orderId: string): Promise<Blob> {
+  return requestBlob(`/api/user/me/shop/orders/${encodeURIComponent(orderId)}/receipt/print`, {
+    headers: authHeaders(token),
   })
 }

@@ -20,6 +20,7 @@ export const paths = {
   legalPublicOffer: '/legal/public_offer',
   legalRefundPolicy: '/legal/refund_policy',
   legalUserAgreement: '/legal/user_agreement',
+  wiki: '/wiki',
 } as const
 
 export type AppPath = (typeof paths)[keyof typeof paths]
@@ -38,4 +39,12 @@ export function adminTokenAuditPath(tokenId: string) {
 
 export function adminShopProductPath(productId: string) {
   return `${paths.admin}/shop/products/${encodeURIComponent(productId)}`
+}
+
+export function adminLootboxPath(lootboxId: string) {
+  return `${paths.admin}/lootboxes/${encodeURIComponent(lootboxId)}`
+}
+
+export function adminUserLootboxHistoryPath(userId: string) {
+  return `${paths.admin}/users/${encodeURIComponent(userId)}/lootboxes/open-history`
 }

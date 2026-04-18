@@ -3,8 +3,8 @@ import toast from 'react-hot-toast'
 import { toDisplayError } from '../api/http'
 import {
   buildPublicAssetImageUrl,
+  listAllPublicAssets,
   listMyEntitlements,
-  listPublicAssets,
   type AssetResponse,
   type EntitlementResponse,
   type SkinRarity,
@@ -26,6 +26,7 @@ const SHOP_LOCALE = 'ru-RU'
 type ShopSortKey = 'default' | 'price_asc' | 'price_desc' | 'rarity' | 'weapon'
 type ShopRarityFilter = 'all' | 'none' | SkinRarity
 type ShopWeaponFilter = 'all' | string
+type ShopAssetKindFilter = 'all' | string
 
 type ShopState =
   | { status: 'loading' }
@@ -46,6 +47,21 @@ const priceFormatter = new Intl.NumberFormat('ru-RU', {
 
 function formatPrice(value: number) {
   return priceFormatter.format(value)
+}
+
+function formatDuration(seconds: number | null | undefined) {
+  if (!seconds || seconds <= 0) return null
+
+  const days = Math.floor(seconds / 86400)
+  const hours = Math.floor((seconds % 86400) / 3600)
+  const minutes = Math.floor((seconds % 3600) / 60)
+
+  const parts: string[] = []
+  if (days) parts.push(`${days} дн.`)
+  if (hours) parts.push(`${hours} ч.`)
+  if (!days && minutes) parts.push(`${minutes} мин.`)
+
+  return parts.length ? parts.join(' ') : 'меньше минуты'
 }
 
 function cardStyle(accent: string): CSSProperties {
@@ -91,7 +107,67 @@ function productAccent(product: ShopProductResponse, asset: AssetResponse | null
 }
 
 function rarityLabel(rarity: SkinRarity | null | undefined) {
-  return rarity ? skinRarityConfig[rarity].label : 'Скин'
+  return rarity ? skinRarityConfig[rarity].label : 'Товар'
+}
+
+function assetKindLabel(assetKind: string | null | undefined) {
+  switch ((assetKind ?? '').trim().toLowerCase()) {
+    case 'skin':
+      return 'Скин'
+    case 'subscription':
+      return 'Подписка'
+    case 'kit':
+      return 'Кит'
+    case 'lootbox':
+      return 'Лутбокс'
+    case 'currency':
+      return 'Валюта'
+    case 'cosmetic':
+      return 'Косметика'
+    case 'ticket':
+      return 'Билет'
+    case 'token':
+      return 'Токен'
+    case 'item':
+      return 'Предмет'
+    default:
+      return assetKind?.trim() || 'Товар'
+  }
+}
+
+function normalizedAssetKind(product: ShopProductResponse, asset: AssetResponse | null) {
+  return (
+    metadataString(product, ['assetKind', 'kind', 'type'])
+    ?? metadataString(asset, ['assetKind', 'kind', 'type'])
+    ?? asset?.assetKind
+    ?? 'item'
+  ).trim().toLowerCase()
+}
+
+function normalizedOwnershipModel(product: ShopProductResponse, asset: AssetResponse | null) {
+  return (asset?.ownershipModel ?? product.ownershipModel).trim().toLowerCase()
+}
+
+function isSkinProduct(product: ShopProductResponse, asset: AssetResponse | null) {
+  return normalizedAssetKind(product, asset) === 'skin' || Boolean(asset?.weaponKey || asset?.rarity)
+}
+
+function productCardLabel(product: ShopProductResponse, asset: AssetResponse | null) {
+  if (isSkinProduct(product, asset) && asset?.rarity) {
+    return rarityLabel(asset.rarity)
+  }
+
+  return assetKindLabel(normalizedAssetKind(product, asset))
+}
+
+function uniqueSortedValues(values: Array<string | null | undefined>, labelForValue: (value: string) => string) {
+  return Array.from(
+    new Set(
+      values
+        .map((value) => value?.trim().toLowerCase() ?? '')
+        .filter(Boolean),
+    ),
+  ).sort((a, b) => labelForValue(a).localeCompare(labelForValue(b), 'ru'))
 }
 
 function buildAssetMap(assets: AssetResponse[]) {
@@ -121,41 +197,39 @@ function productDescription(product: ShopProductResponse, asset: AssetResponse |
     ?? asset?.description
     ?? metadataString(product, ['description', 'details'])
     ?? metadataString(asset, ['description', 'details'])
-    ?? 'Скин для твоего инвентаря.'
+    ?? 'Товар для твоего инвентаря.'
 }
 
-function isSkinProduct(product: ShopProductResponse, asset: AssetResponse | null) {
-  if (product.ownershipModel !== 'entitlement') return false
-  if (!asset) return true
-  if (asset.assetKind === 'skin' || asset.weaponKey) return true
-
-  const haystack = [
-    product.key,
-    product.assetKey,
-    product.localizedName,
-    product.assetDisplayName,
-    asset.key,
-    asset.displayName,
-    asset.assetKind,
-  ].join(' ').toLowerCase()
-
-  return haystack.includes('skin') || haystack.includes('скин')
+function addMetaItem(rows: Array<{ label: string; value: string }>, label: string, value: string | null | undefined) {
+  if (!value) return
+  rows.push({ label, value })
 }
 
-async function listAllEntitlementAssets(perPage = 100) {
-  const items: AssetResponse[] = []
-  let page = 1
+function buildProductMetaItems(product: ShopProductResponse, asset: AssetResponse | null) {
+  const rows: Array<{ label: string; value: string }> = []
+  const assetKind = normalizedAssetKind(product, asset)
+  const ownershipModel = normalizedOwnershipModel(product, asset)
+  const isSkin = isSkinProduct(product, asset)
+  const isSubscription = assetKind === 'subscription'
 
-  while (true) {
-    const response = await listPublicAssets({ ownershipModel: 'entitlement', page, perPage })
-    items.push(...response.items)
+  addMetaItem(rows, 'Цена', formatPrice(product.priceRub))
+  addMetaItem(rows, 'Тип', assetKindLabel(assetKind))
 
-    if (items.length >= response.total || response.items.length === 0) {
-      return items
-    }
-
-    page += 1
+  if (isSkin) {
+    if (asset?.rarity) addMetaItem(rows, 'Редкость', rarityLabel(asset.rarity))
+    addMetaItem(rows, 'Оружие', asset?.weaponKey?.replace('taczgun:', '') ?? '—')
   }
+
+  if (!isSkin && (isSubscription || ownershipModel === 'expirable')) {
+    addMetaItem(rows, 'Длительность', formatDuration(product.durationSeconds))
+  }
+
+  if (ownershipModel === 'stackable') {
+    addMetaItem(rows, 'Количество за покупку', product.stackableAmount ? String(product.stackableAmount) : null)
+    addMetaItem(rows, 'Максимум за покупку', product.maxPerPurchase ? String(product.maxPerPurchase) : null)
+  }
+
+  return rows
 }
 
 type ShopProductView = {
@@ -206,7 +280,7 @@ function ProductCard({
           <strong>{item.title}</strong>
         </div>
         <div className="inventory-skin-card__rarity">
-          <span>{rarityLabel(item.asset?.rarity)}</span>
+          <span>{productCardLabel(item.product, item.asset)}</span>
         </div>
         <div className="shop-product-card__footer">
           <strong>{formatPrice(item.product.priceRub)}</strong>
@@ -268,6 +342,7 @@ export default function ShopPage() {
   const [shopSort, setShopSort] = useState<ShopSortKey>('default')
   const [shopRarityFilter, setShopRarityFilter] = useState<ShopRarityFilter>('all')
   const [shopWeaponFilter, setShopWeaponFilter] = useState<ShopWeaponFilter>('all')
+  const [shopAssetKindFilter, setShopAssetKindFilter] = useState<ShopAssetKindFilter>('all')
   const [isShopFiltersModalOpen, setIsShopFiltersModalOpen] = useState(false)
 
   const load = async () => {
@@ -276,7 +351,7 @@ export default function ShopPage() {
       const token = getAuthToken()
       const [products, assets, entitlements] = await Promise.all([
         listPublicShopProducts(SHOP_LOCALE),
-        listAllEntitlementAssets(),
+        listAllPublicAssets(),
         token ? listMyEntitlements(token).catch(() => [] as EntitlementResponse[]) : Promise.resolve([] as EntitlementResponse[]),
       ])
 
@@ -312,7 +387,6 @@ export default function ShopPage() {
           owned: isOwned(product, ownedSet),
         }
       })
-      .filter((item) => isSkinProduct(item.product, item.asset))
   }, [state])
 
   const shopWeaponOptions = useMemo(
@@ -320,8 +394,20 @@ export default function ShopPage() {
     [baseProductViews],
   )
 
+  const shopAssetKindOptions = useMemo(
+    () => uniqueSortedValues(
+      baseProductViews.map((item) => normalizedAssetKind(item.product, item.asset)),
+      assetKindLabel,
+    ),
+    [baseProductViews],
+  )
+
   const productViews = useMemo(() => {
     let rows = baseProductViews
+
+    if (shopAssetKindFilter !== 'all') {
+      rows = rows.filter((item) => normalizedAssetKind(item.product, item.asset) === shopAssetKindFilter)
+    }
 
     if (shopRarityFilter === 'none') {
       rows = rows.filter((item) => !item.asset?.rarity)
@@ -330,7 +416,7 @@ export default function ShopPage() {
     }
 
     if (shopWeaponFilter !== 'all') {
-      rows = rows.filter((item) => (item.asset?.weaponKey ?? '').trim() === shopWeaponFilter)
+      rows = rows.filter((item) => (item.asset?.weaponKey?.replace('taczgun:', '') ?? '').trim() === shopWeaponFilter)
     }
 
     const sorted = [...rows]
@@ -351,7 +437,7 @@ export default function ShopPage() {
         )
         break
       case 'weapon': {
-        const w = (item: ShopProductView) => (item.asset?.weaponKey ?? '').trim().toLowerCase()
+        const w = (item: ShopProductView) => (item.asset?.weaponKey?.replace('taczgun:', '') ?? '').trim().toLowerCase()
         sorted.sort((a, b) => w(a).localeCompare(w(b), 'ru') || tieTitle(a, b))
         break
       }
@@ -360,7 +446,7 @@ export default function ShopPage() {
     }
 
     return sorted
-  }, [baseProductViews, shopSort, shopRarityFilter, shopWeaponFilter])
+  }, [baseProductViews, shopSort, shopRarityFilter, shopWeaponFilter, shopAssetKindFilter])
 
   const openBuyConfirmation = async (item: ShopProductView) => {
     if (item.owned || buyingProductKey || isCreatingOrder) return
@@ -424,8 +510,8 @@ export default function ShopPage() {
     <main className="page ownership-page shop-page">
       <section className="card ownership-hero shop-hero">
         <span className="ui-badge ui-badge-accent">Магазин</span>
-        <h1 className="card-title">Скины</h1>
-        <p className="card-text">Выбирай скин, открывай детали и покупай сразу без корзины.</p>
+        <h1 className="card-title">Товары</h1>
+        <p className="card-text">Выбирай товар, открывай детали и покупай сразу без корзины.</p>
       </section>
 
       <section className="ownership-section inventory-section">
@@ -463,7 +549,7 @@ export default function ShopPage() {
           </div>
         ) : (
           <p className="ownership-muted inventory-empty">
-            {baseProductViews.length ? 'Нет скинов по выбранным фильтрам.' : 'Скинов в магазине пока нет.'}
+            {baseProductViews.length ? 'Нет товаров по выбранным фильтрам.' : 'Товаров в магазине пока нет.'}
           </p>
         )}
       </section>
@@ -497,7 +583,6 @@ export default function ShopPage() {
               <div className="ui-modal-body inventory-filters-modal__body">
                 <div className="inventory-toolbar inventory-toolbar--modal" aria-label="Сортировка и фильтры магазина">
                   <div className="inventory-toolbar__row">
-                    <span className="inventory-toolbar__heading">Сортировка</span>
                     <fieldset className="ui-radio-group inventory-toolbar__fieldset inventory-toolbar__fieldset--inline">
                       <legend className="ui-radio-legend">Сортировка</legend>
                       {(
@@ -525,7 +610,37 @@ export default function ShopPage() {
                   </div>
                   <div className="inventory-toolbar__row inventory-toolbar__row--split">
                     <div className="inventory-toolbar__col">
-                      <span className="inventory-toolbar__heading">Фильтр: редкость</span>
+                      <fieldset className="ui-radio-group inventory-toolbar__fieldset inventory-toolbar__fieldset--wrap">
+                        <legend className="ui-radio-legend">Тип товара</legend>
+                        <label className="ui-radio">
+                          <input
+                            type="radio"
+                            name="shop-filter-kind"
+                            value="all"
+                            checked={shopAssetKindFilter === 'all'}
+                            onChange={() => setShopAssetKindFilter('all')}
+                          />
+                          <span className="ui-radio-mark" aria-hidden />
+                          <span>Все</span>
+                        </label>
+                        {shopAssetKindOptions.map((assetKind) => (
+                          <label key={assetKind} className="ui-radio">
+                            <input
+                              type="radio"
+                              name="shop-filter-kind"
+                              value={assetKind}
+                              checked={shopAssetKindFilter === assetKind}
+                              onChange={() => setShopAssetKindFilter(assetKind)}
+                            />
+                            <span className="ui-radio-mark" aria-hidden />
+                            <span>{assetKindLabel(assetKind)}</span>
+                          </label>
+                        ))}
+                      </fieldset>
+                    </div>
+                  </div>
+                  <div className="inventory-toolbar__row inventory-toolbar__row--split">
+                    <div className="inventory-toolbar__col">
                       <fieldset className="ui-radio-group inventory-toolbar__fieldset">
                         <legend className="ui-radio-legend">Редкость</legend>
                         <label className="ui-radio">
@@ -538,6 +653,17 @@ export default function ShopPage() {
                           />
                           <span className="ui-radio-mark" aria-hidden />
                           <span>Все</span>
+                        </label>
+                        <label className="ui-radio">
+                          <input
+                            type="radio"
+                            name="shop-filter-rarity"
+                            value="none"
+                            checked={shopRarityFilter === 'none'}
+                            onChange={() => setShopRarityFilter('none')}
+                          />
+                          <span className="ui-radio-mark" aria-hidden />
+                          <span>Без редкости</span>
                         </label>
                         {(Object.keys(skinRarityConfig) as SkinRarity[]).map((rarity) => (
                           <label key={rarity} className="ui-radio">
@@ -570,16 +696,16 @@ export default function ShopPage() {
                           <span>Все</span>
                         </label>
                         {shopWeaponOptions.map((weaponKey) => (
-                          <label key={weaponKey} className="ui-radio">
+                          <label key={weaponKey?.replace('taczgun:', '')} className="ui-radio">
                             <input
                               type="radio"
                               name="shop-filter-weapon"
-                              value={weaponKey}
-                              checked={shopWeaponFilter === weaponKey}
-                              onChange={() => setShopWeaponFilter(weaponKey)}
+                              value={weaponKey?.replace('taczgun:', '')}
+                              checked={shopWeaponFilter === weaponKey?.replace('taczgun:', '')}
+                              onChange={() => setShopWeaponFilter(weaponKey?.replace('taczgun:', ''))}
                             />
                             <span className="ui-radio-mark" aria-hidden />
-                            <span>{weaponKey}</span>
+                            <span>{weaponKey?.replace('taczgun:', '')}</span>
                           </label>
                         ))}
                       </fieldset>
@@ -605,9 +731,10 @@ export default function ShopPage() {
             imageUrl: detailsProduct.imageUrl,
             accent: detailsProduct.accent,
             rarity: detailsProduct.asset?.rarity,
-            weaponKey: detailsProduct.asset?.weaponKey,
+            weaponKey: detailsProduct.asset?.weaponKey?.replace('taczgun:', ''),
             priceText: formatPrice(detailsProduct.product.priceRub),
             statusText: detailsProduct.owned ? 'Уже в инвентаре' : 'Можно купить',
+            metaItems: buildProductMetaItems(detailsProduct.product, detailsProduct.asset),
           }}
           titleId="shop-product-details-title"
           onClose={() => setDetailsProduct(null)}

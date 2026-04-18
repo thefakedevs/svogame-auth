@@ -38,9 +38,12 @@ import { getAuthToken } from '../../shared/session/auth-session'
 import { useQuery } from '../../util/query'
 import AdminAssetsPanel from './AdminAssetsPanel'
 import AdminGunskinShopWizard from './AdminGunskinShopWizard'
+import AdminLootboxesPanel from './AdminLootboxesPanel'
+import AdminLootboxView from './AdminLootboxView'
 import AdminShopPanel from './AdminShopPanel'
 import AdminShopProductView from './AdminShopProductView'
 import AdminSquadProfile from './AdminSquadProfile'
+import AdminUserLootboxHistoryView from './AdminUserLootboxHistoryView'
 import AdminUserProfile from './AdminUserProfile'
 import ErrorState from '../ErrorState'
 import LoadingState from '../LoadingState'
@@ -52,8 +55,10 @@ type AdminRoute =
   | { type: 'squad'; squadId: string }
   | { type: 'tokenAudit'; tokenId: string }
   | { type: 'shopProduct'; productId: string }
+  | { type: 'lootbox'; lootboxId: string }
+  | { type: 'userLootboxHistory'; userId: string }
 type AccessState = 'loading' | 'allowed' | 'denied' | 'error'
-type HomeTab = 'overview' | 'users' | 'squads' | 'tokens' | 'assets' | 'shop' | 'skinShop'
+type HomeTab = 'overview' | 'users' | 'squads' | 'tokens' | 'assets' | 'shop' | 'skinShop' | 'lootboxes'
 const PAGE_SIZE = 30
 
 const dateTimeFormatter = new Intl.DateTimeFormat('ru-RU', {
@@ -92,6 +97,9 @@ function parseRoute(pathname: string): AdminRoute {
   const userMatch = pathname.match(/^\/admin\/users\/([^/]+)$/)
   if (userMatch) return { type: 'user', userId: decodeURIComponent(userMatch[1]) }
 
+  const userLootboxHistoryMatch = pathname.match(/^\/admin\/users\/([^/]+)\/lootboxes\/open-history$/)
+  if (userLootboxHistoryMatch) return { type: 'userLootboxHistory', userId: decodeURIComponent(userLootboxHistoryMatch[1]) }
+
   const squadMatch = pathname.match(/^\/admin\/squads\/([^/]+)$/)
   if (squadMatch) return { type: 'squad', squadId: decodeURIComponent(squadMatch[1]) }
 
@@ -100,6 +108,9 @@ function parseRoute(pathname: string): AdminRoute {
 
   const shopProductMatch = pathname.match(/^\/admin\/shop\/products\/([^/]+)$/)
   if (shopProductMatch) return { type: 'shopProduct', productId: decodeURIComponent(shopProductMatch[1]) }
+
+  const lootboxMatch = pathname.match(/^\/admin\/lootboxes\/([^/]+)$/)
+  if (lootboxMatch) return { type: 'lootbox', lootboxId: decodeURIComponent(lootboxMatch[1]) }
 
   return { type: 'home' }
 }
@@ -111,6 +122,7 @@ function tabFromQuery(tab: string | null): HomeTab {
   if (tab === 'assets') return 'assets'
   if (tab === 'shop') return 'shop'
   if (tab === 'skinShop') return 'skinShop'
+  if (tab === 'lootboxes') return 'lootboxes'
   if (tab === 'users') return 'users'
   return 'overview'
 }
@@ -139,10 +151,10 @@ export default function AdminPage() {
   const [squadsQuery, setSquadsQuery] = useState('')
   const [usersPage, setUsersPage] = useState(1)
   const [squadsPage, setSquadsPage] = useState(1)
-  const [usersHasMore, setUsersHasMore] = useState(false)
-  const [squadsHasMore, setSquadsHasMore] = useState(false)
-  const [isUsersLoadingMore, setIsUsersLoadingMore] = useState(false)
-  const [isSquadsLoadingMore, setIsSquadsLoadingMore] = useState(false)
+  const [usersTotal, setUsersTotal] = useState(0)
+  const [squadsTotal, setSquadsTotal] = useState(0)
+  const [usersTotalPages, setUsersTotalPages] = useState(1)
+  const [squadsTotalPages, setSquadsTotalPages] = useState(1)
 
   const [user, setUser] = useState<AdminUserResponse | null>(null)
   const [userSquad, setUserSquad] = useState<AdminSquadResponse | null | undefined>(undefined)
@@ -177,21 +189,21 @@ export default function AdminPage() {
     if (!token || accessState !== 'allowed' || route.type !== 'home') return
 
     if (tab === 'users') {
-      void listAdminUsers(token, { q: usersQuery.trim() || undefined, page: 1, perPage: PAGE_SIZE })
+      void listAdminUsers(token, { q: usersQuery.trim() || undefined, page: usersPage, perPage: PAGE_SIZE })
         .then((response) => {
           setUsers(response.items)
-          setUsersPage(1)
-          setUsersHasMore(response.page < response.totalPages && response.items.length < response.total)
+          setUsersTotal(response.total)
+          setUsersTotalPages(Math.max(1, response.totalPages))
         })
         .catch((cause) => setError(toDisplayError(cause, 'Ошибка загрузки пользователей.')))
     }
 
     if (tab === 'squads') {
-      void listAdminSquads(token, { q: squadsQuery.trim() || undefined, page: 1, perPage: PAGE_SIZE })
+      void listAdminSquads(token, { q: squadsQuery.trim() || undefined, page: squadsPage, perPage: PAGE_SIZE })
         .then((response) => {
           setSquads(response.items)
-          setSquadsPage(1)
-          setSquadsHasMore(response.page * response.perPage < response.total)
+          setSquadsTotal(response.total)
+          setSquadsTotalPages(Math.max(1, Math.ceil(response.total / response.perPage)))
         })
         .catch((cause) => setError(toDisplayError(cause, 'Ошибка загрузки сквадов.')))
     }
@@ -201,46 +213,16 @@ export default function AdminPage() {
         .then(setTokens)
         .catch((cause) => setError(toDisplayError(cause, 'Ошибка загрузки сервисных токенов.')))
     }
-  }, [accessState, route.type, tab, token, usersQuery, squadsQuery])
+  }, [accessState, route.type, tab, token, usersQuery, usersPage, squadsQuery, squadsPage])
 
-  const loadMoreUsers = async () => {
-    if (!token || !usersHasMore || isUsersLoadingMore) return
-    setIsUsersLoadingMore(true)
-    try {
-      const nextPage = usersPage + 1
-      const response = await listAdminUsers(token, {
-        q: usersQuery.trim() || undefined,
-        page: nextPage,
-        perPage: PAGE_SIZE,
-      })
-      setUsers((prev) => [...prev, ...response.items])
-      setUsersPage(nextPage)
-      setUsersHasMore(response.page < response.totalPages && nextPage * PAGE_SIZE < response.total)
-    } catch (cause) {
-      toast.error(toDisplayError(cause, 'Не удалось загрузить еще пользователей.'))
-    } finally {
-      setIsUsersLoadingMore(false)
-    }
+  const changeUsersQuery = (value: string) => {
+    setUsersQuery(value)
+    setUsersPage(1)
   }
 
-  const loadMoreSquads = async () => {
-    if (!token || !squadsHasMore || isSquadsLoadingMore) return
-    setIsSquadsLoadingMore(true)
-    try {
-      const nextPage = squadsPage + 1
-      const response = await listAdminSquads(token, {
-        q: squadsQuery.trim() || undefined,
-        page: nextPage,
-        perPage: PAGE_SIZE,
-      })
-      setSquads((prev) => [...prev, ...response.items])
-      setSquadsPage(nextPage)
-      setSquadsHasMore(response.page * response.perPage < response.total)
-    } catch (cause) {
-      toast.error(toDisplayError(cause, 'Не удалось загрузить еще сквады.'))
-    } finally {
-      setIsSquadsLoadingMore(false)
-    }
+  const changeSquadsQuery = (value: string) => {
+    setSquadsQuery(value)
+    setSquadsPage(1)
   }
 
   useEffect(() => {
@@ -303,14 +285,16 @@ export default function AdminPage() {
         tokens={tokens}
         usersQuery={usersQuery}
         squadsQuery={squadsQuery}
-        usersHasMore={usersHasMore}
-        squadsHasMore={squadsHasMore}
-        isUsersLoadingMore={isUsersLoadingMore}
-        isSquadsLoadingMore={isSquadsLoadingMore}
-        onUsersQueryChange={setUsersQuery}
-        onSquadsQueryChange={setSquadsQuery}
-        onLoadMoreUsers={loadMoreUsers}
-        onLoadMoreSquads={loadMoreSquads}
+        usersPage={usersPage}
+        squadsPage={squadsPage}
+        usersTotal={usersTotal}
+        squadsTotal={squadsTotal}
+        usersTotalPages={usersTotalPages}
+        squadsTotalPages={squadsTotalPages}
+        onUsersQueryChange={changeUsersQuery}
+        onSquadsQueryChange={changeSquadsQuery}
+        onUsersPageChange={setUsersPage}
+        onSquadsPageChange={setSquadsPage}
         onTokensChange={setTokens}
       />
     )
@@ -318,6 +302,10 @@ export default function AdminPage() {
 
   if (route.type === 'user') {
     return <AdminUserProfile token={token!} user={user} userId={route.userId} userSquad={userSquad} onUserChange={setUser} />
+  }
+
+  if (route.type === 'userLootboxHistory') {
+    return <AdminUserLootboxHistoryView token={token!} userId={route.userId} />
   }
 
   if (route.type === 'tokenAudit') {
@@ -328,8 +316,58 @@ export default function AdminPage() {
     return <AdminShopProductView token={token!} productId={route.productId} />
   }
 
+  if (route.type === 'lootbox') {
+    return <AdminLootboxView token={token!} lootboxId={route.lootboxId} />
+  }
+
   return (
     <AdminSquadProfile token={token!} squad={squad} members={squadMembers} onSquadChange={setSquad} onMembersChange={setSquadMembers} />
+  )
+}
+
+function getPaginationPages(page: number, totalPages: number) {
+  const pages = new Set([1, totalPages, page - 1, page, page + 1].filter((item) => item >= 1 && item <= totalPages))
+  return Array.from(pages).sort((left, right) => left - right)
+}
+
+function AdminPagination({
+  page,
+  totalPages,
+  onPageChange,
+  label,
+}: {
+  page: number
+  totalPages: number
+  onPageChange: (page: number) => void
+  label: string
+}) {
+  const pages = getPaginationPages(page, totalPages)
+
+  return (
+    <nav className="admin-pagination" aria-label={label}>
+      <ul className="ui-pagination">
+        <li>
+          <button type="button" className="ui-pagination-btn" aria-label="Предыдущая страница" disabled={page <= 1} onClick={() => onPageChange(Math.max(1, page - 1))}>‹</button>
+        </li>
+        {pages.map((item, index) => (
+          <li key={item}>
+            {index > 0 && item - pages[index - 1] > 1 ? <span className="ui-pagination-ellipsis">…</span> : null}
+            <button
+              type="button"
+              className="ui-pagination-btn"
+              aria-label={`Страница ${item}`}
+              aria-current={page === item ? 'page' : undefined}
+              onClick={() => onPageChange(item)}
+            >
+              {item}
+            </button>
+          </li>
+        ))}
+        <li>
+          <button type="button" className="ui-pagination-btn" aria-label="Следующая страница" disabled={page >= totalPages} onClick={() => onPageChange(Math.min(totalPages, page + 1))}>›</button>
+        </li>
+      </ul>
+    </nav>
   )
 }
 
@@ -341,14 +379,16 @@ function AdminHome({
   tokens,
   usersQuery,
   squadsQuery,
-  usersHasMore,
-  squadsHasMore,
-  isUsersLoadingMore,
-  isSquadsLoadingMore,
+  usersPage,
+  squadsPage,
+  usersTotal,
+  squadsTotal,
+  usersTotalPages,
+  squadsTotalPages,
   onUsersQueryChange,
   onSquadsQueryChange,
-  onLoadMoreUsers,
-  onLoadMoreSquads,
+  onUsersPageChange,
+  onSquadsPageChange,
   onTokensChange,
 }: {
   token: string
@@ -358,14 +398,16 @@ function AdminHome({
   tokens: ServiceTokenResponse[]
   usersQuery: string
   squadsQuery: string
-  usersHasMore: boolean
-  squadsHasMore: boolean
-  isUsersLoadingMore: boolean
-  isSquadsLoadingMore: boolean
+  usersPage: number
+  squadsPage: number
+  usersTotal: number
+  squadsTotal: number
+  usersTotalPages: number
+  squadsTotalPages: number
   onUsersQueryChange: (value: string) => void
   onSquadsQueryChange: (value: string) => void
-  onLoadMoreUsers: () => Promise<void>
-  onLoadMoreSquads: () => Promise<void>
+  onUsersPageChange: (page: number) => void
+  onSquadsPageChange: (page: number) => void
   onTokensChange: (fn: (prev: ServiceTokenResponse[]) => ServiceTokenResponse[]) => void
 }) {
   const [systemName, setSystemName] = useState('')
@@ -490,6 +532,7 @@ function AdminHome({
           <button type="button" className={`admin-tab ${tab === 'assets' ? 'is-active' : ''}`} onClick={() => setHomeTab('assets')}>Ассеты</button>
           <button type="button" className={`admin-tab ${tab === 'shop' ? 'is-active' : ''}`} onClick={() => setHomeTab('shop')}>Магазин</button>
           <button type="button" className={`admin-tab ${tab === 'skinShop' ? 'is-active' : ''}`} onClick={() => setHomeTab('skinShop')}>Скины → магазин</button>
+          <button type="button" className={`admin-tab ${tab === 'lootboxes' ? 'is-active' : ''}`} onClick={() => setHomeTab('lootboxes')}>Лутбоксы</button>
           <button type="button" className={`admin-tab ${tab === 'tokens' ? 'is-active' : ''}`} onClick={() => setHomeTab('tokens')}>Сервисные токены</button>
         </nav>
       </section>
@@ -587,6 +630,7 @@ function AdminHome({
       {tab === 'users' ? (
         <section className="card admin-card">
           <input className="ui-input" value={usersQuery} onChange={(event) => onUsersQueryChange(event.target.value)} placeholder="Поиск пользователей" />
+          <p className="admin-inline-muted">Найдено: {usersTotal}. Страница {usersPage} из {Math.max(1, usersTotalPages)}</p>
           <div className="admin-list">
             {users.map((user) => (
               <button key={user.id} type="button" className="admin-row" onClick={() => pushUrl(adminUserPath(user.id))}>
@@ -604,12 +648,9 @@ function AdminHome({
                 ) : null}
               </button>
             ))}
+            {users.length === 0 ? <p className="admin-inline-muted">Пользователи не найдены.</p> : null}
           </div>
-          {usersHasMore ? (
-            <button type="button" className="btn" disabled={isUsersLoadingMore} onClick={() => void onLoadMoreUsers()}>
-              {isUsersLoadingMore ? 'Загрузка...' : 'Загрузить еще'}
-            </button>
-          ) : null}
+          <AdminPagination page={usersPage} totalPages={Math.max(1, usersTotalPages)} onPageChange={onUsersPageChange} label="Нумерация страниц пользователей" />
         </section>
       ) : null}
 
@@ -617,6 +658,7 @@ function AdminHome({
         <section className="card admin-card">
           <h2 className="card-title">Все сквады</h2>
           <input className="ui-input" value={squadsQuery} onChange={(event) => onSquadsQueryChange(event.target.value)} placeholder="Поиск сквадов" />
+          <p className="admin-inline-muted">Найдено: {squadsTotal}. Страница {squadsPage} из {Math.max(1, squadsTotalPages)}</p>
           <div className="admin-list">
             {squads.map((squadItem) => (
               <button key={squadItem.id} type="button" className="admin-row" onClick={() => pushUrl(adminSquadPath(squadItem.id))}>
@@ -632,12 +674,9 @@ function AdminHome({
                 </span>
               </button>
             ))}
+            {squads.length === 0 ? <p className="admin-inline-muted">Сквады не найдены.</p> : null}
           </div>
-          {squadsHasMore ? (
-            <button type="button" className="btn" disabled={isSquadsLoadingMore} onClick={() => void onLoadMoreSquads()}>
-              {isSquadsLoadingMore ? 'Загрузка...' : 'Загрузить еще'}
-            </button>
-          ) : null}
+          <AdminPagination page={squadsPage} totalPages={Math.max(1, squadsTotalPages)} onPageChange={onSquadsPageChange} label="Нумерация страниц сквадов" />
         </section>
       ) : null}
 
@@ -679,6 +718,7 @@ function AdminHome({
 
       {tab === 'shop' ? <AdminShopPanel token={token} /> : null}
       {tab === 'skinShop' ? <AdminGunskinShopWizard token={token} /> : null}
+      {tab === 'lootboxes' ? <AdminLootboxesPanel token={token} /> : null}
 
       {tokenModalSecret ? (
         <div className="admin-token-modal-backdrop" role="dialog" aria-modal="true" aria-label="Новый сервисный токен">

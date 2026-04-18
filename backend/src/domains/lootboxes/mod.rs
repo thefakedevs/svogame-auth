@@ -7,7 +7,7 @@ pub fn router() -> Router<crate::app::state::SharedAppState> {
     Router::new()
         .route("/api/lootboxes", get(handlers::list_public_lootboxes))
         .route(
-            "/api/lootboxes/{asset_key}",
+            "/api/lootboxes/{lootbox_id}",
             get(handlers::get_public_lootbox),
         )
         .route("/api/user/me/lootboxes", get(handlers::get_my_lootboxes))

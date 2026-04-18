@@ -18,6 +18,7 @@ pub enum AssetKind {
     Currency,
     Ticket,
     Token,
+    Kit,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -58,6 +59,7 @@ impl AssetKind {
             Self::Currency => "currency",
             Self::Ticket => "ticket",
             Self::Token => "token",
+            Self::Kit => "kit",
         }
     }
 
@@ -71,6 +73,7 @@ impl AssetKind {
             "currency" => Ok(Self::Currency),
             "ticket" => Ok(Self::Ticket),
             "token" => Ok(Self::Token),
+            "kit" => Ok(Self::Kit),
             _ => bail!("Unsupported asset kind"),
         }
     }

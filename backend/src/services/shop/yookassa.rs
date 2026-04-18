@@ -26,6 +26,8 @@ pub struct YooKassaPayment {
     #[serde(default)]
     pub paid: bool,
     #[serde(default)]
+    pub test: bool,
+    #[serde(default)]
     pub amount: Option<YooKassaAmount>,
     #[serde(default)]
     pub income_amount: Option<YooKassaAmount>,

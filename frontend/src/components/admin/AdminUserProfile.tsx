@@ -17,7 +17,7 @@ import {
 import { toDisplayError } from '../../api/http'
 import { getRestrictionMeta, type RestrictionMetaResponse } from '../../api/meta'
 import { buildSkinUrl } from '../../api/skins'
-import { adminSquadPath, paths } from '../../routes/paths'
+import { adminSquadPath, adminUserLootboxHistoryPath, paths } from '../../routes/paths'
 import { pushUrl } from '../../shared/navigation/history'
 import AppPortal from '../../shared/ui/portal/AppPortal'
 import LoadingState from '../LoadingState'
@@ -248,20 +248,12 @@ export default function AdminUserProfile({
 
               <div className="admin-user-headbar-actions">
                 <button
-                  className="btn btn-sm"
+                  className={`btn btn-sm ${user.isSuperuser ? 'danger' : ''}`}
                   type="button"
-                  disabled={isUpdatingSuperuser || user.isSuperuser}
-                  onClick={() => void grantSuperuser()}
+                  disabled={isUpdatingSuperuser}
+                  onClick={() => void (user.isSuperuser ? revokeSuperuser() : grantSuperuser())}
                 >
-                  Выдать Superuser
-                </button>
-                <button
-                  className="btn btn-sm danger"
-                  type="button"
-                  disabled={isUpdatingSuperuser || !user.isSuperuser}
-                  onClick={() => void revokeSuperuser()}
-                >
-                  Снять Superuser
+                  {isUpdatingSuperuser ? 'Обновляем...' : user.isSuperuser ? 'Снять Superuser' : 'Выдать Superuser'}
                 </button>
                 <button
                   className="btn btn-sm danger"
@@ -270,6 +262,13 @@ export default function AdminUserProfile({
                   onClick={() => setIsResetAuthEpochModalOpen(true)}
                 >
                   {isResettingAuthEpoch ? 'Очищаем...' : 'Очистить сессии'}
+                </button>
+                <button
+                  className="btn btn-sm"
+                  type="button"
+                  onClick={() => pushUrl(adminUserLootboxHistoryPath(user.id))}
+                >
+                  Открытые кейсы
                 </button>
               </div>
             </div>

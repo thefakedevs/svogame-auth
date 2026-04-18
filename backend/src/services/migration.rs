@@ -1511,6 +1511,11 @@ impl MigrationTrait for CreateLootboxDropDefinitionTable {
                             .null(),
                     )
                     .col(
+                        ColumnDef::new(LootboxDropDefinition::DuplicateCompensationAmount)
+                            .big_integer()
+                            .null(),
+                    )
+                    .col(
                         ColumnDef::new(LootboxDropDefinition::Weight)
                             .big_integer()
                             .not_null(),
@@ -1564,6 +1569,7 @@ enum LootboxDropDefinition {
     RewardAssetDefinitionId,
     StackableAmount,
     ExpirableDurationSeconds,
+    DuplicateCompensationAmount,
     Weight,
     TitleI18n,
     IsActive,
@@ -1645,6 +1651,42 @@ impl MigrationTrait for CreateLootboxOpenOperationTable {
                             .string()
                             .not_null(),
                     )
+                    .col(
+                        ColumnDef::new(LootboxOpenOperation::GrantedAssetDefinitionId)
+                            .uuid()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(LootboxOpenOperation::GrantedOwnershipModel)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(LootboxOpenOperation::GrantedAmount)
+                            .big_integer()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(LootboxOpenOperation::GrantedDurationSeconds)
+                            .big_integer()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(LootboxOpenOperation::GrantedExpiresAt)
+                            .timestamp_with_time_zone()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(LootboxOpenOperation::GrantedTitle)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(LootboxOpenOperation::WasCompensated)
+                            .boolean()
+                            .not_null()
+                            .default(false),
+                    )
                     .col(ColumnDef::new(LootboxOpenOperation::Locale).string().null())
                     .col(
                         ColumnDef::new(LootboxOpenOperation::ActorKind)
@@ -1708,6 +1750,13 @@ enum LootboxOpenOperation {
     RewardDurationSeconds,
     RewardExpiresAt,
     RewardTitle,
+    GrantedAssetDefinitionId,
+    GrantedOwnershipModel,
+    GrantedAmount,
+    GrantedDurationSeconds,
+    GrantedExpiresAt,
+    GrantedTitle,
+    WasCompensated,
     Locale,
     ActorKind,
     ActorUserId,
@@ -1719,6 +1768,58 @@ enum LootboxOpenOperation {
 }
 
 pub struct CreateShopProductTable;
+
+pub struct AddLootboxRewardCompensationColumns;
+
+impl MigrationName for AddLootboxRewardCompensationColumns {
+    fn name(&self) -> &str {
+        "m20260417_000036_add_lootbox_reward_compensation_columns"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for AddLootboxRewardCompensationColumns {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        let backend = manager.get_database_backend();
+        let statements = match backend {
+            DatabaseBackend::Postgres | DatabaseBackend::Sqlite => vec![
+                r#"ALTER TABLE "lootbox_drop_definition" ADD COLUMN "duplicate_compensation_amount" bigint NULL"#,
+                r#"ALTER TABLE "lootbox_open_operation" ADD COLUMN "granted_asset_definition_id" uuid NULL"#,
+                r#"ALTER TABLE "lootbox_open_operation" ADD COLUMN "granted_ownership_model" varchar NULL"#,
+                r#"ALTER TABLE "lootbox_open_operation" ADD COLUMN "granted_amount" bigint NULL"#,
+                r#"ALTER TABLE "lootbox_open_operation" ADD COLUMN "granted_duration_seconds" bigint NULL"#,
+                r#"ALTER TABLE "lootbox_open_operation" ADD COLUMN "granted_expires_at" timestamptz NULL"#,
+                r#"ALTER TABLE "lootbox_open_operation" ADD COLUMN "granted_title" varchar NULL"#,
+                r#"ALTER TABLE "lootbox_open_operation" ADD COLUMN "was_compensated" boolean NOT NULL DEFAULT false"#,
+                r#"UPDATE "lootbox_open_operation" SET "granted_asset_definition_id" = "reward_asset_definition_id" WHERE "granted_asset_definition_id" IS NULL"#,
+                r#"UPDATE "lootbox_open_operation" SET "granted_ownership_model" = "reward_ownership_model" WHERE "granted_ownership_model" IS NULL"#,
+                r#"UPDATE "lootbox_open_operation" SET "granted_amount" = "reward_amount" WHERE "granted_amount" IS NULL"#,
+                r#"UPDATE "lootbox_open_operation" SET "granted_duration_seconds" = "reward_duration_seconds" WHERE "granted_duration_seconds" IS NULL"#,
+                r#"UPDATE "lootbox_open_operation" SET "granted_expires_at" = "reward_expires_at" WHERE "granted_expires_at" IS NULL"#,
+                r#"UPDATE "lootbox_open_operation" SET "granted_title" = "reward_title" WHERE "granted_title" IS NULL"#,
+            ],
+            _ => return Ok(()),
+        };
+
+        for sql in statements {
+            match manager
+                .get_connection()
+                .execute(Statement::from_string(backend, sql.to_string()))
+                .await
+            {
+                Ok(_) => {}
+                Err(error) if is_duplicate_column_error(&error) => {}
+                Err(error) => return Err(error),
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn down(&self, _manager: &SchemaManager) -> Result<(), DbErr> {
+        Ok(())
+    }
+}
 
 impl MigrationName for CreateShopProductTable {
     fn name(&self) -> &str {
@@ -2275,11 +2376,23 @@ impl MigrationTrait for CreateDiscordBroadcastTable {
                             .not_null()
                             .primary_key(),
                     )
-                    .col(ColumnDef::new(DiscordBroadcast::RequestedByUserId).uuid().null())
-                    .col(ColumnDef::new(DiscordBroadcast::TemplateKey).string().not_null())
+                    .col(
+                        ColumnDef::new(DiscordBroadcast::RequestedByUserId)
+                            .uuid()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(DiscordBroadcast::TemplateKey)
+                            .string()
+                            .not_null(),
+                    )
                     .col(ColumnDef::new(DiscordBroadcast::Message).text().not_null())
                     .col(ColumnDef::new(DiscordBroadcast::Status).string().not_null())
-                    .col(ColumnDef::new(DiscordBroadcast::TotalCount).big_integer().not_null())
+                    .col(
+                        ColumnDef::new(DiscordBroadcast::TotalCount)
+                            .big_integer()
+                            .not_null(),
+                    )
                     .col(
                         ColumnDef::new(DiscordBroadcast::CreatedAt)
                             .timestamp_with_time_zone()
@@ -2353,13 +2466,29 @@ impl MigrationTrait for CreateDiscordDeliveryTable {
                     )
                     .col(ColumnDef::new(DiscordDelivery::BroadcastId).uuid().null())
                     .col(ColumnDef::new(DiscordDelivery::UserId).uuid().not_null())
-                    .col(ColumnDef::new(DiscordDelivery::RequestedByUserId).uuid().null())
-                    .col(ColumnDef::new(DiscordDelivery::TemplateKey).string().not_null())
+                    .col(
+                        ColumnDef::new(DiscordDelivery::RequestedByUserId)
+                            .uuid()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(DiscordDelivery::TemplateKey)
+                            .string()
+                            .not_null(),
+                    )
                     .col(ColumnDef::new(DiscordDelivery::Message).text().not_null())
                     .col(ColumnDef::new(DiscordDelivery::Status).string().not_null())
                     .col(ColumnDef::new(DiscordDelivery::ErrorMessage).text().null())
-                    .col(ColumnDef::new(DiscordDelivery::DiscordChannelId).string().null())
-                    .col(ColumnDef::new(DiscordDelivery::DiscordMessageId).string().null())
+                    .col(
+                        ColumnDef::new(DiscordDelivery::DiscordChannelId)
+                            .string()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(DiscordDelivery::DiscordMessageId)
+                            .string()
+                            .null(),
+                    )
                     .col(
                         ColumnDef::new(DiscordDelivery::AttemptCount)
                             .integer()
@@ -2506,7 +2635,11 @@ impl MigrationTrait for CreateUserSelectedGunskinTable {
                 Table::create()
                     .table(UserSelectedGunskin::Table)
                     .if_not_exists()
-                    .col(ColumnDef::new(UserSelectedGunskin::UserId).uuid().not_null())
+                    .col(
+                        ColumnDef::new(UserSelectedGunskin::UserId)
+                            .uuid()
+                            .not_null(),
+                    )
                     .col(
                         ColumnDef::new(UserSelectedGunskin::WeaponKey)
                             .string()
@@ -2571,5 +2704,198 @@ enum UserSelectedGunskin {
     WeaponKey,
     AssetDefinitionId,
     SelectedAt,
+    UpdatedAt,
+}
+
+pub struct CreateAppKvTable;
+
+impl MigrationName for CreateAppKvTable {
+    fn name(&self) -> &str {
+        "m20260417_000034_create_app_kv_table"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for CreateAppKvTable {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .create_table(
+                Table::create()
+                    .table(AppKv::Table)
+                    .if_not_exists()
+                    .col(ColumnDef::new(AppKv::Key).string().not_null().primary_key())
+                    .col(ColumnDef::new(AppKv::Value).text().not_null())
+                    .col(
+                        ColumnDef::new(AppKv::CreatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .col(
+                        ColumnDef::new(AppKv::UpdatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .to_owned(),
+            )
+            .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_table(Table::drop().table(AppKv::Table).to_owned())
+            .await
+    }
+}
+
+#[derive(DeriveIden)]
+enum AppKv {
+    Table,
+    Key,
+    Value,
+    CreatedAt,
+    UpdatedAt,
+}
+
+pub struct CreateShopReceiptTable;
+
+impl MigrationName for CreateShopReceiptTable {
+    fn name(&self) -> &str {
+        "m20260417_000035_create_shop_receipt_table"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for CreateShopReceiptTable {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .create_table(
+                Table::create()
+                    .table(ShopReceipt::Table)
+                    .if_not_exists()
+                    .col(
+                        ColumnDef::new(ShopReceipt::Id)
+                            .uuid()
+                            .not_null()
+                            .primary_key(),
+                    )
+                    .col(ColumnDef::new(ShopReceipt::OrderId).uuid().not_null())
+                    .col(ColumnDef::new(ShopReceipt::Provider).string().not_null())
+                    .col(ColumnDef::new(ShopReceipt::Status).string().not_null())
+                    .col(ColumnDef::new(ShopReceipt::ReceiptUuid).string().null())
+                    .col(ColumnDef::new(ShopReceipt::JsonUrl).string().null())
+                    .col(ColumnDef::new(ShopReceipt::PrintUrl).string().null())
+                    .col(
+                        ColumnDef::new(ShopReceipt::AttemptCount)
+                            .integer()
+                            .not_null()
+                            .default(0),
+                    )
+                    .col(
+                        ColumnDef::new(ShopReceipt::FirstAttemptAt)
+                            .timestamp_with_time_zone()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(ShopReceipt::LastAttemptAt)
+                            .timestamp_with_time_zone()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(ShopReceipt::NextAttemptAt)
+                            .timestamp_with_time_zone()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(ShopReceipt::DeadlineAt)
+                            .timestamp_with_time_zone()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(ShopReceipt::LockedUntil)
+                            .timestamp_with_time_zone()
+                            .null(),
+                    )
+                    .col(ColumnDef::new(ShopReceipt::FailureProblem).string().null())
+                    .col(
+                        ColumnDef::new(ShopReceipt::RequestPayload)
+                            .text()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(ShopReceipt::ResponsePayload)
+                            .text()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(ShopReceipt::CompletedAt)
+                            .timestamp_with_time_zone()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(ShopReceipt::CreatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .col(
+                        ColumnDef::new(ShopReceipt::UpdatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+
+        let backend = manager.get_database_backend();
+        for sql in [
+            r#"CREATE UNIQUE INDEX IF NOT EXISTS "idx_shop_receipt_order_id" ON "shop_receipt" ("order_id")"#,
+            r#"CREATE INDEX IF NOT EXISTS "idx_shop_receipt_status_next_attempt_at" ON "shop_receipt" ("status", "next_attempt_at")"#,
+            r#"CREATE INDEX IF NOT EXISTS "idx_shop_receipt_locked_until" ON "shop_receipt" ("locked_until")"#,
+        ] {
+            match manager
+                .get_connection()
+                .execute(Statement::from_string(backend, sql.to_string()))
+                .await
+            {
+                Ok(_) => {}
+                Err(error) if is_duplicate_index_error(&error) => {}
+                Err(error) => return Err(error),
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_table(Table::drop().table(ShopReceipt::Table).to_owned())
+            .await
+    }
+}
+
+#[derive(DeriveIden)]
+enum ShopReceipt {
+    Table,
+    Id,
+    OrderId,
+    Provider,
+    Status,
+    ReceiptUuid,
+    JsonUrl,
+    PrintUrl,
+    AttemptCount,
+    FirstAttemptAt,
+    LastAttemptAt,
+    NextAttemptAt,
+    DeadlineAt,
+    LockedUntil,
+    FailureProblem,
+    RequestPayload,
+    ResponsePayload,
+    CompletedAt,
+    CreatedAt,
     UpdatedAt,
 }

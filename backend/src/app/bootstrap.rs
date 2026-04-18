@@ -26,6 +26,7 @@ pub async fn run() -> Result<()> {
     let state: SharedAppState = Arc::new(RwLock::new(AppState::new(config.clone(), db, s3)));
     spawn_auth_cleanup_worker(state.clone());
     spawn_shop_reconciliation_worker(state.clone());
+    spawn_receipt_worker(state.clone());
     spawn_discord_delivery_worker(state.clone());
 
     let app = build_router(state);
@@ -132,14 +133,49 @@ fn spawn_shop_reconciliation_worker(state: SharedAppState) {
         let mut interval = tokio::time::interval(std::time::Duration::from_secs(interval_seconds));
         loop {
             interval.tick().await;
-            let (db, shop_config) = {
+            let (db, shop_config, receipts_config) = {
                 let state_guard = state.read().await;
-                (state_guard.db.clone(), state_guard.config.shop.clone())
+                (
+                    state_guard.db.clone(),
+                    state_guard.config.shop.clone(),
+                    state_guard.config.receipts.clone(),
+                )
             };
             if let Err(error) =
-                crate::services::shop::reconcile_pending_orders(&db, &shop_config).await
+                crate::services::shop::reconcile_pending_orders(
+                    &db,
+                    &shop_config,
+                    &receipts_config,
+                )
+                .await
             {
                 warn!("Shop reconciliation failed: {error}");
+            }
+        }
+    });
+}
+
+fn spawn_receipt_worker(state: SharedAppState) {
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(std::time::Duration::from_secs(60));
+        loop {
+            interval.tick().await;
+            let (db, receipts_config, receipts_runtime) = {
+                let state_guard = state.read().await;
+                (
+                    state_guard.db.clone(),
+                    state_guard.config.receipts.clone(),
+                    state_guard.receipts.clone(),
+                )
+            };
+            if let Err(error) = crate::services::receipts::process_due_receipts(
+                &db,
+                &receipts_config,
+                &receipts_runtime,
+            )
+            .await
+            {
+                warn!("Receipt worker failed: {error}");
             }
         }
     });
