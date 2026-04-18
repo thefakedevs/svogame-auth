@@ -461,6 +461,12 @@ fn validate_asset_type_compatibility(
     if is_currency && *asset_kind != AssetKind::Currency {
         bail!("Currency assets must use currency asset kind");
     }
+    if *asset_kind == AssetKind::Kit && *ownership_model != OwnershipModel::Stackable {
+        bail!("Kit assets must use stackable ownership");
+    }
+    if *asset_kind == AssetKind::Kit && is_currency {
+        bail!("Kit assets cannot be currency");
+    }
     Ok(())
 }
 

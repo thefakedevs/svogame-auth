@@ -52,6 +52,7 @@ Examples:
 - `coin_default x500`
 - `repair_kit x2`
 - `subscription_plus for 7 days`
+- `exclusive_banner` with `coin_default x250` duplicate compensation
 
 Fields:
 
@@ -60,6 +61,7 @@ Fields:
 - `reward_asset_definition_id`
 - `stackable_amount`
 - `expirable_duration_seconds`
+- `duplicate_compensation_amount`
 - `weight`
 - `title_i18n`
 - `is_active`
@@ -69,10 +71,12 @@ Fields:
 
 Reward support in the current implementation:
 
+- currency `stackable`
 - non-currency `stackable`
 - non-currency `expirable`
+- non-currency `entitlement`
 
-`entitlement` rewards are intentionally rejected for now.
+For entitlement rewards, `duplicate_compensation_amount` is required. If the selected entitlement is already owned by the user, the opening still records the entitlement as the selected reward, but grants `coin_default` in that configured amount instead.
 
 ## Weights
 
@@ -109,15 +113,17 @@ The server performs one transaction:
 3. Load active drop definitions.
 4. Select the real reward by weights.
 5. Remove exactly one lootbox from inventory.
-6. Grant the reward through the typed ownership services.
+6. Grant the reward through the typed ownership services, or grant default currency compensation for duplicate entitlement rewards.
 7. Generate a roulette feed separately from the reward selection.
 8. Force the selected reward into `winnerIndex` inside the feed.
 9. Persist a `LootboxOpenOperation`.
-10. Return reward + feed payload to the client.
+10. Return selected reward, final granted reward, compensation flag, and feed payload to the client.
 
 This preserves a clean separation:
 
-- `reward` is the domain truth
+- `selectedReward` is what the weighted drop selected and what the roulette should show
+- `reward` is what was actually granted to the player
+- `wasCompensated` tells the client when `reward` is duplicate compensation instead of the selected entitlement
 - `feed` is presentation data
 
 ## Roulette Feed
@@ -142,8 +148,11 @@ So the client never decides what dropped and never derives the reward from feed 
 
 Rewards are issued through the same ownership services that the rest of the project already uses.
 
+- currency reward -> `wallet::credit`
 - stackable reward -> `inventory::add_stackable`
 - expirable reward -> `inventory::prolong_expirable`
+- entitlement reward -> `inventory::grant_entitlement`
+- duplicate entitlement reward -> `wallet::credit` for `coin_default`
 
 This means lootboxes automatically inherit existing behavior and invariants.
 
@@ -195,7 +204,7 @@ Service-token initiated opens keep `actorServiceName` in metadata and in lootbox
 ### Public
 
 - `GET /api/lootboxes`
-- `GET /api/lootboxes/{asset_key}`
+- `GET /api/lootboxes/{lootbox_id}`
 
 ### User
 
@@ -228,10 +237,12 @@ It exists for server-side integrations such as the Minecraft plugin.
 
 ## Frontend Notes
 
-- Treat `reward` as the only authoritative drop result.
+- Treat `selectedReward` as the authoritative visual drop result.
+- Treat `reward` as the authoritative grant result.
+- When `wasCompensated = true`, show that `selectedReward` dropped but `reward` was issued as duplicate compensation.
 - Use `feed` only for animation/presentation.
 - Do not try to reconstruct probabilities from feed composition.
-- Show localized titles from `reward.title` and `feed[*].title`; they are already resolved server-side.
+- Show localized titles from `selectedReward.title`, `reward.title`, and `feed[*].title`; they are already resolved server-side.
 - `winnerIndex` is the slot the animation should stop on.
 - A lootbox can disappear from `/api/user/me/lootboxes` immediately after opening if its amount reaches zero.
 
@@ -243,6 +254,9 @@ Implemented now:
 - typed drop rows with exact amount or exact duration
 - weighted reward selection
 - separate roulette feed generation
+- currency rewards
+- entitlement rewards
+- duplicate entitlement compensation in default currency
 - user open endpoint
 - privileged open-for-user endpoint
 - open history
@@ -251,8 +265,6 @@ Implemented now:
 
 Intentionally deferred:
 
-- entitlement rewards
-- currency rewards
 - batched open operations
 - analytics endpoints
 - purchase/store integration

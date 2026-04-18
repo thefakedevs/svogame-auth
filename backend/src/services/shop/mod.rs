@@ -10,7 +10,7 @@ use serde_json::{Value, json};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
-use crate::app::config::{ShopConfig, ShopPaymentProviderKind};
+use crate::app::config::{ReceiptsConfig, ShopConfig, ShopPaymentProviderKind};
 use crate::entities::{
     AssetDefinition, AssetDefinitionColumn, AssetDefinitionModel, ShopOrder, ShopOrderActiveModel,
     ShopOrderColumn, ShopOrderModel, ShopPaymentAttempt, ShopPaymentAttemptActiveModel,
@@ -477,9 +477,10 @@ pub async fn list_orders_for_user(
     db: &DatabaseConnection,
     user_id: Uuid,
     shop_config: &ShopConfig,
+    receipts_config: &ReceiptsConfig,
 ) -> Result<Vec<ShopOrderView>> {
     ensure_user_exists(db, user_id).await?;
-    reconcile_orders_for_user(db, user_id, shop_config).await?;
+    reconcile_orders_for_user(db, user_id, shop_config, receipts_config).await?;
     let orders = ShopOrder::find()
         .filter(ShopOrderColumn::UserId.eq(user_id))
         .order_by_desc(ShopOrderColumn::CreatedAt)
@@ -493,9 +494,10 @@ pub async fn get_order_for_user(
     user_id: Uuid,
     order_id: Uuid,
     shop_config: &ShopConfig,
+    receipts_config: &ReceiptsConfig,
 ) -> Result<Option<ShopOrderView>> {
     ensure_user_exists(db, user_id).await?;
-    reconcile_order_for_user(db, user_id, order_id, shop_config).await?;
+    reconcile_order_for_user(db, user_id, order_id, shop_config, receipts_config).await?;
     let order = ShopOrder::find_by_id(order_id).one(db).await?;
     let Some(order) = order else {
         return Ok(None);
@@ -512,6 +514,7 @@ pub async fn create_order(
     user_id: Uuid,
     input: CreateShopOrderInput,
     shop_config: ShopConfig,
+    receipts_config: ReceiptsConfig,
 ) -> Result<ShopOrderView> {
     let product_key = validate_shop_key(&input.product_key)?;
     let quantity = input.quantity.unwrap_or(1);
@@ -611,7 +614,7 @@ pub async fn create_order(
 
     tx.commit().await?;
 
-    get_order_for_user(db, user_id, order.id, &shop_config)
+    get_order_for_user(db, user_id, order.id, &shop_config, &receipts_config)
         .await?
         .ok_or_else(|| anyhow!("Created order could not be loaded"))
 }
@@ -640,6 +643,7 @@ async fn create_payment(
 pub async fn reconcile_pending_orders(
     db: &DatabaseConnection,
     shop_config: &ShopConfig,
+    receipts_config: &ReceiptsConfig,
 ) -> Result<()> {
     let order_ids = ShopOrder::find()
         .filter(reconcilable_order_status_condition())
@@ -650,7 +654,15 @@ pub async fn reconcile_pending_orders(
         .collect::<Vec<_>>();
 
     for order_id in order_ids {
-        reconcile_order_by_id(db, order_id, shop_config, "shop.reconciler", true).await?;
+        reconcile_order_by_id(
+            db,
+            order_id,
+            shop_config,
+            receipts_config,
+            "shop.reconciler",
+            true,
+        )
+        .await?;
     }
 
     Ok(())
@@ -659,6 +671,7 @@ pub async fn reconcile_pending_orders(
 pub async fn handle_yookassa_webhook(
     db: &DatabaseConnection,
     shop_config: &ShopConfig,
+    receipts_config: &ReceiptsConfig,
     headers: &axum::http::HeaderMap,
     body: &str,
 ) -> Result<ShopWebhookAckView> {
@@ -694,6 +707,7 @@ pub async fn handle_yookassa_webhook(
     let synced_order = sync_yookassa_attempt_and_order_in_tx(
         &tx,
         shop_config,
+        receipts_config,
         attempt.id,
         &payment,
         "shop.yookassa_webhook",
@@ -728,6 +742,7 @@ async fn reconcile_orders_for_user(
     db: &DatabaseConnection,
     user_id: Uuid,
     shop_config: &ShopConfig,
+    receipts_config: &ReceiptsConfig,
 ) -> Result<()> {
     let order_ids = ShopOrder::find()
         .filter(ShopOrderColumn::UserId.eq(user_id))
@@ -739,7 +754,15 @@ async fn reconcile_orders_for_user(
         .collect::<Vec<_>>();
 
     for order_id in order_ids {
-        reconcile_order_by_id(db, order_id, shop_config, "shop.user_poll", true).await?;
+        reconcile_order_by_id(
+            db,
+            order_id,
+            shop_config,
+            receipts_config,
+            "shop.user_poll",
+            true,
+        )
+        .await?;
     }
 
     Ok(())
@@ -750,6 +773,7 @@ async fn reconcile_order_for_user(
     user_id: Uuid,
     order_id: Uuid,
     shop_config: &ShopConfig,
+    receipts_config: &ReceiptsConfig,
 ) -> Result<()> {
     let order = ShopOrder::find_by_id(order_id).one(db).await?;
     let Some(order) = order else {
@@ -759,7 +783,15 @@ async fn reconcile_order_for_user(
         return Ok(());
     }
 
-    reconcile_order_by_id(db, order_id, shop_config, "shop.user_poll", true).await?;
+    reconcile_order_by_id(
+        db,
+        order_id,
+        shop_config,
+        receipts_config,
+        "shop.user_poll",
+        true,
+    )
+    .await?;
     Ok(())
 }
 
@@ -767,6 +799,7 @@ async fn reconcile_order_by_id(
     db: &DatabaseConnection,
     order_id: Uuid,
     shop_config: &ShopConfig,
+    receipts_config: &ReceiptsConfig,
     source: &'static str,
     tolerate_provider_errors: bool,
 ) -> Result<Option<ShopOrderModel>> {
@@ -781,12 +814,21 @@ async fn reconcile_order_by_id(
     let latest_attempt = latest_payment_attempt_for_order(db, order.id).await?;
     let reconciled = match order.payment_provider.as_str() {
         "mock" => {
-            reconcile_mock_order(db, shop_config, &order, latest_attempt.as_ref(), source).await?
+            reconcile_mock_order(
+                db,
+                shop_config,
+                receipts_config,
+                &order,
+                latest_attempt.as_ref(),
+                source,
+            )
+            .await?
         }
         yookassa::PROVIDER_NAME => {
             reconcile_yookassa_order(
                 db,
                 shop_config,
+                receipts_config,
                 &order,
                 latest_attempt.as_ref(),
                 source,
@@ -803,6 +845,7 @@ async fn reconcile_order_by_id(
 async fn reconcile_mock_order(
     db: &DatabaseConnection,
     shop_config: &ShopConfig,
+    receipts_config: &ReceiptsConfig,
     order: &ShopOrderModel,
     attempt: Option<&ShopPaymentAttemptModel>,
     source: &'static str,
@@ -818,6 +861,7 @@ async fn reconcile_mock_order(
             process_successful_payment_in_tx(
                 &tx,
                 shop_config,
+                receipts_config,
                 &reloaded_order,
                 OwnershipActor::system(source),
             )
@@ -841,6 +885,7 @@ async fn reconcile_mock_order(
 async fn reconcile_yookassa_order(
     db: &DatabaseConnection,
     shop_config: &ShopConfig,
+    receipts_config: &ReceiptsConfig,
     order: &ShopOrderModel,
     attempt: Option<&ShopPaymentAttemptModel>,
     source: &'static str,
@@ -880,6 +925,7 @@ async fn reconcile_yookassa_order(
     let synced = sync_yookassa_attempt_and_order_in_tx(
         &tx,
         shop_config,
+        receipts_config,
         attempt.id,
         &payment,
         source,
@@ -895,6 +941,7 @@ async fn reconcile_yookassa_order(
 async fn sync_yookassa_attempt_and_order_in_tx(
     db: &impl ConnectionTrait,
     shop_config: &ShopConfig,
+    receipts_config: &ReceiptsConfig,
     attempt_id: Uuid,
     payment: &yookassa::YooKassaPayment,
     source: &'static str,
@@ -948,6 +995,7 @@ async fn sync_yookassa_attempt_and_order_in_tx(
     sync_order_with_payment_state_in_tx(
         db,
         shop_config,
+        receipts_config,
         &order,
         payment,
         OwnershipActor::system(source),
@@ -958,6 +1006,7 @@ async fn sync_yookassa_attempt_and_order_in_tx(
 async fn sync_order_with_payment_state_in_tx(
     db: &impl ConnectionTrait,
     shop_config: &ShopConfig,
+    receipts_config: &ReceiptsConfig,
     order: &ShopOrderModel,
     payment: &yookassa::YooKassaPayment,
     actor: OwnershipActor,
@@ -973,7 +1022,7 @@ async fn sync_order_with_payment_state_in_tx(
                 .await;
             }
 
-            process_successful_payment_in_tx(db, shop_config, order, actor).await
+            process_successful_payment_in_tx(db, shop_config, receipts_config, order, actor).await
         }
         PAYMENT_STATUS_CANCELED => {
             mark_order_payment_canceled_in_tx(db, order, yookassa::cancellation_problem(payment))
@@ -1073,6 +1122,7 @@ pub async fn complete_mock_order_payment(
     user_id: Uuid,
     order_id: Uuid,
     shop_config: &ShopConfig,
+    receipts_config: &ReceiptsConfig,
 ) -> Result<ShopOrderView> {
     let tx = db.begin().await?;
     ensure_user_exists(&tx, user_id).await?;
@@ -1096,7 +1146,7 @@ pub async fn complete_mock_order_payment(
     };
     if order.status == ORDER_STATUS_FULFILLED {
         tx.commit().await?;
-        return get_order_for_user(db, user_id, order_id, shop_config)
+        return get_order_for_user(db, user_id, order_id, shop_config, receipts_config)
             .await?
             .ok_or_else(|| anyhow!("Order disappeared after fulfillment"));
     }
@@ -1131,11 +1181,17 @@ pub async fn complete_mock_order_payment(
     payment_active.updated_at = Set(now);
     payment_active.update(&tx).await?;
 
-    process_successful_payment_in_tx(&tx, shop_config, &order, OwnershipActor::user(user_id))
-        .await?;
+    process_successful_payment_in_tx(
+        &tx,
+        shop_config,
+        receipts_config,
+        &order,
+        OwnershipActor::user(user_id),
+    )
+    .await?;
 
     tx.commit().await?;
-    get_order_for_user(db, user_id, order_id, shop_config)
+    get_order_for_user(db, user_id, order_id, shop_config, receipts_config)
         .await?
         .ok_or_else(|| anyhow!("Completed order could not be loaded"))
 }
@@ -1155,6 +1211,7 @@ async fn reconcile_local_pending_order_in_tx(
 async fn process_successful_payment_in_tx(
     db: &impl ConnectionTrait,
     shop_config: &ShopConfig,
+    receipts_config: &ReceiptsConfig,
     order: &ShopOrderModel,
     actor: OwnershipActor,
 ) -> Result<ShopOrderModel> {
@@ -1173,7 +1230,7 @@ async fn process_successful_payment_in_tx(
         return Ok(claimed_order);
     }
 
-    let fulfillment = fulfill_order_in_tx(db, &claimed_order, actor).await;
+    let fulfillment = fulfill_order_in_tx(db, receipts_config, &claimed_order, actor).await;
     match fulfillment {
         Ok(_) => reload_order_in_tx(db, order.id).await,
         Err(error) => {
@@ -1400,6 +1457,7 @@ fn reconcilable_order_status_condition() -> Condition {
 
 async fn fulfill_order_in_tx(
     db: &impl ConnectionTrait,
+    receipts_config: &ReceiptsConfig,
     order: &ShopOrderModel,
     actor: OwnershipActor,
 ) -> Result<()> {
@@ -1483,7 +1541,8 @@ async fn fulfill_order_in_tx(
     active.fulfilled_at = Set(Some(chrono::Utc::now()));
     active.updated_at = Set(chrono::Utc::now());
     active.failure_problem = Set(None);
-    active.update(db).await?;
+    let fulfilled_order = active.update(db).await?;
+    receipts::ensure_receipt_for_order_in_tx(db, &fulfilled_order, receipts_config).await?;
     queue_shop_purchase_completed_notification(
         db,
         order.user_id,

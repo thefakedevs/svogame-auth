@@ -91,6 +91,9 @@ Examples:
 - `Currency`
 - `Ticket`
 - `Token`
+- `Kit`
+
+`Kit` is intentionally constrained to `Stackable` ownership. It represents a countable bundle-like asset, not a permanent unlock or timed entitlement.
 
 Recommendation for Rust:
 

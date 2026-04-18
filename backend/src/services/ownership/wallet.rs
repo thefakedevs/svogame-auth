@@ -180,7 +180,17 @@ pub async fn credit(
     db: &sea_orm::DatabaseConnection,
     mutation: WalletMutation,
 ) -> Result<WalletBalanceView> {
-    mutate_balance(db, mutation, "credit", |current, amount| {
+    let tx = db.begin().await?;
+    let result = credit_in_tx(&tx, mutation).await?;
+    tx.commit().await?;
+    Ok(result)
+}
+
+pub(crate) async fn credit_in_tx(
+    db: &impl ConnectionTrait,
+    mutation: WalletMutation,
+) -> Result<WalletBalanceView> {
+    mutate_balance_in_tx(db, mutation, "credit", |current, amount| {
         Ok(current + amount)
     })
     .await
@@ -258,17 +268,31 @@ async fn mutate_balance<F>(
 where
     F: Fn(i64, i64) -> Result<i64>,
 {
+    let tx = db.begin().await?;
+    let result = mutate_balance_in_tx(&tx, mutation, operation_type, compute_new_balance).await?;
+    tx.commit().await?;
+    Ok(result)
+}
+
+async fn mutate_balance_in_tx<F>(
+    db: &impl ConnectionTrait,
+    mutation: WalletMutation,
+    operation_type: &str,
+    compute_new_balance: F,
+) -> Result<WalletBalanceView>
+where
+    F: Fn(i64, i64) -> Result<i64>,
+{
     mutation.actor.validate()?;
     if mutation.amount <= 0 {
         bail!("Amount must be positive");
     }
     let currency_key = validate_asset_key(&mutation.currency_key)?;
-    let tx = db.begin().await?;
-    ensure_user_exists(&tx, mutation.user_id).await?;
-    let asset = get_currency_asset_by_key(&tx, &currency_key).await?;
+    ensure_user_exists(db, mutation.user_id).await?;
+    let asset = get_currency_asset_by_key(db, &currency_key).await?;
     let now = chrono::Utc::now();
     let existing = WalletBalance::find_by_id((mutation.user_id, asset.id))
-        .one(&tx)
+        .one(db)
         .await?;
     let current = existing.as_ref().map_or(0, |balance| balance.balance);
     let new_balance = compute_new_balance(current, mutation.amount)?;
@@ -277,14 +301,14 @@ where
     }
 
     let balance =
-        write_balance_state(&tx, mutation.user_id, asset.id, new_balance, now, existing).await?;
+        write_balance_state(db, mutation.user_id, asset.id, new_balance, now, existing).await?;
     let delta = if operation_type == "debit" {
         -mutation.amount
     } else {
         mutation.amount
     };
     write_wallet_transaction(
-        &tx,
+        db,
         mutation.user_id,
         asset.id,
         operation_type,
@@ -295,7 +319,6 @@ where
     )
     .await?;
 
-    tx.commit().await?;
     Ok(WalletBalanceView {
         user_id: mutation.user_id,
         currency_asset_definition_id: asset.id,
