@@ -172,7 +172,7 @@ function ReceiptPanel({ state }: { state: ReceiptState }) {
     return (
       <div className="shop-receipt-panel">
         <div className="shop-receipt-panel__content">
-          <span className="ui-badge">Чек</span>
+          <span className="ui-badge ui-badge-neutral">Чек</span>
           <h2>Печатный чек недоступен</h2>
           <p>{state.message}</p>
         </div>
@@ -183,7 +183,7 @@ function ReceiptPanel({ state }: { state: ReceiptState }) {
   return (
     <div className="shop-receipt-panel">
       <div className="shop-receipt-panel__content">
-        <span className="ui-badge">Чек</span>
+        <span className="ui-badge ui-badge-neutral">Чек</span>
         <h2>Готовим чек</h2>
         <p>{state.message || receiptStatusText(state.receipt)}</p>
       </div>
@@ -419,7 +419,7 @@ export default function ShopCheckoutReturnPage() {
       <main className="page ownership-page shop-page">
         <section className="card shop-callback-card">
           <span className="ui-badge ui-badge-success">Оплачено</span>
-          <h1 className="card-title">Скин добавлен в инвентарь</h1>
+          <h1 className="card-title">Товар уже у вас</h1>
           <p className="card-text">{statusText(state.order.status)}</p>
           <OrderSummary order={state.order} />
           <ReceiptPanel state={receiptState} />

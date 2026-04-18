@@ -7,6 +7,7 @@ export type SkinDetailsModalItem = {
   description: string
   imageUrl: string | null
   accent: string
+  metaItems?: Array<{ label: string; value: string }>
   rarity?: SkinRarity | null
   weaponKey?: string | null
   priceText?: string | null
@@ -25,6 +26,22 @@ function cardStyle(accent: string): CSSProperties {
 
 function rarityLabel(rarity: SkinRarity | null | undefined) {
   return rarity ? rarityLabels[rarity] : 'Скин'
+}
+
+function defaultMetaItems(item: SkinDetailsModalItem) {
+  const rows: Array<{ label: string; value: string }> = []
+
+  if (item.priceText) {
+    rows.push({ label: 'Цена', value: item.priceText })
+  }
+
+  rows.push({ label: 'Редкость', value: rarityLabel(item.rarity) })
+
+  if (item.weaponKey) {
+    rows.push({ label: 'Оружие', value: item.weaponKey })
+  }
+
+  return rows
 }
 
 function SkinDetailsVisual({ item }: { item: SkinDetailsModalItem }) {
@@ -68,22 +85,12 @@ export default function SkinDetailsModal({
             <div className="skin-details-modal__content">
               <p>{item.description}</p>
               <dl className="skin-details-modal__meta">
-                {item.priceText ? (
-                  <div>
-                    <dt>Цена</dt>
-                    <dd>{item.priceText}</dd>
+                {(item.metaItems ?? defaultMetaItems(item)).map((metaItem) => (
+                  <div key={`${metaItem.label}:${metaItem.value}`}>
+                    <dt>{metaItem.label}</dt>
+                    <dd>{metaItem.value}</dd>
                   </div>
-                ) : null}
-                <div>
-                  <dt>Редкость</dt>
-                  <dd>{rarityLabel(item.rarity)}</dd>
-                </div>
-                {item.weaponKey ? (
-                  <div>
-                    <dt>Оружие</dt>
-                    <dd>{item.weaponKey}</dd>
-                  </div>
-                ) : null}
+                ))}
               </dl>
             </div>
           </div>
