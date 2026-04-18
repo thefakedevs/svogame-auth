@@ -9,6 +9,7 @@ import {
   selectMyGunskin,
   type AssetResponse,
   type EntitlementResponse,
+  type ExpirableResponse,
   type InventoryResponse,
   type SelectedGunskinResponse,
   type SkinRarity,
@@ -36,21 +37,6 @@ type OwnershipState =
   | { status: 'unauthorized' }
   | { status: 'error'; error: string }
   | { status: 'ready'; inventory: InventoryResponse; assets: AssetResponse[]; selectedGunskins: SelectedGunskinResponse[]; lootboxes: OwnedLootboxResponse[] }
-
-const defaultSubscriptions = [
-  {
-    assetKey: 'subscription_plus',
-    title: 'Subscription Plus',
-    description: 'Базовая подписка аккаунта.',
-    accent: '#2db7a3',
-  },
-  {
-    assetKey: 'subscription_pro',
-    title: 'Subscription Pro',
-    description: 'Расширенная подписка аккаунта.',
-    accent: '#f7a41d',
-  },
-] as const
 
 const skinRarityConfig: Record<SkinRarity, { label: string; color: string }> = {
   common: { label: 'Обычный', color: '#9aa8b5' },
@@ -305,6 +291,18 @@ type SkinCardItem = InventoryAssetView & {
 type LootboxCardItem = InventoryAssetView & OwnedLootboxResponse
   & Pick<StackableResponse, 'assetDefinitionId' | 'updatedAt'>
 
+type RegularInventoryItem = InventoryAssetView & {
+  assetKey: string
+  assetDefinitionId: string
+  amount?: number
+  expiresAt?: string | null
+  grantedAt?: string | null
+  updatedAt?: string | null
+  isActive?: boolean
+  lastExtendedAt?: string | null
+  source: 'stackable' | 'entitlement' | 'expirable'
+}
+
 type LootboxDetailsState =
   | { status: 'loading'; item: LootboxCardItem }
   | { status: 'ready'; item: LootboxCardItem; detail: LootboxDetailResponse }
@@ -520,6 +518,51 @@ function LootboxCard({ item, onOpenDetails }: { item: LootboxCardItem; onOpenDet
   )
 }
 
+function RegularInventoryCard({ item, onOpenDetails }: { item: RegularInventoryItem; onOpenDetails: (item: RegularInventoryItem) => void }) {
+  const kindLabel = assetKindLabel(normalizedAssetKind(item.asset))
+  const statusLabel = item.amount !== undefined
+    ? `${item.amount} шт`
+    : item.expiresAt
+      ? item.isActive ? 'Активно' : 'Неактивно'
+      : 'В инвентаре'
+  const metaText = item.expiresAt
+    ? `Действует до ${formatDateTime(item.expiresAt).replace(', ', ' ')}`
+    : item.grantedAt
+      ? `Выдано: ${formatDateTime(item.grantedAt).replace(', ', ' ')}`
+      : item.updatedAt
+        ? `Обновлено: ${formatDateTime(item.updatedAt).replace(', ', ' ')}`
+        : null
+
+  return (
+    <article
+      className="inventory-skin-card inventory-regular-card"
+      data-rarity="none"
+      style={cardStyle(item.accent)}
+    >
+      <button className="inventory-skin-card__preview" type="button" onClick={() => onOpenDetails(item)}>
+        <InventoryVisual item={{ ...item, fallbackLabel: kindLabel }} />
+      </button>
+      <div className="inventory-skin-card__body">
+        <div className="inventory-card-title">
+          <strong>{item.title}</strong>
+        </div>
+        <div className="inventory-skin-card__rarity inventory-lootbox-card__badges">
+          <span>{kindLabel}</span>
+          <span>{statusLabel}</span>
+        </div>
+        <div className="inventory-skin-card__selection">
+          <span className="inventory-skin-card__action is-selected">Открыть</span>
+        </div>
+        {metaText ? (
+          <div className="inventory-card-meta">
+            <span>{metaText}</span>
+          </div>
+        ) : null}
+      </div>
+    </article>
+  )
+}
+
 function ItemCard({ item }: { item: InventoryAssetView & StackableResponse }) {
   return (
     <article className="inventory-compact-card" style={cardStyle(item.accent)}>
@@ -552,15 +595,7 @@ function AccessCard({ item }: { item: InventoryAssetView & EntitlementResponse }
   )
 }
 
-type SubscriptionCardItem = InventoryAssetView & {
-  assetKey: string
-  assetDefinitionId: string
-  expiresAt?: string | null
-  grantedAt?: string | null
-  updatedAt?: string | null
-  isActive: boolean
-  lastExtendedAt?: string | null
-}
+type SubscriptionCardItem = InventoryAssetView & ExpirableResponse
 
 function SubscriptionCard({ item }: { item: SubscriptionCardItem }) {
   const tier = subscriptionTier(item.asset, item.assetKey, item.title)
@@ -592,16 +627,19 @@ void SubscriptionCard
 type InvSortKey = 'default' | 'rarity' | 'weapon'
 type InvRarityFilter = 'all' | 'none' | SkinRarity
 type InvWeaponFilter = 'all' | string
+type InvAssetKindFilter = 'all' | string
 
 export default function OwnershipPage() {
   const [state, setState] = useState<OwnershipState>({ status: 'loading' })
   const [selectingSkinKey, setSelectingSkinKey] = useState<string | null>(null)
   const [resettingSkinKey, setResettingSkinKey] = useState<string | null>(null)
   const [detailsSkin, setDetailsSkin] = useState<SkinCardItem | null>(null)
+  const [detailsInventoryItem, setDetailsInventoryItem] = useState<RegularInventoryItem | null>(null)
   const [detailsLootbox, setDetailsLootbox] = useState<LootboxDetailsState | null>(null)
   const [invSort, setInvSort] = useState<InvSortKey>('default')
   const [invRarityFilter, setInvRarityFilter] = useState<InvRarityFilter>('all')
   const [invWeaponFilter, setInvWeaponFilter] = useState<InvWeaponFilter>('all')
+  const [invAssetKindFilter, setInvAssetKindFilter] = useState<InvAssetKindFilter>('all')
   const [isInvFiltersModalOpen, setIsInvFiltersModalOpen] = useState(false)
 
   const load = async () => {
@@ -691,6 +729,45 @@ export default function OwnershipPage() {
       .sort((left, right) => left.title.localeCompare(right.title, 'ru'))
   }, [assetMap, state])
 
+  const regularItemEntries = useMemo((): RegularInventoryItem[] => {
+    if (state.status !== 'ready') return []
+
+    const map = makeAssetMap(state.assets)
+    const lootboxAssetKeys = new Set(state.lootboxes.map((item) => item.assetKey))
+    const stackableEntries = state.inventory.stackables
+      .filter((item) => !lootboxAssetKeys.has(item.assetKey))
+      .map((item) => ({
+        ...item,
+        ...assetView(map, item.assetKey, item.assetDefinitionId),
+        source: 'stackable' as const,
+      }))
+      .filter((item) => !isSkinAsset(item.asset, item.assetKey))
+    const entitlementEntries = state.inventory.entitlements
+      .map((item) => ({
+        ...item,
+        ...assetView(map, item.assetKey, item.assetDefinitionId),
+        source: 'entitlement' as const,
+      }))
+      .filter((item) => !isSkinAsset(item.asset, item.assetKey))
+    const expirableEntries = state.inventory.expirables
+      .map((item) => ({
+        ...item,
+        ...assetView(map, item.assetKey, item.assetDefinitionId),
+        source: 'expirable' as const,
+      }))
+      .filter((item) => !isSkinAsset(item.asset, item.assetKey))
+
+    return [...stackableEntries, ...entitlementEntries, ...expirableEntries]
+  }, [state])
+
+  const invAssetKindOptions = useMemo(() => {
+    const values = new Set<string>()
+    for (const item of [...baseSkinEntries, ...lootboxEntries, ...regularItemEntries]) {
+      values.add(normalizedAssetKind(item.asset))
+    }
+    return [...values].sort((left, right) => assetKindLabel(left).localeCompare(assetKindLabel(right), 'ru'))
+  }, [baseSkinEntries, lootboxEntries, regularItemEntries])
+
   const invWeaponOptions = useMemo(
     () => uniqueSortedWeaponKeys(baseSkinEntries.map((item) => item.weaponKey?.replace('taczgun:', ''))),
     [baseSkinEntries],
@@ -698,6 +775,10 @@ export default function OwnershipPage() {
 
   const displayedSkinEntries = useMemo(() => {
     let rows = baseSkinEntries
+
+    if (invAssetKindFilter !== 'all') {
+      rows = rows.filter((item) => normalizedAssetKind(item.asset) === invAssetKindFilter)
+    }
 
     if (invRarityFilter === 'none') {
       rows = rows.filter((item) => !item.rarity)
@@ -726,10 +807,25 @@ export default function OwnershipPage() {
     }
 
     return sorted
-  }, [baseSkinEntries, invSort, invRarityFilter, invWeaponFilter])
+  }, [baseSkinEntries, invSort, invRarityFilter, invWeaponFilter, invAssetKindFilter])
 
-  const displayedInventoryCount = displayedSkinEntries.length + lootboxEntries.length
-  const baseInventoryCount = baseSkinEntries.length + lootboxEntries.length
+  const displayedLootboxEntries = useMemo(() => {
+    if (invAssetKindFilter === 'all') return lootboxEntries
+    return lootboxEntries.filter((item) => normalizedAssetKind(item.asset) === invAssetKindFilter)
+  }, [lootboxEntries, invAssetKindFilter])
+
+  const displayedRegularItemEntries = useMemo(() => {
+    let rows = regularItemEntries
+
+    if (invAssetKindFilter !== 'all') {
+      rows = rows.filter((item) => normalizedAssetKind(item.asset) === invAssetKindFilter)
+    }
+
+    return [...rows].sort((left, right) => left.title.localeCompare(right.title, 'ru'))
+  }, [regularItemEntries, invAssetKindFilter])
+
+  const displayedInventoryCount = displayedSkinEntries.length + displayedLootboxEntries.length + displayedRegularItemEntries.length
+  const baseInventoryCount = baseSkinEntries.length + lootboxEntries.length + regularItemEntries.length
 
   if (state.status === 'loading') {
     return <LoadingState title="Загружаем инвентарь" />
@@ -752,36 +848,6 @@ export default function OwnershipPage() {
     return <ErrorState title="Инвентарь недоступен" message={state.error} primaryActionLabel="Повторить" onPrimaryAction={() => void load()} />
   }
 
-  const { inventory } = state
-  const stackableEntries = inventory.stackables.map((item) => ({ ...item, ...assetView(assetMap, item.assetKey, item.assetDefinitionId) }))
-  const itemEntries = stackableEntries.filter((item) => !isSkinAsset(item.asset, item.assetKey))
-  const ownedSubscriptionEntries = inventory.expirables.map((item) => ({ ...item, ...assetView(assetMap, item.assetKey, item.assetDefinitionId) }))
-  const ownedSubscriptionByKey = new Map(ownedSubscriptionEntries.map((item) => [item.assetKey, item]))
-  const defaultSubscriptionKeys = new Set<string>(defaultSubscriptions.map((item) => item.assetKey))
-  const subscriptionEntries: SubscriptionCardItem[] = [
-    ...defaultSubscriptions.map((fallback) => {
-      const owned = ownedSubscriptionByKey.get(fallback.assetKey)
-      if (owned) return owned
-
-      const view = assetView(assetMap, fallback.assetKey, fallback.assetKey)
-      return {
-        ...view,
-        title: view.asset ? view.title : fallback.title,
-        description: view.asset ? view.description : fallback.description,
-        accent: view.asset ? view.accent : fallback.accent,
-        assetKey: fallback.assetKey,
-        assetDefinitionId: view.asset?.id ?? fallback.assetKey,
-        expiresAt: null,
-        grantedAt: null,
-        updatedAt: null,
-        isActive: false,
-        lastExtendedAt: null,
-      }
-    }),
-    ...ownedSubscriptionEntries.filter((item) => !defaultSubscriptionKeys.has(item.assetKey)),
-  ]
-  void itemEntries
-  void subscriptionEntries
   const selectSkin = async (item: SkinCardItem) => {
     const token = getAuthToken()
     if (!token) {
@@ -875,7 +941,7 @@ export default function OwnershipPage() {
           </div>
           <div className="ownership-section-head-actions">
             <span className="ui-badge ui-badge-neutral">{displayedInventoryCount}</span>
-            {baseSkinEntries.length ? (
+            {baseInventoryCount ? (
               <button
                 type="button"
                 className="btn btn-sm"
@@ -908,8 +974,11 @@ export default function OwnershipPage() {
                 />
               )
             })}
-            {lootboxEntries.map((item) => (
+            {displayedLootboxEntries.map((item) => (
               <LootboxCard key={item.lootboxId} item={item} onOpenDetails={(selected) => void openLootboxDetails(selected)} />
+            ))}
+            {displayedRegularItemEntries.map((item) => (
+              <RegularInventoryCard key={`${item.source}:${item.assetKey}:${item.assetDefinitionId}`} item={item} onOpenDetails={setDetailsInventoryItem} />
             ))}
           </div>
         ) : <EmptySection text={baseInventoryCount ? 'Нет предметов по выбранным фильтрам.' : 'Инвентарь пока пуст.'} />}
@@ -968,6 +1037,35 @@ export default function OwnershipPage() {
                     </fieldset>
                   </div>
                   <div className="inventory-toolbar__row inventory-toolbar__row--split">
+                    <div className="inventory-toolbar__col">
+                      <fieldset className="ui-radio-group inventory-toolbar__fieldset">
+                        <legend className="ui-radio-legend">Тип</legend>
+                        <label className="ui-radio">
+                          <input
+                            type="radio"
+                            name="inv-filter-kind"
+                            value="all"
+                            checked={invAssetKindFilter === 'all'}
+                            onChange={() => setInvAssetKindFilter('all')}
+                          />
+                          <span className="ui-radio-mark" aria-hidden />
+                          <span>Все</span>
+                        </label>
+                        {invAssetKindOptions.map((assetKind) => (
+                          <label key={assetKind} className="ui-radio">
+                            <input
+                              type="radio"
+                              name="inv-filter-kind"
+                              value={assetKind}
+                              checked={invAssetKindFilter === assetKind}
+                              onChange={() => setInvAssetKindFilter(assetKind)}
+                            />
+                            <span className="ui-radio-mark" aria-hidden />
+                            <span>{assetKindLabel(assetKind)}</span>
+                          </label>
+                        ))}
+                      </fieldset>
+                    </div>
                     <div className="inventory-toolbar__col">
                       <fieldset className="ui-radio-group inventory-toolbar__fieldset">
                         <legend className="ui-radio-legend">Редкость</legend>
@@ -1059,6 +1157,30 @@ export default function OwnershipPage() {
           onClose={() => setDetailsSkin(null)}
           footer={(
             <button className="btn" type="button" onClick={() => setDetailsSkin(null)}>Закрыть</button>
+          )}
+        />
+      ) : null}
+
+      {detailsInventoryItem ? (
+        <SkinDetailsModal
+          item={{
+            title: detailsInventoryItem.title,
+            description: detailsInventoryItem.description,
+            imageUrl: detailsInventoryItem.imageUrl,
+            accent: detailsInventoryItem.accent,
+            rarity: detailsInventoryItem.rarity,
+            weaponKey: detailsInventoryItem.weaponKey?.replace('taczgun:', ''),
+            statusText: 'Уже в инвентаре',
+            metaItems: buildInventoryMetaItems(detailsInventoryItem.asset, {
+              amount: detailsInventoryItem.amount,
+              expiresAt: detailsInventoryItem.expiresAt,
+              updatedAt: detailsInventoryItem.updatedAt,
+            }),
+          }}
+          titleId="inventory-item-details-title"
+          onClose={() => setDetailsInventoryItem(null)}
+          footer={(
+            <button className="btn" type="button" onClick={() => setDetailsInventoryItem(null)}>Закрыть</button>
           )}
         />
       ) : null}
