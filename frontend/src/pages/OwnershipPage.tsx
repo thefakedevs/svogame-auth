@@ -850,7 +850,7 @@ export default function OwnershipPage() {
   const openLootboxDetails = async (item: LootboxCardItem) => {
     setDetailsLootbox({ status: 'loading', item })
     try {
-      const detail = await getPublicLootbox(item.assetKey)
+      const detail = await getPublicLootbox(item.lootboxId)
       setDetailsLootbox({ status: 'ready', item, detail })
     } catch (cause) {
       setDetailsLootbox({
