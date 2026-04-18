@@ -49,17 +49,6 @@ function formatPrice(value: number) {
   return priceFormatter.format(value)
 }
 
-function formatDateTime(value: string | null | undefined) {
-  if (!value) return null
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return null
-
-  return new Intl.DateTimeFormat('ru-RU', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(date)
-}
-
 function formatDuration(seconds: number | null | undefined) {
   if (!seconds || seconds <= 0) return null
 
@@ -146,19 +135,6 @@ function assetKindLabel(assetKind: string | null | undefined) {
   }
 }
 
-function ownershipModelLabel(ownershipModel: string | null | undefined) {
-  switch ((ownershipModel ?? '').trim().toLowerCase()) {
-    case 'stackable':
-      return 'Накопляемый'
-    case 'entitlement':
-      return 'Постоянный доступ'
-    case 'expirable':
-      return 'Временный доступ'
-    default:
-      return ownershipModel?.trim() || 'Неизвестно'
-  }
-}
-
 function normalizedAssetKind(product: ShopProductResponse, asset: AssetResponse | null) {
   return (
     metadataString(product, ['assetKind', 'kind', 'type'])
@@ -235,8 +211,6 @@ function buildProductMetaItems(product: ShopProductResponse, asset: AssetRespons
   const ownershipModel = normalizedOwnershipModel(product, asset)
   const isSkin = isSkinProduct(product, asset)
   const isSubscription = assetKind === 'subscription'
-  const bundleSummary = metadataString(product, ['contents', 'content', 'items', 'bundle', 'kit', 'summary'])
-    ?? metadataString(asset, ['contents', 'content', 'items', 'bundle', 'kit', 'summary'])
 
   addMetaItem(rows, 'Цена', formatPrice(product.priceRub))
   addMetaItem(rows, 'Тип', assetKindLabel(assetKind))
@@ -428,14 +402,6 @@ export default function ShopPage() {
     [baseProductViews],
   )
 
-  const shopOwnershipOptions = useMemo(
-    () => uniqueSortedValues(
-      baseProductViews.map((item) => normalizedOwnershipModel(item.product, item.asset)),
-      ownershipModelLabel,
-    ),
-    [baseProductViews],
-  )
-
   const productViews = useMemo(() => {
     let rows = baseProductViews
 
@@ -450,7 +416,7 @@ export default function ShopPage() {
     }
 
     if (shopWeaponFilter !== 'all') {
-      rows = rows.filter((item) => (item.asset?.weaponKey ?? '').trim() === shopWeaponFilter)
+      rows = rows.filter((item) => (item.asset?.weaponKey?.replace('taczgun:', '') ?? '').trim() === shopWeaponFilter)
     }
 
     const sorted = [...rows]
@@ -471,7 +437,7 @@ export default function ShopPage() {
         )
         break
       case 'weapon': {
-        const w = (item: ShopProductView) => (item.asset?.weaponKey ?? '').trim().toLowerCase()
+        const w = (item: ShopProductView) => (item.asset?.weaponKey?.replace('taczgun:', '') ?? '').trim().toLowerCase()
         sorted.sort((a, b) => w(a).localeCompare(w(b), 'ru') || tieTitle(a, b))
         break
       }
@@ -730,16 +696,16 @@ export default function ShopPage() {
                           <span>Все</span>
                         </label>
                         {shopWeaponOptions.map((weaponKey) => (
-                          <label key={weaponKey} className="ui-radio">
+                          <label key={weaponKey?.replace('taczgun:', '')} className="ui-radio">
                             <input
                               type="radio"
                               name="shop-filter-weapon"
-                              value={weaponKey}
-                              checked={shopWeaponFilter === weaponKey}
-                              onChange={() => setShopWeaponFilter(weaponKey)}
+                              value={weaponKey?.replace('taczgun:', '')}
+                              checked={shopWeaponFilter === weaponKey?.replace('taczgun:', '')}
+                              onChange={() => setShopWeaponFilter(weaponKey?.replace('taczgun:', ''))}
                             />
                             <span className="ui-radio-mark" aria-hidden />
-                            <span>{weaponKey}</span>
+                            <span>{weaponKey?.replace('taczgun:', '')}</span>
                           </label>
                         ))}
                       </fieldset>
@@ -765,7 +731,7 @@ export default function ShopPage() {
             imageUrl: detailsProduct.imageUrl,
             accent: detailsProduct.accent,
             rarity: detailsProduct.asset?.rarity,
-            weaponKey: detailsProduct.asset?.weaponKey,
+            weaponKey: detailsProduct.asset?.weaponKey?.replace('taczgun:', ''),
             priceText: formatPrice(detailsProduct.product.priceRub),
             statusText: detailsProduct.owned ? 'Уже в инвентаре' : 'Можно купить',
             metaItems: buildProductMetaItems(detailsProduct.product, detailsProduct.asset),

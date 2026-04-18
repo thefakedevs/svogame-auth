@@ -131,7 +131,7 @@ function assetView(assetMap: Map<string, AssetResponse>, assetKey: string, asset
     imageUrl: assetImageUrl(asset),
     accent: assetAccent(asset, assetKey),
     rarity: asset?.rarity ?? null,
-    weaponKey: asset?.weaponKey ?? null,
+    weaponKey: asset?.weaponKey?.replace('taczgun:', '') ?? null,
   }
 }
 
@@ -141,7 +141,7 @@ function isSkinAsset(asset: AssetResponse | null, assetKey: string) {
     asset?.key,
     asset?.displayName,
     asset?.assetKind,
-    asset?.weaponKey,
+    asset?.weaponKey?.replace('taczgun:', ''),
     metadataString(asset, ['type', 'category', 'kind', 'itemType']),
   ].filter(Boolean).join(' ').toLowerCase()
 
@@ -150,6 +150,82 @@ function isSkinAsset(asset: AssetResponse | null, assetKey: string) {
 
 function rarityLabel(rarity: SkinRarity | null) {
   return rarity ? skinRarityConfig[rarity].label : 'Без редкости'
+}
+
+function assetKindLabel(assetKind: string | null | undefined) {
+  switch ((assetKind ?? '').trim().toLowerCase()) {
+    case 'skin':
+      return 'Скин'
+    case 'subscription':
+      return 'Подписка'
+    case 'kit':
+      return 'Кит'
+    case 'lootbox':
+      return 'Лутбокс'
+    case 'currency':
+      return 'Валюта'
+    case 'cosmetic':
+      return 'Косметика'
+    case 'ticket':
+      return 'Билет'
+    case 'token':
+      return 'Токен'
+    case 'item':
+      return 'Предмет'
+    default:
+      return assetKind?.trim() || 'Товар'
+  }
+}
+
+function normalizedAssetKind(asset: AssetResponse | null) {
+  return (
+    metadataString(asset, ['assetKind', 'kind', 'type'])
+    ?? asset?.assetKind
+    ?? 'item'
+  ).trim().toLowerCase()
+}
+
+function normalizedOwnershipModel(asset: AssetResponse | null) {
+  return (asset?.ownershipModel ?? 'entitlement').trim().toLowerCase()
+}
+
+function addMetaItem(rows: Array<{ label: string; value: string }>, label: string, value: string | null | undefined) {
+  if (!value) return
+  rows.push({ label, value })
+}
+
+function buildInventoryMetaItems(
+  asset: AssetResponse | null,
+  options: {
+    amount?: number | null
+    expiresAt?: string | null
+    updatedAt?: string | null
+  } = {},
+) {
+  const rows: Array<{ label: string; value: string }> = []
+  const assetKind = normalizedAssetKind(asset)
+  const ownershipModel = normalizedOwnershipModel(asset)
+  const isSkin = assetKind === 'skin' || Boolean(asset?.weaponKey?.replace('taczgun:', '') || asset?.rarity)
+
+  addMetaItem(rows, 'Тип', assetKindLabel(assetKind))
+
+  if (isSkin) {
+    if (asset?.rarity) addMetaItem(rows, 'Редкость', rarityLabel(asset.rarity))
+    addMetaItem(rows, 'Оружие', asset?.weaponKey?.replace('taczgun:', '') ?? '—')
+    return rows
+  }
+
+  if (ownershipModel === 'stackable') {
+    addMetaItem(rows, 'В инвентаре', options.amount !== undefined && options.amount !== null ? `${options.amount} шт` : null)
+  }
+
+  if (ownershipModel === 'expirable') {
+    addMetaItem(rows, 'Активна до', options.expiresAt ? formatDateTime(options.expiresAt).replace(', ', ' ') : null)
+  }
+
+  addMetaItem(rows, 'Обновлено', options.updatedAt ? formatDateTime(options.updatedAt).replace(', ', ' ') : null)
+
+  return rows
 }
 
 function skinRarityAccent(rarity: SkinRarity | null) {
@@ -360,18 +436,12 @@ function LootboxDetailsModal({
               <div className="skin-details-modal__content">
                 <p>{item.description || 'Описание кейса пока не заполнено.'}</p>
                 <dl className="skin-details-modal__meta">
-                  <div>
-                    <dt>Тип</dt>
-                    <dd>Кейс</dd>
-                  </div>
-                  <div>
-                    <dt>В инвентаре</dt>
-                    <dd>{item.amount} шт</dd>
-                  </div>
-                  <div>
-                    <dt>Выдано</dt>
-                    <dd>{formatDateTime(item.updatedAt).replace(', ', ' ')}</dd>
-                  </div>
+                  {buildInventoryMetaItems(item.asset, { amount: item.amount, updatedAt: item.updatedAt }).map((metaItem) => (
+                    <div key={`${metaItem.label}:${metaItem.value}`}>
+                      <dt>{metaItem.label}</dt>
+                      <dd>{metaItem.value}</dd>
+                    </div>
+                  ))}
                 </dl>
 
                 <section className="lootbox-details-modal__drops" aria-label="Содержимое кейса">
@@ -570,7 +640,7 @@ export default function OwnershipPage() {
     if (state.status !== 'ready') return map
 
     for (const selected of state.selectedGunskins) {
-      map.set(selected.weaponKey, selected)
+      map.set(selected.weaponKey?.replace('taczgun:', ''), selected)
     }
     return map
   }, [state])
@@ -622,7 +692,7 @@ export default function OwnershipPage() {
   }, [assetMap, state])
 
   const invWeaponOptions = useMemo(
-    () => uniqueSortedWeaponKeys(baseSkinEntries.map((item) => item.weaponKey)),
+    () => uniqueSortedWeaponKeys(baseSkinEntries.map((item) => item.weaponKey?.replace('taczgun:', ''))),
     [baseSkinEntries],
   )
 
@@ -636,7 +706,7 @@ export default function OwnershipPage() {
     }
 
     if (invWeaponFilter !== 'all') {
-      rows = rows.filter((item) => (item.weaponKey ?? '').trim() === invWeaponFilter)
+      rows = rows.filter((item) => (item.weaponKey?.replace('taczgun:', '') ?? '').trim() === invWeaponFilter)
     }
 
     const sorted = [...rows]
@@ -647,7 +717,7 @@ export default function OwnershipPage() {
         sorted.sort((a, b) => skinRarityRank(a.rarity) - skinRarityRank(b.rarity) || tieTitle(a, b))
         break
       case 'weapon': {
-        const w = (item: SkinCardItem) => (item.weaponKey ?? '').trim().toLowerCase()
+        const w = (item: SkinCardItem) => (item.weaponKey?.replace('taczgun:', '') ?? '').trim().toLowerCase()
         sorted.sort((a, b) => w(a).localeCompare(w(b), 'ru') || tieTitle(a, b))
         break
       }
@@ -718,12 +788,12 @@ export default function OwnershipPage() {
       setState({ status: 'unauthorized' })
       return
     }
-    if (!item.weaponKey || selectingSkinKey) return
+    if (!item.weaponKey?.replace('taczgun:', '') || selectingSkinKey) return
 
-    const requestKey = `${item.weaponKey}:${item.assetKey}`
+    const requestKey = `${item.weaponKey?.replace('taczgun:', '')}:${item.assetKey}`
     setSelectingSkinKey(requestKey)
     try {
-      const selected = await selectMyGunskin(token, item.weaponKey, {
+      const selected = await selectMyGunskin(token, item.weaponKey?.replace('taczgun:', ''), {
         assetKey: item.assetKey,
         reasonCode: 'inventory_page',
         reasonText: 'Selected from inventory page',
@@ -732,7 +802,7 @@ export default function OwnershipPage() {
       setState((prev) => {
         if (prev.status !== 'ready') return prev
 
-        const nextSelections = prev.selectedGunskins.filter((entry) => entry.weaponKey !== selected.weaponKey)
+        const nextSelections = prev.selectedGunskins.filter((entry) => entry.weaponKey?.replace('taczgun:', '') !== selected.weaponKey?.replace('taczgun:', ''))
         nextSelections.push(selected)
 
         return {
@@ -754,19 +824,19 @@ export default function OwnershipPage() {
       setState({ status: 'unauthorized' })
       return
     }
-    if (!item.weaponKey || selectingSkinKey || resettingSkinKey) return
+    if (!item.weaponKey?.replace('taczgun:', '') || selectingSkinKey || resettingSkinKey) return
 
-    const requestKey = `${item.weaponKey}:${item.assetKey}`
+    const requestKey = `${item.weaponKey?.replace('taczgun:', '')}:${item.assetKey}`
     setResettingSkinKey(requestKey)
     try {
-      await resetMyGunskin(token, item.weaponKey)
+      await resetMyGunskin(token, item.weaponKey?.replace('taczgun:', ''))
 
       setState((prev) => {
         if (prev.status !== 'ready') return prev
 
         return {
           ...prev,
-          selectedGunskins: prev.selectedGunskins.filter((entry) => entry.weaponKey !== item.weaponKey),
+          selectedGunskins: prev.selectedGunskins.filter((entry) => entry.weaponKey?.replace('taczgun:', '') !== item.weaponKey?.replace('taczgun:', '')),
         }
       })
       toast.success('Выбор скина снят.')
@@ -822,8 +892,8 @@ export default function OwnershipPage() {
         {displayedInventoryCount ? (
           <div className="inventory-skin-grid">
             {displayedSkinEntries.map((item) => {
-              const selected = item.weaponKey ? selectedGunskinByWeapon.get(item.weaponKey) : null
-              const requestKey = item.weaponKey ? `${item.weaponKey}:${item.assetKey}` : null
+              const selected = item.weaponKey?.replace('taczgun:', '') ? selectedGunskinByWeapon.get(item.weaponKey?.replace('taczgun:', '')) : null
+              const requestKey = item.weaponKey?.replace('taczgun:', '') ? `${item.weaponKey?.replace('taczgun:', '')}:${item.assetKey}` : null
 
               return (
                 <SkinCard
@@ -943,16 +1013,16 @@ export default function OwnershipPage() {
                           <span>Все</span>
                         </label>
                         {invWeaponOptions.map((weaponKey) => (
-                          <label key={weaponKey} className="ui-radio">
+                          <label key={weaponKey?.replace('taczgun:', '')} className="ui-radio">
                             <input
                               type="radio"
                               name="inv-filter-weapon"
-                              value={weaponKey}
-                              checked={invWeaponFilter === weaponKey}
-                              onChange={() => setInvWeaponFilter(weaponKey)}
+                              value={weaponKey?.replace('taczgun:', '')}
+                              checked={invWeaponFilter === weaponKey?.replace('taczgun:', '')}
+                              onChange={() => setInvWeaponFilter(weaponKey?.replace('taczgun:', ''))}
                             />
                             <span className="ui-radio-mark" aria-hidden />
-                            <span>{weaponKey}</span>
+                            <span>{weaponKey?.replace('taczgun:', '')}</span>
                           </label>
                         ))}
                       </fieldset>
@@ -978,8 +1048,12 @@ export default function OwnershipPage() {
             imageUrl: detailsSkin.imageUrl,
             accent: skinRarityAccent(detailsSkin.rarity),
             rarity: detailsSkin.rarity,
-            weaponKey: detailsSkin.weaponKey,
+            weaponKey: detailsSkin.weaponKey?.replace('taczgun:', ''),
             statusText: 'Уже в инвентаре',
+            metaItems: buildInventoryMetaItems(detailsSkin.asset, {
+              amount: detailsSkin.amount,
+              updatedAt: detailsSkin.updatedAt,
+            }),
           }}
           titleId="inventory-skin-details-title"
           onClose={() => setDetailsSkin(null)}
