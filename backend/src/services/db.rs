@@ -1,12 +1,12 @@
 use crate::app::config::DatabaseConfig;
 use crate::services::migration::{
     AddAssetDefinitionGunskinColumns, AddAuthRayRegistrationColumns,
-    AddLootboxRewardCompensationColumns,
-    AddShopOrderPaymentLifecycleColumns, AddShopPaymentAttemptProviderIndex,
-    AddUserDeactivationReasonColumn, AddUserSquadIdColumn, AddUserSuperuserColumn,
-    CreateAppKvTable, CreateAssetDefinitionTable, CreateAuditLogTable, CreateAuthRayTable,
-    CreateDefaultSkinTable, CreateDiscordBroadcastTable, CreateDiscordDeliveryTable,
-    CreateInventoryOperationTable, CreateLootboxDefinitionTable, CreateLootboxDropDefinitionTable,
+    AddLootboxRewardCompensationColumns, AddShopOrderPaymentLifecycleColumns,
+    AddShopPaymentAttemptProviderIndex, AddUserDeactivationReasonColumn, AddUserSquadIdColumn,
+    AddUserSuperuserColumn, CreateAppKvTable, CreateAssetDefinitionTable, CreateAuditLogTable,
+    CreateAuthRayTable, CreateDefaultSkinTable, CreateDiscordBroadcastTable,
+    CreateDiscordDeliveryTable, CreateEmailDeliveryTable, CreateInventoryOperationTable,
+    CreateLootboxDefinitionTable, CreateLootboxDropDefinitionTable,
     CreateLootboxOpenOperationTable, CreateServiceTokenAuditTable, CreateServiceTokenTable,
     CreateShopOrderTable, CreateShopPaymentAttemptTable, CreateShopProductLocaleTable,
     CreateShopProductTable, CreateShopReceiptTable, CreateSquadInviteTable, CreateSquadTable,
@@ -60,6 +60,7 @@ pub async fn run_migrations(db: &DatabaseConnection) -> Result<()> {
     CreateShopReceiptTable.up(&schema_manager).await?;
     CreateDiscordBroadcastTable.up(&schema_manager).await?;
     CreateDiscordDeliveryTable.up(&schema_manager).await?;
+    CreateEmailDeliveryTable.up(&schema_manager).await?;
     AddShopOrderPaymentLifecycleColumns
         .up(&schema_manager)
         .await?;

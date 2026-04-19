@@ -7,6 +7,7 @@ use tracing::warn;
 pub struct AppConfig {
     pub binding_address: String,
     pub discord: DiscordConfig,
+    pub email: EmailConfig,
     pub database: DatabaseConfig,
     pub s3: S3Config,
     pub shop: ShopConfig,
@@ -32,6 +33,30 @@ pub struct DiscordConfig {
     pub discord_proxy: Option<Proxy>,
     pub bot_token: Option<String>,
     pub events_guild_id: Option<String>,
+    pub http_timeout_ms: u64,
+}
+
+#[derive(Debug, Clone)]
+pub struct EmailConfig {
+    pub enabled: bool,
+    pub provider: EmailProviderKind,
+    pub xyecoc: Option<XyecocMailConfig>,
+    pub retry_interval_seconds: i64,
+    pub failure_after_seconds: i64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum EmailProviderKind {
+    Xyecoc,
+}
+
+#[derive(Debug, Clone)]
+pub struct XyecocMailConfig {
+    pub login: String,
+    pub password: String,
+    pub api_base_url: String,
+    pub current_lang: String,
+    pub auth_local_part_only: bool,
     pub http_timeout_ms: u64,
 }
 
@@ -101,6 +126,7 @@ impl AppConfig {
         let binding_address =
             std::env::var("BINDING_ADDRESS").unwrap_or_else(|_| "0.0.0.0:3000".to_string());
         let discord = DiscordConfig::from_env()?;
+        let email = EmailConfig::from_env()?;
         let database = DatabaseConfig::from_env()?;
         let s3 = S3Config::from_env()?;
         let shop = ShopConfig::from_env()?;
@@ -115,6 +141,7 @@ impl AppConfig {
         Ok(AppConfig {
             binding_address,
             discord,
+            email,
             database,
             s3,
             shop,
@@ -122,6 +149,96 @@ impl AppConfig {
             pow_complexity,
             jwt_secret,
             gamervii_compat,
+        })
+    }
+}
+
+impl EmailConfig {
+    fn from_env() -> Result<Self> {
+        let enabled = std::env::var("EMAIL_DELIVERY_ENABLED")
+            .unwrap_or_else(|_| "false".to_string())
+            == "true";
+        let provider = EmailProviderKind::from_env()?;
+        let retry_interval_seconds = std::env::var("EMAIL_RETRY_INTERVAL_SECONDS")
+            .unwrap_or_else(|_| "300".to_string())
+            .parse::<i64>()
+            .context("EMAIL_RETRY_INTERVAL_SECONDS must be a valid integer")?;
+        if retry_interval_seconds <= 0 {
+            anyhow::bail!("EMAIL_RETRY_INTERVAL_SECONDS must be positive");
+        }
+        let failure_after_seconds = std::env::var("EMAIL_FAILURE_AFTER_SECONDS")
+            .unwrap_or_else(|_| "86400".to_string())
+            .parse::<i64>()
+            .context("EMAIL_FAILURE_AFTER_SECONDS must be a valid integer")?;
+        if failure_after_seconds <= 0 {
+            anyhow::bail!("EMAIL_FAILURE_AFTER_SECONDS must be positive");
+        }
+
+        let xyecoc = if enabled && provider == EmailProviderKind::Xyecoc {
+            Some(XyecocMailConfig::from_env()?)
+        } else {
+            None
+        };
+
+        Ok(Self {
+            enabled,
+            provider,
+            xyecoc,
+            retry_interval_seconds,
+            failure_after_seconds,
+        })
+    }
+}
+
+impl EmailProviderKind {
+    fn from_env() -> Result<Self> {
+        let value = std::env::var("EMAIL_PROVIDER")
+            .unwrap_or_else(|_| "xyecoc".to_string())
+            .trim()
+            .to_lowercase();
+        match value.as_str() {
+            "xyecoc" | "ксайкок" => Ok(Self::Xyecoc),
+            _ => anyhow::bail!("EMAIL_PROVIDER must be one of: xyecoc"),
+        }
+    }
+
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Xyecoc => "xyecoc",
+        }
+    }
+}
+
+impl XyecocMailConfig {
+    fn from_env() -> Result<Self> {
+        let login = std::env::var("XYECOC_MAIL_LOGIN").context("XYECOC_MAIL_LOGIN not set")?;
+        let password =
+            std::env::var("XYECOC_MAIL_PASSWORD").context("XYECOC_MAIL_PASSWORD not set")?;
+        let api_base_url = std::env::var("XYECOC_API_BASE_URL")
+            .unwrap_or_else(|_| "https://api.xyecoc.com".to_string())
+            .trim()
+            .trim_end_matches('/')
+            .to_string();
+        if api_base_url.is_empty() {
+            anyhow::bail!("XYECOC_API_BASE_URL must not be empty");
+        }
+        let current_lang =
+            std::env::var("XYECOC_MAIL_CURRENT_LANG").unwrap_or_else(|_| "mail".to_string());
+        let auth_local_part_only = std::env::var("XYECOC_AUTH_LOCAL_PART_ONLY")
+            .unwrap_or_else(|_| "true".to_string())
+            == "true";
+        let http_timeout_ms = std::env::var("XYECOC_HTTP_TIMEOUT_MS")
+            .unwrap_or_else(|_| "10000".to_string())
+            .parse::<u64>()
+            .context("XYECOC_HTTP_TIMEOUT_MS must be a valid integer")?;
+
+        Ok(Self {
+            login,
+            password,
+            api_base_url,
+            current_lang,
+            auth_local_part_only,
+            http_timeout_ms,
         })
     }
 }

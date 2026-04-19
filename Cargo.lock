@@ -216,6 +216,7 @@ dependencies = [
  "aws-credential-types",
  "aws-sdk-s3",
  "axum",
+ "base64 0.22.1",
  "chrono",
  "crc32fast",
  "dotenvy",

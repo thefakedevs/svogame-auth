@@ -2575,6 +2575,153 @@ enum DiscordDelivery {
     FinishedAt,
 }
 
+pub struct CreateEmailDeliveryTable;
+
+impl MigrationName for CreateEmailDeliveryTable {
+    fn name(&self) -> &str {
+        "m20260419_000036_create_email_delivery_table"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for CreateEmailDeliveryTable {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .create_table(
+                Table::create()
+                    .table(EmailDelivery::Table)
+                    .if_not_exists()
+                    .col(
+                        ColumnDef::new(EmailDelivery::Id)
+                            .uuid()
+                            .not_null()
+                            .primary_key(),
+                    )
+                    .col(ColumnDef::new(EmailDelivery::UserId).uuid().null())
+                    .col(
+                        ColumnDef::new(EmailDelivery::RequestedByUserId)
+                            .uuid()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(EmailDelivery::RecipientEmail)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(EmailDelivery::TemplateKey)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(ColumnDef::new(EmailDelivery::Subject).text().not_null())
+                    .col(ColumnDef::new(EmailDelivery::HtmlBody).text().not_null())
+                    .col(ColumnDef::new(EmailDelivery::Status).string().not_null())
+                    .col(ColumnDef::new(EmailDelivery::ErrorMessage).text().null())
+                    .col(
+                        ColumnDef::new(EmailDelivery::ProviderMessageId)
+                            .string()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(EmailDelivery::AttemptCount)
+                            .integer()
+                            .not_null()
+                            .default(0),
+                    )
+                    .col(ColumnDef::new(EmailDelivery::Metadata).text().not_null())
+                    .col(ColumnDef::new(EmailDelivery::AttachmentUrl).text().null())
+                    .col(
+                        ColumnDef::new(EmailDelivery::AttachmentFilename)
+                            .string()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(EmailDelivery::AttachmentContentType)
+                            .string()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(EmailDelivery::CreatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .col(
+                        ColumnDef::new(EmailDelivery::UpdatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .col(
+                        ColumnDef::new(EmailDelivery::LastAttemptAt)
+                            .timestamp_with_time_zone()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(EmailDelivery::DeliveredAt)
+                            .timestamp_with_time_zone()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(EmailDelivery::FinishedAt)
+                            .timestamp_with_time_zone()
+                            .null(),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+
+        let backend = manager.get_database_backend();
+        for sql in [
+            r#"CREATE INDEX IF NOT EXISTS "idx_email_delivery_status_created_at" ON "email_delivery" ("status", "created_at")"#,
+            r#"CREATE INDEX IF NOT EXISTS "idx_email_delivery_user_id" ON "email_delivery" ("user_id")"#,
+        ] {
+            match manager
+                .get_connection()
+                .execute(Statement::from_string(backend, sql.to_string()))
+                .await
+            {
+                Ok(_) => {}
+                Err(error) if is_duplicate_index_error(&error) => {}
+                Err(error) => return Err(error),
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_table(Table::drop().table(EmailDelivery::Table).to_owned())
+            .await
+    }
+}
+
+#[derive(DeriveIden)]
+enum EmailDelivery {
+    Table,
+    Id,
+    UserId,
+    RequestedByUserId,
+    RecipientEmail,
+    TemplateKey,
+    Subject,
+    HtmlBody,
+    Status,
+    ErrorMessage,
+    ProviderMessageId,
+    AttemptCount,
+    Metadata,
+    AttachmentUrl,
+    AttachmentFilename,
+    AttachmentContentType,
+    CreatedAt,
+    UpdatedAt,
+    LastAttemptAt,
+    DeliveredAt,
+    FinishedAt,
+}
+
 pub struct AddAssetDefinitionGunskinColumns;
 
 impl MigrationName for AddAssetDefinitionGunskinColumns {

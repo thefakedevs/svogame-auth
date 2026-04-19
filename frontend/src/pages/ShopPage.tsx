@@ -217,7 +217,7 @@ function buildProductMetaItems(product: ShopProductResponse, asset: AssetRespons
 
   if (isSkin) {
     if (asset?.rarity) addMetaItem(rows, 'Редкость', rarityLabel(asset.rarity))
-    addMetaItem(rows, 'Оружие', asset?.weaponKey?.replace('taczgun:', '') ?? '—')
+    addMetaItem(rows, 'Оружие', asset?.weaponKey ?? '—')
   }
 
   if (!isSkin && (isSubscription || ownershipModel === 'expirable')) {
@@ -416,7 +416,7 @@ export default function ShopPage() {
     }
 
     if (shopWeaponFilter !== 'all') {
-      rows = rows.filter((item) => (item.asset?.weaponKey?.replace('taczgun:', '') ?? '').trim() === shopWeaponFilter)
+      rows = rows.filter((item) => (item.asset?.weaponKey ?? '').trim() === shopWeaponFilter)
     }
 
     const sorted = [...rows]
@@ -437,7 +437,7 @@ export default function ShopPage() {
         )
         break
       case 'weapon': {
-        const w = (item: ShopProductView) => (item.asset?.weaponKey?.replace('taczgun:', '') ?? '').trim().toLowerCase()
+        const w = (item: ShopProductView) => (item.asset?.weaponKey ?? '').trim().toLowerCase()
         sorted.sort((a, b) => w(a).localeCompare(w(b), 'ru') || tieTitle(a, b))
         break
       }
@@ -696,16 +696,16 @@ export default function ShopPage() {
                           <span>Все</span>
                         </label>
                         {shopWeaponOptions.map((weaponKey) => (
-                          <label key={weaponKey?.replace('taczgun:', '')} className="ui-radio">
+                          <label key={weaponKey} className="ui-radio">
                             <input
                               type="radio"
                               name="shop-filter-weapon"
-                              value={weaponKey?.replace('taczgun:', '')}
-                              checked={shopWeaponFilter === weaponKey?.replace('taczgun:', '')}
-                              onChange={() => setShopWeaponFilter(weaponKey?.replace('taczgun:', ''))}
+                              value={weaponKey}
+                              checked={shopWeaponFilter === weaponKey}
+                              onChange={() => setShopWeaponFilter(weaponKey)}
                             />
                             <span className="ui-radio-mark" aria-hidden />
-                            <span>{weaponKey?.replace('taczgun:', '')}</span>
+                            <span>{weaponKey}</span>
                           </label>
                         ))}
                       </fieldset>
@@ -731,7 +731,7 @@ export default function ShopPage() {
             imageUrl: detailsProduct.imageUrl,
             accent: detailsProduct.accent,
             rarity: detailsProduct.asset?.rarity,
-            weaponKey: detailsProduct.asset?.weaponKey?.replace('taczgun:', ''),
+            weaponKey: detailsProduct.asset?.weaponKey,
             priceText: formatPrice(detailsProduct.product.priceRub),
             statusText: detailsProduct.owned ? 'Уже в инвентаре' : 'Можно купить',
             metaItems: buildProductMetaItems(detailsProduct.product, detailsProduct.asset),

@@ -2,8 +2,8 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use auth::app::config::{
-    AppConfig, DatabaseConfig, DiscordConfig, ReceiptProviderKind, ReceiptsConfig, S3Config,
-    ShopConfig, ShopPaymentProviderKind, YooKassaConfig,
+    AppConfig, DatabaseConfig, DiscordConfig, EmailConfig, EmailProviderKind, ReceiptProviderKind,
+    ReceiptsConfig, S3Config, ShopConfig, ShopPaymentProviderKind, YooKassaConfig,
 };
 use auth::app::router::build_router;
 use auth::app::state::{AppState, SharedAppState};
@@ -99,6 +99,13 @@ impl TestApp {
                 bot_token: None,
                 events_guild_id: None,
                 http_timeout_ms: 10_000,
+            },
+            email: EmailConfig {
+                enabled: false,
+                provider: EmailProviderKind::Xyecoc,
+                xyecoc: None,
+                retry_interval_seconds: 300,
+                failure_after_seconds: 86400,
             },
             database,
             s3: S3Config {

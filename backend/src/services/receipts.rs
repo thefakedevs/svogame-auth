@@ -536,7 +536,18 @@ async fn process_one_receipt(
     };
 
     match submission {
-        Ok(submission) => mark_receipt_completed(db, receipt, submission).await?,
+        Ok(submission) => {
+            let completed_receipt = mark_receipt_completed(db, receipt, submission).await?;
+            if let Err(error) =
+                crate::services::email::queue_shop_receipt_email(db, &order, &completed_receipt)
+                    .await
+            {
+                tracing::warn!(
+                    "Failed to queue receipt email for order {}: {error}",
+                    order.id
+                );
+            }
+        }
         Err(error) => schedule_receipt_retry(db, config, receipt, error.to_string()).await?,
     }
     Ok(())
@@ -582,7 +593,7 @@ async fn mark_receipt_completed(
     db: &DatabaseConnection,
     receipt: ShopReceiptModel,
     submission: ReceiptSubmission,
-) -> Result<()> {
+) -> Result<ShopReceiptModel> {
     let now = chrono::Utc::now();
     let mut active: ShopReceiptActiveModel = receipt.into();
     active.status = Set(RECEIPT_STATUS_COMPLETED.to_string());
@@ -597,8 +608,7 @@ async fn mark_receipt_completed(
     active.locked_until = Set(None);
     active.failure_problem = Set(None);
     active.updated_at = Set(now);
-    active.update(db).await?;
-    Ok(())
+    active.update(db).await.map_err(Into::into)
 }
 
 async fn schedule_receipt_retry(
