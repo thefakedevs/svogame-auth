@@ -117,7 +117,7 @@ function assetView(assetMap: Map<string, AssetResponse>, assetKey: string, asset
     imageUrl: assetImageUrl(asset),
     accent: assetAccent(asset, assetKey),
     rarity: asset?.rarity ?? null,
-    weaponKey: asset?.weaponKey?.replace('taczgun:', '') ?? null,
+    weaponKey: asset?.weaponKey ?? null,
   }
 }
 
@@ -127,7 +127,7 @@ function isSkinAsset(asset: AssetResponse | null, assetKey: string) {
     asset?.key,
     asset?.displayName,
     asset?.assetKind,
-    asset?.weaponKey?.replace('taczgun:', ''),
+    asset?.weaponKey,
     metadataString(asset, ['type', 'category', 'kind', 'itemType']),
   ].filter(Boolean).join(' ').toLowerCase()
 
@@ -191,13 +191,13 @@ function buildInventoryMetaItems(
   const rows: Array<{ label: string; value: string }> = []
   const assetKind = normalizedAssetKind(asset)
   const ownershipModel = normalizedOwnershipModel(asset)
-  const isSkin = assetKind === 'skin' || Boolean(asset?.weaponKey?.replace('taczgun:', '') || asset?.rarity)
+  const isSkin = assetKind === 'skin' || Boolean(asset?.weaponKey || asset?.rarity)
 
   addMetaItem(rows, 'Тип', assetKindLabel(assetKind))
 
   if (isSkin) {
     if (asset?.rarity) addMetaItem(rows, 'Редкость', rarityLabel(asset.rarity))
-    addMetaItem(rows, 'Оружие', asset?.weaponKey?.replace('taczgun:', '') ?? '—')
+    addMetaItem(rows, 'Оружие', asset?.weaponKey ?? '—')
     return rows
   }
 
@@ -678,7 +678,7 @@ export default function OwnershipPage() {
     if (state.status !== 'ready') return map
 
     for (const selected of state.selectedGunskins) {
-      map.set(selected.weaponKey?.replace('taczgun:', ''), selected)
+      map.set(selected.weaponKey, selected)
     }
     return map
   }, [state])
@@ -769,7 +769,7 @@ export default function OwnershipPage() {
   }, [baseSkinEntries, lootboxEntries, regularItemEntries])
 
   const invWeaponOptions = useMemo(
-    () => uniqueSortedWeaponKeys(baseSkinEntries.map((item) => item.weaponKey?.replace('taczgun:', ''))),
+    () => uniqueSortedWeaponKeys(baseSkinEntries.map((item) => item.weaponKey)),
     [baseSkinEntries],
   )
 
@@ -787,7 +787,7 @@ export default function OwnershipPage() {
     }
 
     if (invWeaponFilter !== 'all') {
-      rows = rows.filter((item) => (item.weaponKey?.replace('taczgun:', '') ?? '').trim() === invWeaponFilter)
+      rows = rows.filter((item) => (item.weaponKey ?? '').trim() === invWeaponFilter)
     }
 
     const sorted = [...rows]
@@ -798,7 +798,7 @@ export default function OwnershipPage() {
         sorted.sort((a, b) => skinRarityRank(a.rarity) - skinRarityRank(b.rarity) || tieTitle(a, b))
         break
       case 'weapon': {
-        const w = (item: SkinCardItem) => (item.weaponKey?.replace('taczgun:', '') ?? '').trim().toLowerCase()
+        const w = (item: SkinCardItem) => (item.weaponKey ?? '').trim().toLowerCase()
         sorted.sort((a, b) => w(a).localeCompare(w(b), 'ru') || tieTitle(a, b))
         break
       }
@@ -854,12 +854,12 @@ export default function OwnershipPage() {
       setState({ status: 'unauthorized' })
       return
     }
-    if (!item.weaponKey?.replace('taczgun:', '') || selectingSkinKey) return
+    if (!item.weaponKey || selectingSkinKey) return
 
-    const requestKey = `${item.weaponKey?.replace('taczgun:', '')}:${item.assetKey}`
+    const requestKey = `${item.weaponKey}:${item.assetKey}`
     setSelectingSkinKey(requestKey)
     try {
-      const selected = await selectMyGunskin(token, item.weaponKey?.replace('taczgun:', ''), {
+      const selected = await selectMyGunskin(token, item.weaponKey, {
         assetKey: item.assetKey,
         reasonCode: 'inventory_page',
         reasonText: 'Selected from inventory page',
@@ -868,7 +868,7 @@ export default function OwnershipPage() {
       setState((prev) => {
         if (prev.status !== 'ready') return prev
 
-        const nextSelections = prev.selectedGunskins.filter((entry) => entry.weaponKey?.replace('taczgun:', '') !== selected.weaponKey?.replace('taczgun:', ''))
+        const nextSelections = prev.selectedGunskins.filter((entry) => entry.weaponKey !== selected.weaponKey)
         nextSelections.push(selected)
 
         return {
@@ -890,19 +890,19 @@ export default function OwnershipPage() {
       setState({ status: 'unauthorized' })
       return
     }
-    if (!item.weaponKey?.replace('taczgun:', '') || selectingSkinKey || resettingSkinKey) return
+    if (!item.weaponKey || selectingSkinKey || resettingSkinKey) return
 
-    const requestKey = `${item.weaponKey?.replace('taczgun:', '')}:${item.assetKey}`
+    const requestKey = `${item.weaponKey}:${item.assetKey}`
     setResettingSkinKey(requestKey)
     try {
-      await resetMyGunskin(token, item.weaponKey?.replace('taczgun:', ''))
+      await resetMyGunskin(token, item.weaponKey)
 
       setState((prev) => {
         if (prev.status !== 'ready') return prev
 
         return {
           ...prev,
-          selectedGunskins: prev.selectedGunskins.filter((entry) => entry.weaponKey?.replace('taczgun:', '') !== item.weaponKey?.replace('taczgun:', '')),
+          selectedGunskins: prev.selectedGunskins.filter((entry) => entry.weaponKey !== item.weaponKey),
         }
       })
       toast.success('Выбор скина снят.')
@@ -958,8 +958,8 @@ export default function OwnershipPage() {
         {displayedInventoryCount ? (
           <div className="inventory-skin-grid">
             {displayedSkinEntries.map((item) => {
-              const selected = item.weaponKey?.replace('taczgun:', '') ? selectedGunskinByWeapon.get(item.weaponKey?.replace('taczgun:', '')) : null
-              const requestKey = item.weaponKey?.replace('taczgun:', '') ? `${item.weaponKey?.replace('taczgun:', '')}:${item.assetKey}` : null
+              const selected = item.weaponKey ? selectedGunskinByWeapon.get(item.weaponKey) : null
+              const requestKey = item.weaponKey ? `${item.weaponKey}:${item.assetKey}` : null
 
               return (
                 <SkinCard
@@ -1111,16 +1111,16 @@ export default function OwnershipPage() {
                           <span>Все</span>
                         </label>
                         {invWeaponOptions.map((weaponKey) => (
-                          <label key={weaponKey?.replace('taczgun:', '')} className="ui-radio">
+                          <label key={weaponKey} className="ui-radio">
                             <input
                               type="radio"
                               name="inv-filter-weapon"
-                              value={weaponKey?.replace('taczgun:', '')}
-                              checked={invWeaponFilter === weaponKey?.replace('taczgun:', '')}
-                              onChange={() => setInvWeaponFilter(weaponKey?.replace('taczgun:', ''))}
+                              value={weaponKey}
+                              checked={invWeaponFilter === weaponKey}
+                              onChange={() => setInvWeaponFilter(weaponKey)}
                             />
                             <span className="ui-radio-mark" aria-hidden />
-                            <span>{weaponKey?.replace('taczgun:', '')}</span>
+                            <span>{weaponKey}</span>
                           </label>
                         ))}
                       </fieldset>
@@ -1146,7 +1146,7 @@ export default function OwnershipPage() {
             imageUrl: detailsSkin.imageUrl,
             accent: skinRarityAccent(detailsSkin.rarity),
             rarity: detailsSkin.rarity,
-            weaponKey: detailsSkin.weaponKey?.replace('taczgun:', ''),
+            weaponKey: detailsSkin.weaponKey,
             statusText: 'Уже в инвентаре',
             metaItems: buildInventoryMetaItems(detailsSkin.asset, {
               amount: detailsSkin.amount,
@@ -1169,7 +1169,7 @@ export default function OwnershipPage() {
             imageUrl: detailsInventoryItem.imageUrl,
             accent: detailsInventoryItem.accent,
             rarity: detailsInventoryItem.rarity,
-            weaponKey: detailsInventoryItem.weaponKey?.replace('taczgun:', ''),
+            weaponKey: detailsInventoryItem.weaponKey,
             statusText: 'Уже в инвентаре',
             metaItems: buildInventoryMetaItems(detailsInventoryItem.asset, {
               amount: detailsInventoryItem.amount,
