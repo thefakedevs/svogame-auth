@@ -390,6 +390,13 @@
   border-radius: 0;
 }
 
+.inventory-regular-card .inventory-skin-card__action {
+  display: inline-grid;
+  place-items: center;
+  cursor: default;
+  border-radius: 0;
+}
+
 .inventory-lootbox-card {
   border-color: color-mix(in srgb, var(--inventory-accent) 62%, var(--ui-border));
 }
@@ -401,6 +408,12 @@
 }
 
 .inventory-lootbox-card .inventory-skin-card__action.is-selected:hover {
+  border-color: rgba(103, 211, 145, 0.5);
+  background: rgba(103, 211, 145, 0.12);
+  color: #67d391;
+}
+
+.inventory-regular-card .inventory-skin-card__action:hover {
   border-color: rgba(103, 211, 145, 0.5);
   background: rgba(103, 211, 145, 0.12);
   color: #67d391;

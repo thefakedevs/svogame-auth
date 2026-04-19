@@ -231,7 +231,7 @@ export default function AdminLootboxWizard({
       <h2 className="card-title">Новый лутбокс одной кнопкой</h2>
       <p className="admin-inline-muted">
         Создаёт ассет <code>lootbox</code> со stackable-владением, объявляет его лутбоксом и добавляет выбранные ассеты как drops.
-        В содержимое можно добавлять только активные stackable/expirable ассеты.
+        В содержимое можно добавлять активные stackable, expirable и entitlement ассеты, включая валюту.
       </p>
 
       {assetsError ? <p className="error-message">{assetsError}</p> : null}

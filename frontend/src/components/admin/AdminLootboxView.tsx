@@ -83,6 +83,9 @@ export default function AdminLootboxView({ token, lootboxId }: { token: string; 
   const [detail, setDetail] = useState<LootboxDetailResponse | null>(null)
   const [loadError, setLoadError] = useState('')
   const [assets, setAssets] = useState<AssetResponse[]>([])
+  const [displayName, setDisplayName] = useState('')
+  const [description, setDescription] = useState('')
+  const [isPublic, setIsPublic] = useState(false)
   const [isActive, setIsActive] = useState(false)
   const [metadataText, setMetadataText] = useState('{}')
   const [dropDrafts, setDropDrafts] = useState<Record<string, DropDraft>>({})
@@ -100,6 +103,9 @@ export default function AdminLootboxView({ token, lootboxId }: { token: string; 
       ])
       setDetail(loadedDetail)
       setAssets(loadedAssets.filter(isRewardAsset))
+      setDisplayName(loadedDetail.definition.assetDisplayName)
+      setDescription(loadedDetail.definition.assetDescription ?? '')
+      setIsPublic(loadedDetail.definition.isPublic)
       setIsActive(loadedDetail.definition.isActive)
       setMetadataText(metadataToText(loadedDetail.definition.metadata))
       setDropDrafts(Object.fromEntries(loadedDetail.drops.map((drop) => [drop.id, draftFromDrop(drop)])))
@@ -117,6 +123,10 @@ export default function AdminLootboxView({ token, lootboxId }: { token: string; 
 
   const saveDefinition = async () => {
     if (!detail || isSavingDefinition) return
+    if (!displayName.trim()) {
+      toast.error('Укажите название лутбокса.')
+      return
+    }
     let metadata: unknown
     try {
       metadata = parseJsonText(metadataText)
@@ -128,10 +138,17 @@ export default function AdminLootboxView({ token, lootboxId }: { token: string; 
     setIsSavingDefinition(true)
     try {
       const updated = await patchAdminLootbox(token, detail.definition.id, {
+        display_name: displayName.trim(),
+        description: description.trim() || null,
         is_active: isActive,
+        is_public: isPublic,
         metadata,
       })
       setDetail(updated)
+      setDisplayName(updated.definition.assetDisplayName)
+      setDescription(updated.definition.assetDescription ?? '')
+      setIsPublic(updated.definition.isPublic)
+      setIsActive(updated.definition.isActive)
       setMetadataText(metadataToText(updated.definition.metadata))
       toast.success('Лутбокс обновлен.')
     } catch (cause) {
@@ -164,6 +181,7 @@ export default function AdminLootboxView({ token, lootboxId }: { token: string; 
       return { amount: null, duration_seconds: null, weight, title_i18n, is_active: draft.isActive, sort_order: sortOrder }
     }
 
+    if (asset.ownershipModel !== 'expirable') throw new Error('API лутбоксов поддерживает только stackable, expirable и entitlement rewards.')
     const durationSeconds = Number.parseInt(draft.durationSeconds, 10)
     if (!Number.isFinite(durationSeconds) || durationSeconds <= 0) {
       throw new Error('durationSeconds должен быть больше 0 для expirable.')
@@ -248,11 +266,34 @@ export default function AdminLootboxView({ token, lootboxId }: { token: string; 
             </p>
             <dl className="admin-kv admin-kv--compact">
               <div><dt>Asset definition</dt><dd>{detail.definition.assetDefinitionId}</dd></div>
-              <div><dt>Видимость ассета</dt><dd>{detail.definition.isPublic ? 'public' : 'hidden'}</dd></div>
+              <div><dt>Видимость лутбокса</dt><dd>{detail.definition.isPublic ? 'public' : 'hidden'}</dd></div>
               <div><dt>Drops</dt><dd>{detail.drops.length}</dd></div>
             </dl>
 
+            <div className="admin-asset-form-grid">
+              <label className="admin-shop-field">
+                <span>Название</span>
+                <input
+                  className="ui-input"
+                  value={displayName}
+                  onChange={(event) => setDisplayName(event.target.value)}
+                />
+              </label>
+              <label className="admin-shop-field">
+                <span>Описание</span>
+                <input
+                  className="ui-input"
+                  value={description}
+                  onChange={(event) => setDescription(event.target.value)}
+                />
+              </label>
+            </div>
+
             <div className="admin-asset-flags admin-shop-form-flags">
+              <label className="admin-checkbox-row">
+                <input type="checkbox" checked={isPublic} onChange={(event) => setIsPublic(event.target.checked)} />
+                Лутбокс публичный
+              </label>
               <label className="admin-checkbox-row">
                 <input type="checkbox" checked={isActive} onChange={(event) => setIsActive(event.target.checked)} />
                 Definition активен

@@ -73,7 +73,10 @@ export interface CreateLootboxDefinitionInput {
 }
 
 export interface UpdateLootboxDefinitionInput {
+  description?: string | null
+  display_name?: string | null
   is_active?: boolean | null
+  is_public?: boolean | null
   metadata?: unknown
 }
 
