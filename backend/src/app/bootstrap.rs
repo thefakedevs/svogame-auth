@@ -27,6 +27,7 @@ pub async fn run() -> Result<()> {
     spawn_auth_cleanup_worker(state.clone());
     spawn_shop_reconciliation_worker(state.clone());
     spawn_receipt_worker(state.clone());
+    spawn_email_delivery_worker(state.clone());
     spawn_discord_delivery_worker(state.clone());
 
     let app = build_router(state);
@@ -142,12 +143,8 @@ fn spawn_shop_reconciliation_worker(state: SharedAppState) {
                 )
             };
             if let Err(error) =
-                crate::services::shop::reconcile_pending_orders(
-                    &db,
-                    &shop_config,
-                    &receipts_config,
-                )
-                .await
+                crate::services::shop::reconcile_pending_orders(&db, &shop_config, &receipts_config)
+                    .await
             {
                 warn!("Shop reconciliation failed: {error}");
             }
@@ -176,6 +173,29 @@ fn spawn_receipt_worker(state: SharedAppState) {
             .await
             {
                 warn!("Receipt worker failed: {error}");
+            }
+        }
+    });
+}
+
+fn spawn_email_delivery_worker(state: SharedAppState) {
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(std::time::Duration::from_secs(1));
+        loop {
+            interval.tick().await;
+            let (db, email_config, email_runtime) = {
+                let state_guard = state.read().await;
+                (
+                    state_guard.db.clone(),
+                    state_guard.config.email.clone(),
+                    state_guard.email.clone(),
+                )
+            };
+            if let Err(error) =
+                crate::services::email::process_next_delivery(&db, &email_config, &email_runtime)
+                    .await
+            {
+                warn!("Email delivery worker failed: {error}");
             }
         }
     });

@@ -1,6 +1,7 @@
 use crate::app::http::ProblemDetails;
 use crate::app::http::ProblemResponse;
 use crate::domains::admin::discord as admin_discord;
+use crate::domains::admin::email as admin_email;
 use crate::domains::admin::handlers as admin_handlers;
 use crate::domains::admin::service_tokens as admin_service_tokens;
 use crate::domains::admin::squads as admin_squads;
@@ -31,6 +32,7 @@ use utoipa::OpenApi;
         admin_handlers::health,
         admin_handlers::me,
         admin_discord::send_notification,
+        admin_email::send_test_receipt,
         admin_discord::create_broadcast,
         admin_discord::list_broadcasts,
         admin_discord::get_broadcast,
@@ -182,6 +184,8 @@ use utoipa::OpenApi;
             admin_handlers::AdminHealthResponse,
             admin_handlers::AdminMeResponse,
             admin_discord::SendDiscordNotificationRequest,
+            admin_email::SendTestReceiptEmailRequest,
+            admin_email::EmailDeliveryResponse,
             admin_discord::CreateDiscordBroadcastRequest,
             admin_discord::DiscordDeliveryResponse,
             admin_discord::DiscordBroadcastResponse,
