@@ -20,6 +20,7 @@ export interface LootboxDropResponse {
   rewardAssetDisplayName: string
   rewardOwnershipModel: string
   amount: number | null
+  duplicateCompensationAmount: number | null
   durationSeconds: number | null
   weight: number
   totalWeight: number
@@ -83,6 +84,7 @@ export interface UpdateLootboxDefinitionInput {
 export interface CreateLootboxDropInput {
   reward_asset_key: string
   amount?: number | null
+  duplicate_compensation_amount?: number | null
   duration_seconds?: number | null
   weight: number
   title_i18n?: unknown
@@ -92,6 +94,7 @@ export interface CreateLootboxDropInput {
 
 export interface UpdateLootboxDropInput {
   amount?: number | null
+  duplicate_compensation_amount?: number | null
   duration_seconds?: number | null
   weight?: number | null
   title_i18n?: unknown

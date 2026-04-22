@@ -19,6 +19,7 @@ import AdminAssetImage from './AdminAssetImage'
 
 type DropDraft = {
   amount: string
+  duplicateCompensationAmount: string
   durationSeconds: string
   weight: string
   title: string
@@ -47,6 +48,7 @@ function parseJsonText(value: string) {
 function draftFromDrop(drop: LootboxDropResponse): DropDraft {
   return {
     amount: drop.amount != null ? String(drop.amount) : '',
+    duplicateCompensationAmount: drop.duplicateCompensationAmount != null ? String(drop.duplicateCompensationAmount) : '',
     durationSeconds: drop.durationSeconds != null ? String(drop.durationSeconds) : '',
     weight: String(drop.weight),
     title: titleFromI18n(drop.titleI18n),
@@ -67,6 +69,7 @@ function titleFromI18n(value: unknown) {
 const emptyNewDrop: NewDropDraft = {
   rewardAssetKey: '',
   amount: '1',
+  duplicateCompensationAmount: '',
   durationSeconds: '',
   weight: '1',
   title: '',
@@ -171,14 +174,37 @@ export default function AdminLootboxView({ token, lootboxId }: { token: string; 
     if (!Number.isFinite(sortOrder)) throw new Error('sortOrder должен быть числом.')
 
     const title_i18n = draft.title.trim() ? { 'ru-RU': draft.title.trim() } : {}
+    const duplicateCompensationAmount = draft.duplicateCompensationAmount.trim()
+      ? Number.parseInt(draft.duplicateCompensationAmount, 10)
+      : null
+    if (duplicateCompensationAmount !== null && (!Number.isFinite(duplicateCompensationAmount) || duplicateCompensationAmount < 0)) {
+      throw new Error('duplicateCompensationAmount должен быть числом не меньше 0 или пустым.')
+    }
+
     if (asset.ownershipModel === 'stackable') {
       const amount = Number.parseInt(draft.amount, 10)
       if (!Number.isFinite(amount) || amount <= 0) throw new Error('amount должен быть больше 0 для stackable.')
-      return { amount, duration_seconds: null, weight, title_i18n, is_active: draft.isActive, sort_order: sortOrder }
+      return {
+        amount,
+        duplicate_compensation_amount: duplicateCompensationAmount,
+        duration_seconds: null,
+        weight,
+        title_i18n,
+        is_active: draft.isActive,
+        sort_order: sortOrder,
+      }
     }
 
     if (asset.ownershipModel === 'entitlement') {
-      return { amount: null, duration_seconds: null, weight, title_i18n, is_active: draft.isActive, sort_order: sortOrder }
+      return {
+        amount: null,
+        duplicate_compensation_amount: duplicateCompensationAmount,
+        duration_seconds: null,
+        weight,
+        title_i18n,
+        is_active: draft.isActive,
+        sort_order: sortOrder,
+      }
     }
 
     if (asset.ownershipModel !== 'expirable') throw new Error('API лутбоксов поддерживает только stackable, expirable и entitlement rewards.')
@@ -186,7 +212,15 @@ export default function AdminLootboxView({ token, lootboxId }: { token: string; 
     if (!Number.isFinite(durationSeconds) || durationSeconds <= 0) {
       throw new Error('durationSeconds должен быть больше 0 для expirable.')
     }
-    return { amount: null, duration_seconds: durationSeconds, weight, title_i18n, is_active: draft.isActive, sort_order: sortOrder }
+    return {
+      amount: null,
+      duplicate_compensation_amount: duplicateCompensationAmount,
+      duration_seconds: durationSeconds,
+      weight,
+      title_i18n,
+      is_active: draft.isActive,
+      sort_order: sortOrder,
+    }
   }
 
   const saveDrop = async (drop: LootboxDropResponse) => {
@@ -317,6 +351,7 @@ export default function AdminLootboxView({ token, lootboxId }: { token: string; 
                 <span>Добавить</span>
                 <span>Выбор ассета</span>
                 <span>Количество / срок</span>
+                <span>Компенсация</span>
                 <span>Вес</span>
                 <span>Название</span>
                 <span>Действие</span>
@@ -339,6 +374,10 @@ export default function AdminLootboxView({ token, lootboxId }: { token: string; 
                     {asset && draft ? (
                       <>
                         <DynamicDropValueField asset={asset} draft={draft} onChange={(patch) => updateDropDraft(drop.id, patch)} />
+                        <DuplicateCompensationField
+                          value={draft.duplicateCompensationAmount}
+                          onChange={(duplicateCompensationAmount) => updateDropDraft(drop.id, { duplicateCompensationAmount })}
+                        />
                         <label className="admin-lootbox-field">
                           <input
                             className="ui-input"
@@ -369,6 +408,7 @@ export default function AdminLootboxView({ token, lootboxId }: { token: string; 
                     ) : (
                       <>
                         <span className="admin-inline-muted admin-lootbox-empty-column">Ассет не найден</span>
+                        <span className="admin-inline-muted admin-lootbox-empty-column">—</span>
                         <span className="admin-inline-muted admin-lootbox-empty-column">—</span>
                         <span className="admin-inline-muted admin-lootbox-empty-column">—</span>
                         <div className="admin-lootbox-cell-actions">
@@ -402,6 +442,10 @@ export default function AdminLootboxView({ token, lootboxId }: { token: string; 
                       draft={newDrop}
                       onChange={(patch) => setNewDrop((prev) => ({ ...prev, ...patch }))}
                     />
+                    <DuplicateCompensationField
+                      value={newDrop.duplicateCompensationAmount}
+                      onChange={(duplicateCompensationAmount) => setNewDrop((prev) => ({ ...prev, duplicateCompensationAmount }))}
+                    />
                     <label className="admin-lootbox-field">
                       <input
                         className="ui-input"
@@ -428,6 +472,7 @@ export default function AdminLootboxView({ token, lootboxId }: { token: string; 
                   </>
                 ) : (
                   <>
+                    <span className="admin-inline-muted admin-lootbox-empty-column">—</span>
                     <span className="admin-inline-muted admin-lootbox-empty-column">—</span>
                     <span className="admin-inline-muted admin-lootbox-empty-column">—</span>
                     <span className="admin-inline-muted admin-lootbox-empty-column">—</span>
@@ -487,6 +532,27 @@ function DynamicDropValueField({
       <span className="admin-inline-muted">Не требуется</span>
       <small>entitlement</small>
     </div>
+  )
+}
+
+function DuplicateCompensationField({
+  value,
+  onChange,
+}: {
+  value: string
+  onChange: (value: string) => void
+}) {
+  return (
+    <label className="admin-lootbox-field">
+      <input
+        className="ui-input"
+        type="number"
+        min={0}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      />
+      <small>duplicate compensation</small>
+    </label>
   )
 }
 

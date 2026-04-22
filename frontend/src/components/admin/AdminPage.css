@@ -1211,7 +1211,7 @@
 .admin-lootbox-table-head,
 .admin-lootbox-cell {
   display: grid;
-  grid-template-columns: 64px minmax(240px, 1.5fr) minmax(132px, .55fr) minmax(104px, .45fr) minmax(190px, 1fr) 96px;
+  grid-template-columns: 64px minmax(220px, 1.35fr) minmax(128px, .52fr) minmax(132px, .52fr) minmax(96px, .4fr) minmax(180px, .9fr) 96px;
   gap: 10px;
   align-items: start;
 }
