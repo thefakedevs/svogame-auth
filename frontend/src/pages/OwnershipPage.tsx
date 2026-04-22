@@ -397,6 +397,14 @@ function formatDropAmount(drop: LootboxDropResponse) {
   return '1 шт'
 }
 
+function formatDropDetails(drop: LootboxDropResponse) {
+  const rows = [formatDropAmount(drop)]
+  if (drop.duplicateCompensationAmount !== null && drop.duplicateCompensationAmount !== undefined) {
+    rows.push(`компенсация дубля: ${drop.duplicateCompensationAmount}`)
+  }
+  return rows.join(' · ')
+}
+
 function formatDropChance(drop: LootboxDropResponse) {
   if (drop.totalWeight <= 0) return null
   const chance = drop.weight / drop.totalWeight * 100
@@ -464,7 +472,7 @@ function LootboxDetailsModal({
                             <InventoryVisual item={reward} compact />
                             <div className="lootbox-details-modal__drop-main">
                               <strong>{drop.rewardAssetDisplayName || reward.title}</strong>
-                              <span>{formatDropAmount(drop)}</span>
+                              <span>{formatDropDetails(drop)}</span>
                             </div>
                             {chance ? <span className="lootbox-details-modal__drop-chance">{chance}</span> : null}
                           </article>

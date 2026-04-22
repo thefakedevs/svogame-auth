@@ -13,6 +13,7 @@ import AdminAssetImage from './AdminAssetImage'
 type DropDraft = {
   assetKey: string
   amount: string
+  duplicateCompensationAmount: string
   durationSeconds: string
   weight: string
   title: string
@@ -21,6 +22,7 @@ type DropDraft = {
 const emptyDrop: DropDraft = {
   assetKey: '',
   amount: '1',
+  duplicateCompensationAmount: '',
   durationSeconds: '',
   weight: '1',
   title: '',
@@ -150,6 +152,7 @@ export default function AdminLootboxWizard({
       asset: AssetResponse
       amount: number | null
       durationSeconds: number | null
+      duplicateCompensationAmount: number | null
       weight: number
       sortOrder: number
     }>
@@ -159,22 +162,28 @@ export default function AdminLootboxWizard({
         if (!asset) throw new Error(`Ассет ${drop.assetKey} не найден.`)
         const weight = Number.parseInt(drop.weight, 10)
         if (!Number.isFinite(weight) || weight <= 0) throw new Error(`Вес в ячейке ${index + 1} должен быть больше 0.`)
+        const duplicateCompensationAmount = drop.duplicateCompensationAmount.trim()
+          ? Number.parseInt(drop.duplicateCompensationAmount, 10)
+          : null
+        if (duplicateCompensationAmount !== null && (!Number.isFinite(duplicateCompensationAmount) || duplicateCompensationAmount < 0)) {
+          throw new Error(`Компенсация дубля в ячейке ${index + 1} должна быть числом не меньше 0 или пустой.`)
+        }
 
         if (asset.ownershipModel === 'stackable') {
           const amount = Number.parseInt(drop.amount, 10)
           if (!Number.isFinite(amount) || amount <= 0) throw new Error(`Количество в ячейке ${index + 1} должно быть больше 0.`)
-          return { drop, asset, amount, durationSeconds: null, weight, sortOrder: index }
+          return { drop, asset, amount, durationSeconds: null, duplicateCompensationAmount, weight, sortOrder: index }
         }
 
         if (asset.ownershipModel === 'entitlement') {
-          return { drop, asset, amount: null, durationSeconds: null, weight, sortOrder: index }
+          return { drop, asset, amount: null, durationSeconds: null, duplicateCompensationAmount, weight, sortOrder: index }
         }
 
         const durationSeconds = Number.parseInt(drop.durationSeconds, 10)
         if (!Number.isFinite(durationSeconds) || durationSeconds <= 0) {
           throw new Error(`durationSeconds в ячейке ${index + 1} должен быть больше 0.`)
         }
-        return { drop, asset, amount: null, durationSeconds, weight, sortOrder: index }
+        return { drop, asset, amount: null, durationSeconds, duplicateCompensationAmount, weight, sortOrder: index }
       })
     } catch (cause) {
       toast.error(cause instanceof Error ? cause.message : 'Проверьте содержимое лутбокса.')
@@ -209,6 +218,7 @@ export default function AdminLootboxWizard({
         latest = await createAdminLootboxDrop(token, latest.definition.id, {
           reward_asset_key: item.asset.key,
           amount: item.amount,
+          duplicate_compensation_amount: item.duplicateCompensationAmount,
           duration_seconds: item.durationSeconds,
           weight: item.weight,
           title_i18n: item.drop.title.trim() ? { 'ru-RU': item.drop.title.trim() } : {},
@@ -311,6 +321,7 @@ export default function AdminLootboxWizard({
             <span>Номер</span>
             <span>Выбор ассета</span>
             <span>Количество / срок</span>
+            <span>Компенсация</span>
             <span>Вес</span>
             <span>Название</span>
             <span>Действие</span>
@@ -361,6 +372,16 @@ export default function AdminLootboxWizard({
                       <input
                         className="ui-input"
                         type="number"
+                        min={0}
+                        value={drop.duplicateCompensationAmount}
+                        onChange={(event) => updateDrop(index, { duplicateCompensationAmount: event.target.value })}
+                      />
+                      <small>duplicate compensation</small>
+                    </label>
+                    <label className="admin-lootbox-field">
+                      <input
+                        className="ui-input"
+                        type="number"
                         min={1}
                         value={drop.weight}
                         onChange={(event) => updateDrop(index, { weight: event.target.value })}
@@ -383,6 +404,7 @@ export default function AdminLootboxWizard({
                   </>
                 ) : (
                   <>
+                    <span className="admin-inline-muted admin-lootbox-empty-column">—</span>
                     <span className="admin-inline-muted admin-lootbox-empty-column">—</span>
                     <span className="admin-inline-muted admin-lootbox-empty-column">—</span>
                     <span className="admin-inline-muted admin-lootbox-empty-column">—</span>
