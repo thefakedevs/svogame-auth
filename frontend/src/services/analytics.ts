@@ -19,7 +19,7 @@ declare global {
   }
 }
 
-const DEFAULT_UMAMI_SCRIPT_URL = 'https://analytics.artembay.ru/script.js'
+const DEFAULT_UMAMI_SCRIPT_URL = 'https://analytics.baechka.me/script.js'
 const DEFAULT_UMAMI_WEBSITE_ID = '0c965545-fd3c-4485-9821-5267012848a5'
 const UMAMI_SCRIPT_ID = 'svocraft-umami-script'
 const MAX_QUEUED_CALLS = 50
