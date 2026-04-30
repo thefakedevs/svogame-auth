@@ -2,7 +2,7 @@ FROM node:22-alpine3.22 AS builder
 WORKDIR /app
 
 ARG VITE_UMAMI_ENABLED=true
-ARG VITE_UMAMI_SCRIPT_URL=https://analytics.artembay.ru/script.js
+ARG VITE_UMAMI_SCRIPT_URL=https://analytics.baechka.me/script.js
 ARG VITE_UMAMI_WEBSITE_ID=0c965545-fd3c-4485-9821-5267012848a5
 ARG VITE_UMAMI_HOST_URL=
 ARG VITE_UMAMI_DOMAINS=svocraft.xyz
