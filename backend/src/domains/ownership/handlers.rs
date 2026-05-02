@@ -32,7 +32,7 @@ use crate::services::ownership::inventory::{
     EntitlementMutation, ProlongExpirableMutation, SetExpirationMutation, StackableMutation,
     SubscriptionMutation, SubscriptionStatus,
 };
-use crate::services::ownership::types::{OperationContext, OwnershipActor};
+use crate::services::ownership::types::{AssetKind, OperationContext, OwnershipActor};
 use crate::services::ownership::wallet::WalletMutation;
 use crate::services::ownership::{catalog, inventory, wallet};
 
@@ -106,6 +106,10 @@ pub struct AssetResponse {
     pub is_active: bool,
     #[schema(rename = "imageUrl")]
     pub image_url: Option<String>,
+    #[schema(rename = "modelUrl")]
+    pub model_url: Option<String>,
+    #[schema(rename = "textureUrl")]
+    pub texture_url: Option<String>,
     #[schema(rename = "weaponKey")]
     pub weapon_key: Option<String>,
     pub rarity: Option<crate::services::ownership::types::SkinRarity>,
@@ -282,6 +286,10 @@ const ASSET_IMAGE_MAX_WIDTH: u32 = 4096;
 const ASSET_IMAGE_MAX_HEIGHT: u32 = 4096;
 const ASSET_IMAGES_PREFIX: &str = "asset_images";
 const ASSET_IMAGE_CONTENT_TYPE: &str = "image/png";
+const GUN_MODELS_PREFIX: &str = "gunmodels";
+const GUN_SKINS_PREFIX: &str = "gunskins";
+const GUN_MODEL_CONTENT_TYPE: &str = "application/json";
+const GUN_SKIN_CONTENT_TYPE: &str = "image/png";
 
 #[utoipa::path(
     get,
@@ -360,6 +368,64 @@ pub async fn get_public_asset_image(
         .ok_or_else(|| HttpError::not_found("Asset image not found"))?;
     let bytes = load_asset_image_bytes(&state, &key).await?;
     Ok(([(header::CONTENT_TYPE, ASSET_IMAGE_CONTENT_TYPE)], bytes))
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/assets/{asset_id}/model",
+    params(
+        ("asset_id" = String, Path, description = "Asset UUID.")
+    ),
+    responses(
+        (status = 200, description = "Public weapon model from object storage.", content_type = "application/json"),
+        (status = 400, description = "Invalid asset ID."),
+        (status = 404, description = "Weapon model not found or asset not publicly visible.")
+    ),
+    tag = "ownership"
+)]
+pub async fn get_public_asset_model(
+    State(state): AppStateExtractor,
+    Path(asset_id): Path<String>,
+) -> HttpResult<impl IntoResponse> {
+    let state = state.read().await;
+    let asset_id = parse_uuid(&asset_id, "Invalid asset ID")?;
+    let asset = catalog::get_asset_definition_by_id(&state.db, asset_id)
+        .await
+        .map_err(map_domain_error)?
+        .filter(|asset| asset.is_public && asset.is_active)
+        .ok_or_else(|| HttpError::not_found("Asset not found"))?;
+    let keys = gun_model_key_candidates(&asset);
+    let bytes = load_first_s3_object_bytes(&state, &keys, "Weapon model not found").await?;
+    Ok(([(header::CONTENT_TYPE, GUN_MODEL_CONTENT_TYPE)], bytes))
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/assets/{asset_id}/texture",
+    params(
+        ("asset_id" = String, Path, description = "Asset UUID.")
+    ),
+    responses(
+        (status = 200, description = "Public gunskin texture from object storage.", content_type = "image/png"),
+        (status = 400, description = "Invalid asset ID."),
+        (status = 404, description = "Gunskin texture not found or asset not publicly visible.")
+    ),
+    tag = "ownership"
+)]
+pub async fn get_public_asset_texture(
+    State(state): AppStateExtractor,
+    Path(asset_id): Path<String>,
+) -> HttpResult<impl IntoResponse> {
+    let state = state.read().await;
+    let asset_id = parse_uuid(&asset_id, "Invalid asset ID")?;
+    let asset = catalog::get_asset_definition_by_id(&state.db, asset_id)
+        .await
+        .map_err(map_domain_error)?
+        .filter(|asset| asset.is_public && asset.is_active)
+        .ok_or_else(|| HttpError::not_found("Asset not found"))?;
+    let keys = gun_skin_key_candidates(&asset);
+    let bytes = load_first_s3_object_bytes(&state, &keys, "Gunskin texture not found").await?;
+    Ok(([(header::CONTENT_TYPE, GUN_SKIN_CONTENT_TYPE)], bytes))
 }
 
 #[utoipa::path(
@@ -452,6 +518,72 @@ pub async fn get_admin_asset_image(
         .ok_or_else(|| HttpError::not_found("Asset image not found"))?;
     let bytes = load_asset_image_bytes(&state, &key).await?;
     Ok(([(header::CONTENT_TYPE, ASSET_IMAGE_CONTENT_TYPE)], bytes))
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/admin/assets/{asset_id}/model",
+    params(
+        ("asset_id" = String, Path, description = "Asset UUID.")
+    ),
+    responses(
+        (status = 200, description = "Admin weapon model from object storage.", content_type = "application/json"),
+        (status = 400, description = "Invalid asset ID."),
+        (status = 401, description = "Missing bearer token."),
+        (status = 403, description = "Superuser permissions required."),
+        (status = 404, description = "Weapon model not found.")
+    ),
+    security(("bearer_auth" = [])),
+    tag = "ownership-admin"
+)]
+pub async fn get_admin_asset_model(
+    State(state): AppStateExtractor,
+    headers: HeaderMap,
+    Path(asset_id): Path<String>,
+) -> HttpResult<impl IntoResponse> {
+    let state = state.read().await;
+    require_privileged_actor(&headers, &state).await?;
+    let asset_id = parse_uuid(&asset_id, "Invalid asset ID")?;
+    let asset = catalog::get_asset_definition_by_id(&state.db, asset_id)
+        .await
+        .map_err(map_domain_error)?
+        .ok_or_else(|| HttpError::not_found("Asset not found"))?;
+    let keys = gun_model_key_candidates(&asset);
+    let bytes = load_first_s3_object_bytes(&state, &keys, "Weapon model not found").await?;
+    Ok(([(header::CONTENT_TYPE, GUN_MODEL_CONTENT_TYPE)], bytes))
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/admin/assets/{asset_id}/texture",
+    params(
+        ("asset_id" = String, Path, description = "Asset UUID.")
+    ),
+    responses(
+        (status = 200, description = "Admin gunskin texture from object storage.", content_type = "image/png"),
+        (status = 400, description = "Invalid asset ID."),
+        (status = 401, description = "Missing bearer token."),
+        (status = 403, description = "Superuser permissions required."),
+        (status = 404, description = "Gunskin texture not found.")
+    ),
+    security(("bearer_auth" = [])),
+    tag = "ownership-admin"
+)]
+pub async fn get_admin_asset_texture(
+    State(state): AppStateExtractor,
+    headers: HeaderMap,
+    Path(asset_id): Path<String>,
+) -> HttpResult<impl IntoResponse> {
+    let state = state.read().await;
+    require_privileged_actor(&headers, &state).await?;
+    let asset_id = parse_uuid(&asset_id, "Invalid asset ID")?;
+    let asset = catalog::get_asset_definition_by_id(&state.db, asset_id)
+        .await
+        .map_err(map_domain_error)?
+        .ok_or_else(|| HttpError::not_found("Asset not found"))?;
+    let keys = gun_skin_key_candidates(&asset);
+    let bytes = load_first_s3_object_bytes(&state, &keys, "Gunskin texture not found").await?;
+    Ok(([(header::CONTENT_TYPE, GUN_SKIN_CONTENT_TYPE)], bytes))
 }
 
 #[utoipa::path(
@@ -2137,6 +2269,213 @@ fn with_actor_metadata(metadata: Value, actor: &PrivilegedActor) -> Value {
     Value::Object(metadata)
 }
 
+fn metadata_string(metadata: &Value, keys: &[&str]) -> Option<String> {
+    let object = metadata.as_object()?;
+    keys.iter().find_map(|key| {
+        object
+            .get(*key)
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(ToOwned::to_owned)
+    })
+}
+
+fn normalize_scoped_s3_key(value: &str, prefix: &str, extensions: &[&str]) -> Option<String> {
+    let normalized = value.trim().trim_start_matches('/').replace('\\', "/");
+    if normalized.is_empty()
+        || normalized.starts_with("http://")
+        || normalized.starts_with("https://")
+    {
+        return None;
+    }
+
+    let key = if normalized == prefix || normalized.starts_with(&format!("{prefix}/")) {
+        normalized
+    } else {
+        format!("{prefix}/{normalized}")
+    };
+
+    let relative = key.strip_prefix(&format!("{prefix}/"))?;
+    if relative.is_empty()
+        || relative
+            .split('/')
+            .any(|segment| segment.is_empty() || segment == "." || segment == "..")
+        || !extensions.iter().any(|extension| key.ends_with(extension))
+    {
+        None
+    } else {
+        Some(key)
+    }
+}
+
+fn metadata_scoped_s3_key(
+    metadata: &Value,
+    keys: &[&str],
+    prefix: &str,
+    extensions: &[&str],
+) -> Option<String> {
+    metadata_string(metadata, keys).and_then(|value| {
+        normalize_scoped_s3_key(&value, prefix, extensions)
+    })
+}
+
+fn public_model_url(asset: &catalog::AssetDefinitionView) -> Option<String> {
+    if metadata_string(
+        &asset.metadata,
+        &["modelUrl", "model_url", "geckoModelUrl", "gecko_model_url"],
+    )
+    .is_some()
+    {
+        return metadata_string(
+            &asset.metadata,
+            &["modelUrl", "model_url", "geckoModelUrl", "gecko_model_url"],
+        );
+    }
+
+    let has_model_key = metadata_scoped_s3_key(
+        &asset.metadata,
+        &["modelKey", "model_key", "gunModelKey", "gun_model_key"],
+        GUN_MODELS_PREFIX,
+        &[".geo.json", ".json"],
+    )
+    .is_some();
+    if asset.weapon_key.as_deref().is_some_and(|value| !value.trim().is_empty()) || has_model_key {
+        Some(if asset.is_public && asset.is_active {
+            format!("/api/assets/{}/model", asset.id)
+        } else {
+            format!("/api/admin/assets/{}/model", asset.id)
+        })
+    } else {
+        None
+    }
+}
+
+fn public_texture_url(asset: &catalog::AssetDefinitionView) -> Option<String> {
+    if metadata_string(
+        &asset.metadata,
+        &["textureUrl", "texture_url", "geckoTextureUrl", "gecko_texture_url"],
+    )
+    .is_some()
+    {
+        return metadata_string(
+            &asset.metadata,
+            &["textureUrl", "texture_url", "geckoTextureUrl", "gecko_texture_url"],
+        );
+    }
+
+    let has_texture_key = metadata_scoped_s3_key(
+        &asset.metadata,
+        &["textureKey", "texture_key", "gunskinKey", "gunskin_key", "skinKey", "skin_key"],
+        GUN_SKINS_PREFIX,
+        &[".png"],
+    )
+    .is_some();
+    let is_skin = asset.asset_kind == AssetKind::Skin
+        || asset.weapon_key.as_deref().is_some_and(|value| !value.trim().is_empty())
+        || asset.rarity.is_some();
+    if is_skin || has_texture_key {
+        Some(if asset.is_public && asset.is_active {
+            format!("/api/assets/{}/texture", asset.id)
+        } else {
+            format!("/api/admin/assets/{}/texture", asset.id)
+        })
+    } else {
+        None
+    }
+}
+
+fn file_stem_candidate(value: &str) -> Option<String> {
+    let value = value.trim();
+    if value.is_empty() {
+        return None;
+    }
+    let without_namespace = value.rsplit(':').next().unwrap_or(value);
+    let without_path = without_namespace.rsplit('/').next().unwrap_or(without_namespace);
+    let stem = without_path
+        .trim_end_matches(".geo.json")
+        .trim_end_matches(".json")
+        .trim_end_matches(".png")
+        .trim();
+    if stem.is_empty()
+        || stem.contains("..")
+        || stem.contains('\\')
+        || stem.contains('/')
+    {
+        None
+    } else {
+        Some(stem.to_owned())
+    }
+}
+
+fn push_unique_key(keys: &mut Vec<String>, key: String) {
+    if !keys.iter().any(|existing| existing == &key) {
+        keys.push(key);
+    }
+}
+
+fn gun_model_key_candidates(asset: &catalog::AssetDefinitionView) -> Vec<String> {
+    let mut keys = Vec::new();
+    if let Some(key) = metadata_scoped_s3_key(
+        &asset.metadata,
+        &["modelKey", "model_key", "gunModelKey", "gun_model_key"],
+        GUN_MODELS_PREFIX,
+        &[".geo.json", ".json"],
+    ) {
+        push_unique_key(&mut keys, key);
+    }
+
+    if let Some(weapon_key) = asset.weapon_key.as_deref().and_then(file_stem_candidate) {
+        push_unique_key(
+            &mut keys,
+            format!("{GUN_MODELS_PREFIX}/{weapon_key}.geo.json"),
+        );
+        push_unique_key(
+            &mut keys,
+            format!("{GUN_MODELS_PREFIX}/{weapon_key}_geo.json"),
+        );
+        push_unique_key(&mut keys, format!("{GUN_MODELS_PREFIX}/{weapon_key}.json"));
+    }
+
+    keys
+}
+
+fn gun_skin_key_candidates(asset: &catalog::AssetDefinitionView) -> Vec<String> {
+    let mut keys = Vec::new();
+    if let Some(key) = metadata_scoped_s3_key(
+        &asset.metadata,
+        &["textureKey", "texture_key", "gunskinKey", "gunskin_key", "skinKey", "skin_key"],
+        GUN_SKINS_PREFIX,
+        &[".png"],
+    ) {
+        push_unique_key(&mut keys, key);
+    }
+
+    let asset_key = file_stem_candidate(&asset.key);
+    let asset_id = asset.id.as_hyphenated().to_string();
+    let weapon_key = asset.weapon_key.as_deref().and_then(file_stem_candidate);
+
+    if let Some(asset_key) = asset_key.as_deref() {
+        push_unique_key(&mut keys, format!("{GUN_SKINS_PREFIX}/{asset_key}.png"));
+    }
+    push_unique_key(&mut keys, format!("{GUN_SKINS_PREFIX}/{asset_id}.png"));
+
+    if let Some(weapon_key) = weapon_key.as_deref() {
+        if let Some(asset_key) = asset_key.as_deref() {
+            push_unique_key(
+                &mut keys,
+                format!("{GUN_SKINS_PREFIX}/{weapon_key}/{asset_key}.png"),
+            );
+        }
+        push_unique_key(
+            &mut keys,
+            format!("{GUN_SKINS_PREFIX}/{weapon_key}/{asset_id}.png"),
+        );
+    }
+
+    keys
+}
+
 fn parse_uuid(value: &str, message: &str) -> HttpResult<Uuid> {
     Uuid::parse_str(value).map_err(|_| HttpError::bad_request(message))
 }
@@ -2182,6 +2521,8 @@ fn asset_json(asset: catalog::AssetDefinitionView) -> Value {
             format!("/api/admin/assets/{}/image", asset.id)
         }
     });
+    let model_url = public_model_url(&asset);
+    let texture_url = public_texture_url(&asset);
 
     json!({
         "id": asset.id,
@@ -2195,6 +2536,8 @@ fn asset_json(asset: catalog::AssetDefinitionView) -> Value {
         "isPublic": asset.is_public,
         "isActive": asset.is_active,
         "imageUrl": image_url,
+        "modelUrl": model_url,
+        "textureUrl": texture_url,
         "weaponKey": asset.weapon_key,
         "rarity": asset.rarity,
         "metadata": asset.metadata,
@@ -2411,6 +2754,60 @@ async fn load_asset_image_bytes(
         })
 }
 
+async fn load_first_s3_object_bytes(
+    state: &crate::app::state::AppState,
+    keys: &[String],
+    not_found_message: &'static str,
+) -> HttpResult<Bytes> {
+    if keys.is_empty() {
+        return Err(HttpError::not_found(not_found_message));
+    }
+
+    let mut last_error = None;
+    for key in keys {
+        let object = match state
+            .s3
+            .get_object()
+            .bucket(&state.config.s3.bucket)
+            .key(key)
+            .send()
+            .await
+        {
+            Ok(object) => object,
+            Err(error) => {
+                let maybe_code = error
+                    .as_service_error()
+                    .and_then(|service_error| service_error.code());
+                if matches!(maybe_code, Some("NoSuchKey") | Some("NotFound") | Some("404")) {
+                    continue;
+                }
+                last_error = Some(error.to_string());
+                break;
+            }
+        };
+
+        return object
+            .body
+            .collect()
+            .await
+            .map(|body| body.into_bytes())
+            .map_err(|error| {
+                HttpError::internal_error(format!(
+                    "Failed to read object body for key '{}': {}",
+                    key, error
+                ))
+            });
+    }
+
+    if let Some(error) = last_error {
+        Err(HttpError::internal_error(format!(
+            "Failed to load object from S3: {error}"
+        )))
+    } else {
+        Err(HttpError::not_found(not_found_message))
+    }
+}
+
 async fn delete_asset_image_object(state: &crate::app::state::AppState, key: &str) -> HttpResult<()> {
     state
         .s3
@@ -2421,4 +2818,61 @@ async fn delete_asset_image_object(state: &crate::app::state::AppState, key: &st
         .await
         .map_err(|e| HttpError::internal_error(format!("Failed to delete asset image object: {e}")))?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn scoped_s3_key_accepts_only_expected_prefix_and_extension() {
+        assert_eq!(
+            normalize_scoped_s3_key("ak47.geo.json", GUN_MODELS_PREFIX, &[".geo.json", ".json"]),
+            Some("gunmodels/ak47.geo.json".to_string())
+        );
+        assert_eq!(
+            normalize_scoped_s3_key(
+                "gunmodels/taczgun/ak47.geo.json",
+                GUN_MODELS_PREFIX,
+                &[".geo.json", ".json"],
+            ),
+            Some("gunmodels/taczgun/ak47.geo.json".to_string())
+        );
+        assert_eq!(
+            normalize_scoped_s3_key("/redline.png", GUN_SKINS_PREFIX, &[".png"]),
+            Some("gunskins/redline.png".to_string())
+        );
+    }
+
+    #[test]
+    fn scoped_s3_key_rejects_traversal_and_prefix_escape() {
+        assert_eq!(
+            normalize_scoped_s3_key("../secret.geo.json", GUN_MODELS_PREFIX, &[".geo.json", ".json"]),
+            None
+        );
+        assert_eq!(
+            normalize_scoped_s3_key(
+                "gunmodels/../secret.geo.json",
+                GUN_MODELS_PREFIX,
+                &[".geo.json", ".json"],
+            ),
+            None
+        );
+        assert_eq!(
+            normalize_scoped_s3_key(
+                "gunmodels//ak47.geo.json",
+                GUN_MODELS_PREFIX,
+                &[".geo.json", ".json"],
+            ),
+            None
+        );
+        assert_eq!(
+            normalize_scoped_s3_key("https://example.com/ak47.geo.json", GUN_MODELS_PREFIX, &[".geo.json"]),
+            None
+        );
+        assert_eq!(
+            normalize_scoped_s3_key("secret.txt", GUN_MODELS_PREFIX, &[".geo.json", ".json"]),
+            None
+        );
+    }
 }

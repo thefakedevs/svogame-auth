@@ -1,5 +1,6 @@
 import { useState, type CSSProperties, type ReactNode } from 'react'
 import type { SkinRarity } from '../api/inventory'
+import GeckoModelViewer from './GeckoModelViewer'
 import './SkinDetailsModal.css'
 
 export type SkinDetailsModalItem = {
@@ -12,6 +13,10 @@ export type SkinDetailsModalItem = {
   weaponKey?: string | null
   priceText?: string | null
   statusText?: string | null
+  modelPreview?: {
+    modelUrl: string
+    textureUrl: string
+  } | null
 }
 
 const rarityLabels: Record<SkinRarity, string> = {
@@ -51,7 +56,21 @@ function SkinDetailsVisual({ item }: { item: SkinDetailsModalItem }) {
 
   return (
     <div className="skin-details-modal__visual" style={cardStyle(item.accent)}>
-      {showImage ? <img src={item.imageUrl ?? ''} alt="" loading="lazy" onError={() => setFailedImageUrl(item.imageUrl)} /> : <span>{fallback}</span>}
+      {item.modelPreview ? (
+        <GeckoModelViewer
+          modelUrl={item.modelPreview.modelUrl}
+          textureUrl={item.modelPreview.textureUrl}
+          className="skin-details-modal__model"
+          initialRotation={[12, 130, 180]}
+          initialZoom={1.45}
+          mirrorVertical
+          verticalOffset={-0.08}
+        />
+      ) : showImage ? (
+        <img src={item.imageUrl ?? ''} alt="" loading="lazy" onError={() => setFailedImageUrl(item.imageUrl)} />
+      ) : (
+        <span>{fallback}</span>
+      )}
       <div className="inventory-visual-splash" />
     </div>
   )

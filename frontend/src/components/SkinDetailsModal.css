@@ -35,6 +35,20 @@
   object-position: center;
 }
 
+.skin-details-modal__model {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  min-height: 360px;
+  border: 0;
+  background: transparent;
+}
+
+.skin-details-modal__model canvas {
+  min-height: 360px;
+}
+
 .skin-details-modal__visual span {
   display: grid;
   place-items: center;
@@ -96,6 +110,11 @@
   }
 
   .skin-details-modal__visual {
+    min-height: 240px;
+  }
+
+  .skin-details-modal__model,
+  .skin-details-modal__model canvas {
     min-height: 240px;
   }
 
