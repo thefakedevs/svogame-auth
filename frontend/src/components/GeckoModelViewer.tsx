@@ -30,6 +30,7 @@ interface GeckoBone {
 
 interface GeckoGeometry {
   description?: {
+    identifier?: string
     texture_width?: number
     texture_height?: number
   }
@@ -55,7 +56,7 @@ export interface GeckoModelViewerProps {
 const geometryCache = new Map<string, Promise<THREE.BufferGeometry>>()
 const textureCache = new Map<string, Promise<THREE.Texture>>()
 
-const modelParserVersion = 'tacz-bedrock-preview-3'
+const modelParserVersion = 'tacz-bedrock-preview-5'
 const faceNames: FaceName[] = ['north', 'east', 'south', 'west', 'up', 'down']
 const defaultInitialRotation: Vec3 = [0, 0, 0]
 
@@ -63,8 +64,25 @@ function degToRad(value: number) {
   return (value * Math.PI) / 180
 }
 
-function isHiddenPreviewBoneName(name: string) {
+function usesAttachmentAdapterAsDefaultStock(modelIdentifier: string) {
+  const normalized = modelIdentifier.trim().toLowerCase()
+  return normalized.includes('m4a1') || normalized.includes('rpk') || normalized.includes('sks_tactical')
+}
+
+function isHiddenPreviewBoneName(name: string, modelIdentifier: string) {
   const normalized = name.trim().toLowerCase()
+  const allowDefaultStock = usesAttachmentAdapterAsDefaultStock(modelIdentifier)
+
+  if (normalized === 'attachment_adapter') {
+    return !allowDefaultStock
+  }
+  if (normalized.startsWith('oem_stock_')) {
+    return !allowDefaultStock || normalized !== 'oem_stock_tactical'
+  }
+  if (normalized.startsWith('ar_stock_adapter')) {
+    return true
+  }
+
   return (
     normalized === 'camera'
     || normalized === 'constraint'
@@ -85,16 +103,13 @@ function isHiddenPreviewBoneName(name: string) {
     || normalized.startsWith('762x')
     || normalized.startsWith('extd_mag')
     || normalized.startsWith('mag_extended')
-    || normalized.startsWith('oem_stock_')
-    || normalized.startsWith('ar_stock_adapter')
-    || normalized.startsWith('attachment_adapter')
     || normalized.endsWith('_pos')
     || normalized.endsWith('_view')
     || normalized.includes('refit_')
   )
 }
 
-function resolvePreviewVisibleBones(bones: GeckoBone[]) {
+function resolvePreviewVisibleBones(bones: GeckoBone[], modelIdentifier: string) {
   const byName = new Map(bones.map((bone) => [bone.name, bone]))
   const resolved = new Map<string, boolean>()
 
@@ -103,7 +118,7 @@ function resolvePreviewVisibleBones(bones: GeckoBone[]) {
     if (cached !== undefined) return cached
 
     const parent = bone.parent ? byName.get(bone.parent) : undefined
-    const visible = !isHiddenPreviewBoneName(bone.name) && (!parent || isVisible(parent))
+    const visible = !isHiddenPreviewBoneName(bone.name, modelIdentifier) && (!parent || isVisible(parent))
     resolved.set(bone.name, visible)
     return visible
   }
@@ -275,11 +290,12 @@ async function loadGeometry(modelUrl: string) {
 
       const textureWidth = geometryData.description?.texture_width ?? 64
       const textureHeight = geometryData.description?.texture_height ?? 64
+      const modelIdentifier = geometryData.description?.identifier ?? ''
       const bones = geometryData.bones ?? []
       const positions: number[] = []
       const uvs: number[] = []
       const indices: number[] = []
-      const visibleBones = resolvePreviewVisibleBones(bones)
+      const visibleBones = resolvePreviewVisibleBones(bones, modelIdentifier)
       const boneTransforms = resolveBoneTransforms(bones)
 
       for (const bone of bones) {
