@@ -55,7 +55,7 @@ export interface GeckoModelViewerProps {
 const geometryCache = new Map<string, Promise<THREE.BufferGeometry>>()
 const textureCache = new Map<string, Promise<THREE.Texture>>()
 
-const modelParserVersion = 'tacz-bedrock-preview-2'
+const modelParserVersion = 'tacz-bedrock-preview-3'
 const faceNames: FaceName[] = ['north', 'east', 'south', 'west', 'up', 'down']
 const defaultInitialRotation: Vec3 = [0, 0, 0]
 
@@ -81,7 +81,6 @@ function isHiddenPreviewBoneName(name: string) {
     || normalized === 'righthand'
     || normalized === 'righthand_pos'
     || normalized === 'additional_magazine'
-    || (normalized.includes('hand') && !normalized.includes('handguard') && normalized !== 'lefthand_and_mag')
     || normalized.startsWith('bullet')
     || normalized.startsWith('762x')
     || normalized.startsWith('extd_mag')
