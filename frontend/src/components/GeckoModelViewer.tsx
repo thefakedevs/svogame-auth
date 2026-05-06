@@ -56,7 +56,7 @@ export interface GeckoModelViewerProps {
 const geometryCache = new Map<string, Promise<THREE.BufferGeometry>>()
 const textureCache = new Map<string, Promise<THREE.Texture>>()
 
-const modelParserVersion = 'tacz-bedrock-preview-5'
+const modelParserVersion = 'tacz-bedrock-preview-6'
 const faceNames: FaceName[] = ['north', 'east', 'south', 'west', 'up', 'down']
 const defaultInitialRotation: Vec3 = [0, 0, 0]
 
@@ -381,6 +381,8 @@ export default function GeckoModelViewer({
     let horizontalVelocity = 0
     let inertiaFrame = 0
     let lastInertiaTime = 0
+    let autoRotationFrame = 0
+    let lastAutoRotationTime = 0
 
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: background === null })
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
@@ -395,10 +397,16 @@ export default function GeckoModelViewer({
     modelGroup.rotation.z = degToRad(initialRotationZ)
     scene.add(modelGroup)
 
-    scene.add(new THREE.AmbientLight(0xffffff, 1.15))
-    const keyLight = new THREE.DirectionalLight(0xffffff, 1.7)
-    keyLight.position.set(2, 4, 5)
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x262b36, 1.35))
+    const keyLight = new THREE.DirectionalLight(0xffffff, 2.15)
+    keyLight.position.set(3, 5, 6)
     scene.add(keyLight)
+    const rimLight = new THREE.DirectionalLight(0xa9bbff, 0.9)
+    rimLight.position.set(-5, 2, -4)
+    scene.add(rimLight)
+    const fillLight = new THREE.DirectionalLight(0xffd5a8, 0.42)
+    fillLight.position.set(-2, -3, 3)
+    scene.add(fillLight)
 
     const requestRender = () => {
       if (renderQueued || disposed) return
@@ -450,6 +458,23 @@ export default function GeckoModelViewer({
       if (Math.abs(horizontalVelocity) <= 0.00002 || inertiaFrame) return
       lastInertiaTime = performance.now()
       inertiaFrame = window.requestAnimationFrame(stepInertia)
+    }
+
+    const stepAutoRotation = (time: number) => {
+      if (disposed) {
+        autoRotationFrame = 0
+        return
+      }
+
+      const elapsed = lastAutoRotationTime ? Math.min(time - lastAutoRotationTime, 32) : 16.67
+      lastAutoRotationTime = time
+
+      if (activePointers.size === 0 && !inertiaFrame) {
+        rotation.y += elapsed * 0.00022
+        requestRender()
+      }
+
+      autoRotationFrame = window.requestAnimationFrame(stepAutoRotation)
     }
 
     const resize = () => {
@@ -535,7 +560,7 @@ export default function GeckoModelViewer({
     Promise.all([loadGeometry(modelUrl), loadTexture(textureUrl)])
       .then(([geometry, texture]) => {
         if (disposed) return
-        const material = new THREE.MeshBasicMaterial({
+        const material = new THREE.MeshLambertMaterial({
           map: texture,
           transparent: true,
           alphaTest: 0.1,
@@ -550,6 +575,9 @@ export default function GeckoModelViewer({
         setIsLoading(false)
         resize()
         requestRender()
+        if (!autoRotationFrame) {
+          autoRotationFrame = window.requestAnimationFrame(stepAutoRotation)
+        }
       })
       .catch((reason: unknown) => {
         if (disposed) return
@@ -569,6 +597,9 @@ export default function GeckoModelViewer({
       canvas.removeEventListener('pointercancel', onPointerEnd)
       if (inertiaFrame) {
         window.cancelAnimationFrame(inertiaFrame)
+      }
+      if (autoRotationFrame) {
+        window.cancelAnimationFrame(autoRotationFrame)
       }
       for (const child of modelGroup.children) {
         const mesh = child as THREE.Mesh<THREE.BufferGeometry, THREE.Material>
