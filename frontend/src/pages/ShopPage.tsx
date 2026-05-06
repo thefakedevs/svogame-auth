@@ -238,8 +238,35 @@ type ShopProductView = {
   title: string
   description: string
   imageUrl: string | null
+  modelPreview: {
+    modelUrl: string
+    textureUrl: string
+  } | null
   accent: string
   owned: boolean
+}
+
+function resolveModelPreviewUrl(value: string | null) {
+  if (!value) return null
+  if (value.startsWith('/') || value.startsWith('http://') || value.startsWith('https://')) return value
+  return null
+}
+
+function productModelPreview(product: ShopProductResponse, asset: AssetResponse | null) {
+  const rawModel =
+    asset?.modelUrl
+    ?? metadataString(asset, ['modelUrl', 'model_url', 'geckoModelUrl', 'gecko_model_url', 'model'])
+    ?? metadataString(product, ['modelUrl', 'model_url', 'geckoModelUrl', 'gecko_model_url', 'model'])
+    ?? null
+  const rawTexture =
+    asset?.textureUrl
+    ?? metadataString(asset, ['textureUrl', 'texture_url', 'geckoTextureUrl', 'gecko_texture_url', 'texture'])
+    ?? metadataString(product, ['textureUrl', 'texture_url', 'geckoTextureUrl', 'gecko_texture_url', 'texture'])
+    ?? null
+
+  const modelUrl = resolveModelPreviewUrl(rawModel)
+  const textureUrl = resolveModelPreviewUrl(rawTexture)
+  return modelUrl && textureUrl ? { modelUrl, textureUrl } : null
 }
 
 function InventoryVisual({ item }: { item: { title: string; imageUrl: string | null; accent: string } }) {
@@ -383,6 +410,7 @@ export default function ShopPage() {
           title,
           description,
           imageUrl: assetImageUrl(asset),
+          modelPreview: productModelPreview(product, asset),
           accent: productAccent(product, asset),
           owned: isOwned(product, ownedSet),
         }
@@ -735,6 +763,7 @@ export default function ShopPage() {
             priceText: formatPrice(detailsProduct.product.priceRub),
             statusText: detailsProduct.owned ? 'Уже в инвентаре' : 'Можно купить',
             metaItems: buildProductMetaItems(detailsProduct.product, detailsProduct.asset),
+            modelPreview: detailsProduct.modelPreview,
           }}
           titleId="shop-product-details-title"
           onClose={() => setDetailsProduct(null)}

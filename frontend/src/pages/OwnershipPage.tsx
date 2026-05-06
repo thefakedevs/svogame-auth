@@ -94,6 +94,27 @@ function assetImageUrl(asset: AssetResponse | null) {
     ?? buildPublicAssetImageUrl(asset.id, asset.updatedAt)
 }
 
+function resolveModelPreviewUrl(value: string | null) {
+  if (!value) return null
+  if (value.startsWith('/') || value.startsWith('http://') || value.startsWith('https://')) return value
+  return null
+}
+
+function assetModelPreview(asset: AssetResponse | null) {
+  const rawModel =
+    asset?.modelUrl
+    ?? metadataString(asset, ['modelUrl', 'model_url', 'geckoModelUrl', 'gecko_model_url', 'model'])
+    ?? null
+  const rawTexture =
+    asset?.textureUrl
+    ?? metadataString(asset, ['textureUrl', 'texture_url', 'geckoTextureUrl', 'gecko_texture_url', 'texture'])
+    ?? null
+
+  const modelUrl = resolveModelPreviewUrl(rawModel)
+  const textureUrl = resolveModelPreviewUrl(rawTexture)
+  return modelUrl && textureUrl ? { modelUrl, textureUrl } : null
+}
+
 function fallbackAccent(key: string) {
   const palette = ['#2db7a3', '#f7a41d', '#67d391', '#ff8b8b', '#6fb6ff', '#d6a4ff']
   let hash = 0
@@ -115,6 +136,7 @@ function assetView(assetMap: Map<string, AssetResponse>, assetKey: string, asset
     title: asset?.displayName ?? assetKey,
     description: asset?.description ?? asset?.assetKind ?? assetKey,
     imageUrl: assetImageUrl(asset),
+    modelPreview: assetModelPreview(asset),
     accent: assetAccent(asset, assetKey),
     rarity: asset?.rarity ?? null,
     weaponKey: asset?.weaponKey ?? null,
@@ -1155,6 +1177,7 @@ export default function OwnershipPage() {
             accent: skinRarityAccent(detailsSkin.rarity),
             rarity: detailsSkin.rarity,
             weaponKey: detailsSkin.weaponKey,
+            modelPreview: detailsSkin.modelPreview,
             statusText: 'Уже в инвентаре',
             metaItems: buildInventoryMetaItems(detailsSkin.asset, {
               amount: detailsSkin.amount,
@@ -1178,6 +1201,7 @@ export default function OwnershipPage() {
             accent: detailsInventoryItem.accent,
             rarity: detailsInventoryItem.rarity,
             weaponKey: detailsInventoryItem.weaponKey,
+            modelPreview: detailsInventoryItem.modelPreview,
             statusText: 'Уже в инвентаре',
             metaItems: buildInventoryMetaItems(detailsInventoryItem.asset, {
               amount: detailsInventoryItem.amount,

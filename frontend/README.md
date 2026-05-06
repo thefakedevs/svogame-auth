@@ -11,7 +11,7 @@ Environment variables:
 
 ```env
 VITE_UMAMI_ENABLED=true
-VITE_UMAMI_SCRIPT_URL=https://analytics.artembay.ru/script.js
+VITE_UMAMI_SCRIPT_URL=https://analytics.baechka.me/script.js
 VITE_UMAMI_WEBSITE_ID=0c965545-fd3c-4485-9821-5267012848a5
 ```
 

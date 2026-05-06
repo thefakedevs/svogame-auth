@@ -11,6 +11,14 @@ pub fn router() -> Router<crate::app::state::SharedAppState> {
             "/api/assets/{asset_id}/image",
             get(handlers::get_public_asset_image),
         )
+        .route(
+            "/api/assets/{asset_id}/model",
+            get(handlers::get_public_asset_model),
+        )
+        .route(
+            "/api/assets/{asset_id}/texture",
+            get(handlers::get_public_asset_texture),
+        )
         .route("/api/user/me/inventory", get(handlers::get_my_inventory))
         .route(
             "/api/user/me/inventory/contains/{asset_key}",
@@ -58,6 +66,14 @@ pub fn router() -> Router<crate::app::state::SharedAppState> {
             get(handlers::get_admin_asset_image)
                 .post(handlers::upload_asset_image)
                 .delete(handlers::delete_asset_image),
+        )
+        .route(
+            "/api/admin/assets/{asset_id}/model",
+            get(handlers::get_admin_asset_model),
+        )
+        .route(
+            "/api/admin/assets/{asset_id}/texture",
+            get(handlers::get_admin_asset_texture),
         )
         .route(
             "/api/admin/users/{user_id}/inventory",

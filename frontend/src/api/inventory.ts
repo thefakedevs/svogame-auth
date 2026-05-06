@@ -18,6 +18,8 @@ export interface AssetResponse {
   isUserPurchasable: boolean
   isPublic: boolean
   isActive: boolean
+  modelUrl?: string | null
+  textureUrl?: string | null
   metadata: unknown
   createdAt: string
   updatedAt: string
