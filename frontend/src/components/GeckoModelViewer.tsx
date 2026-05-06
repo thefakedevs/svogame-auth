@@ -56,7 +56,7 @@ export interface GeckoModelViewerProps {
 const geometryCache = new Map<string, Promise<THREE.BufferGeometry>>()
 const textureCache = new Map<string, Promise<THREE.Texture>>()
 
-const modelParserVersion = 'tacz-bedrock-preview-6'
+const modelParserVersion = 'tacz-bedrock-preview-7'
 const faceNames: FaceName[] = ['north', 'east', 'south', 'west', 'up', 'down']
 const defaultInitialRotation: Vec3 = [0, 0, 0]
 
@@ -274,6 +274,46 @@ function pushCube(
   }
 }
 
+function smoothSharedVertexNormals(geometry: THREE.BufferGeometry) {
+  geometry.computeVertexNormals()
+
+  const positions = geometry.getAttribute('position')
+  const normals = geometry.getAttribute('normal')
+  if (!(positions instanceof THREE.BufferAttribute) || !(normals instanceof THREE.BufferAttribute)) return
+
+  const precision = 1000
+  const normalGroups = new Map<string, THREE.Vector3>()
+  for (let index = 0; index < positions.count; index += 1) {
+    const key = [
+      Math.round(positions.getX(index) * precision),
+      Math.round(positions.getY(index) * precision),
+      Math.round(positions.getZ(index) * precision),
+    ].join(',')
+    const normal = normalGroups.get(key) ?? new THREE.Vector3()
+    normal.x += normals.getX(index)
+    normal.y += normals.getY(index)
+    normal.z += normals.getZ(index)
+    normalGroups.set(key, normal)
+  }
+
+  for (const normal of normalGroups.values()) {
+    normal.normalize()
+  }
+
+  for (let index = 0; index < positions.count; index += 1) {
+    const key = [
+      Math.round(positions.getX(index) * precision),
+      Math.round(positions.getY(index) * precision),
+      Math.round(positions.getZ(index) * precision),
+    ].join(',')
+    const normal = normalGroups.get(key)
+    if (!normal) continue
+    normals.setXYZ(index, normal.x, normal.y, normal.z)
+  }
+
+  normals.needsUpdate = true
+}
+
 async function loadGeometry(modelUrl: string) {
   const cacheKey = `${modelParserVersion}:${modelUrl}`
   const cached = geometryCache.get(cacheKey)
@@ -315,7 +355,7 @@ async function loadGeometry(modelUrl: string) {
       geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2))
       geometry.setIndex(indices)
       geometry.applyMatrix4(new THREE.Matrix4().makeScale(-1, -1, 1))
-      geometry.computeVertexNormals()
+      smoothSharedVertexNormals(geometry)
       geometry.computeBoundingBox()
       geometry.computeBoundingSphere()
       geometry.center()
