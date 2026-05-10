@@ -93,7 +93,11 @@ pub async fn create_check(
         }
     };
     let player_uuid = Uuid::parse_str(&body.player_uuid)
-        .map_err(|_| HttpError::bad_request("Invalid player UUID"))?;
+        .map_err(|_| {
+            let error = HttpError::bad_request("Invalid player UUID");
+            log_http_error("littlemice.create_check", &body.player_uuid, &error);
+            error
+        })?;
     let created = littlemice::create_check(
         &state.db,
         &state.config,
@@ -101,7 +105,11 @@ pub async fn create_check(
         player_uuid,
     )
     .await
-    .map_err(map_domain_error)?;
+    .map_err(|error| {
+        let http_error = map_domain_error(error);
+        log_http_error("littlemice.create_check", &player_uuid.to_string(), &http_error);
+        http_error
+    })?;
 
     Ok(Json(LittlemiceCreateCheckResponse {
         id: created.model.id.to_string(),
@@ -136,7 +144,10 @@ pub async fn push_check(
     Path(push_token): Path<String>,
     mut multipart: Multipart,
 ) -> Result<Json<LittlemicePushAckResponse>, Response> {
-    validate_multipart_headers(&headers)?;
+    validate_multipart_headers(&headers).map_err(|error| {
+        log_http_error("littlemice.push_check", &push_token, &error);
+        error.into_response()
+    })?;
 
     let mut screenshot_bytes = None;
     let mut screenshot_content_type = None;
@@ -147,23 +158,41 @@ pub async fn push_check(
     while let Some(field) = multipart
         .next_field()
         .await
-        .map_err(|error| HttpError::bad_request(format!("Invalid multipart body: {error}")).into_response())?
+        .map_err(|error| {
+            let http_error = HttpError::bad_request(format!("Invalid multipart body: {error}"));
+            log_http_error("littlemice.push_check", &push_token, &http_error);
+            http_error.into_response()
+        })?
     {
         let name = field.name().unwrap_or_default().to_string();
         match name.as_str() {
             "screenshot" => {
                 screenshot_content_type = field.content_type().map(|value| value.to_string());
-                screenshot_bytes = Some(read_multipart_bytes(field).await?);
+                screenshot_bytes = Some(read_multipart_bytes(field).await.map_err(|error| {
+                    log_http_error("littlemice.push_check", &push_token, &error);
+                    error.into_response()
+                })?);
             }
             "log" => {
                 log_content_type = field.content_type().map(|value| value.to_string());
-                log_bytes = Some(read_multipart_bytes(field).await?);
+                log_bytes = Some(read_multipart_bytes(field).await.map_err(|error| {
+                    log_http_error("littlemice.push_check", &push_token, &error);
+                    error.into_response()
+                })?);
             }
             "clientInfo" => {
-                let data = read_multipart_bytes(field).await?;
+                let data = read_multipart_bytes(field).await.map_err(|error| {
+                    log_http_error("littlemice.push_check", &push_token, &error);
+                    error.into_response()
+                })?;
                 client_info_text = Some(
                     String::from_utf8(data.to_vec())
-                        .map_err(|_| HttpError::bad_request("clientInfo must be valid UTF-8").into_response())?,
+                        .map_err(|_| {
+                            let http_error =
+                                HttpError::bad_request("clientInfo must be valid UTF-8");
+                            log_http_error("littlemice.push_check", &push_token, &http_error);
+                            http_error.into_response()
+                        })?,
                 );
             }
             _ => {}
@@ -172,7 +201,11 @@ pub async fn push_check(
 
     let payload = PushLittlemicePayload {
         screenshot_bytes: screenshot_bytes
-            .ok_or_else(|| HttpError::bad_request("screenshot field is required").into_response())?
+            .ok_or_else(|| {
+                let http_error = HttpError::bad_request("screenshot field is required");
+                log_http_error("littlemice.push_check", &push_token, &http_error);
+                http_error.into_response()
+            })?
             .to_vec(),
         screenshot_content_type: screenshot_content_type
             .unwrap_or_else(|| "application/octet-stream".to_string()),
@@ -184,7 +217,11 @@ pub async fn push_check(
     let state = state.read().await;
     let saved = littlemice::accept_push(&state.db, &state.s3, &state.config, &push_token, payload)
         .await
-        .map_err(map_domain_error_response)?;
+        .map_err(|error| {
+            let http_error = map_domain_error(error);
+            log_http_error("littlemice.push_check", &push_token, &http_error);
+            http_error.into_response()
+        })?;
 
     Ok(Json(LittlemicePushAckResponse {
         status: "ok",
@@ -222,14 +259,24 @@ pub async fn get_check_status(
     };
 
     let check_id =
-        Uuid::parse_str(&check_id).map_err(|_| HttpError::bad_request("Invalid check ID"))?;
+        Uuid::parse_str(&check_id).map_err(|_| {
+            let error = HttpError::bad_request("Invalid check ID");
+            log_http_error("littlemice.get_check_status", &check_id, &error);
+            error
+        })?;
     let item = littlemice::get_check(&state.db, check_id)
         .await
-        .map_err(map_domain_error)?;
+        .map_err(|error| {
+            let http_error = map_domain_error(error);
+            log_http_error("littlemice.get_check_status", &check_id.to_string(), &http_error);
+            http_error
+        })?;
     if item.service_system_name != service.system_name {
-        return Err(HttpError::forbidden(
+        let error = HttpError::forbidden(
             "Service token cannot access checks created by another service",
-        ));
+        );
+        log_http_error("littlemice.get_check_status", &check_id.to_string(), &error);
+        return Err(error);
     }
 
     Ok(Json(map_status_response(item)))
@@ -267,7 +314,11 @@ pub async fn fail_check(
     };
 
     let check_id =
-        Uuid::parse_str(&check_id).map_err(|_| HttpError::bad_request("Invalid check ID"))?;
+        Uuid::parse_str(&check_id).map_err(|_| {
+            let error = HttpError::bad_request("Invalid check ID");
+            log_http_error("littlemice.fail_check", &check_id, &error);
+            error
+        })?;
     let item = littlemice::fail_check(
         &state.db,
         &state.config,
@@ -279,7 +330,11 @@ pub async fn fail_check(
         },
     )
     .await
-    .map_err(map_domain_error)?;
+    .map_err(|error| {
+        let http_error = map_domain_error(error);
+        log_http_error("littlemice.fail_check", &check_id.to_string(), &http_error);
+        http_error
+    })?;
 
     Ok(Json(map_status_response(item)))
 }
@@ -298,28 +353,30 @@ fn map_status_response(item: crate::entities::LittlemiceCheckModel) -> Littlemic
     }
 }
 
-fn validate_multipart_headers(headers: &HeaderMap) -> Result<(), Response> {
+fn validate_multipart_headers(headers: &HeaderMap) -> HttpResult<()> {
     if let Some(content_length) = headers.get(header::CONTENT_LENGTH)
         && let Ok(len) = content_length.to_str().unwrap_or_default().parse::<usize>()
         && len > MAX_MULTIPART_BODY_SIZE
     {
-        return Err(HttpError::bad_request("Littlemice upload exceeds body size limit").into_response());
+        return Err(HttpError::bad_request(
+            "Littlemice upload exceeds body size limit",
+        ));
     }
     let content_type = headers
         .get(header::CONTENT_TYPE)
         .and_then(|value| value.to_str().ok())
-        .ok_or_else(|| HttpError::bad_request("Missing Content-Type").into_response())?;
+        .ok_or_else(|| HttpError::bad_request("Missing Content-Type"))?;
     if !content_type.starts_with("multipart/form-data") {
-        return Err(HttpError::bad_request("Expected multipart/form-data").into_response());
+        return Err(HttpError::bad_request("Expected multipart/form-data"));
     }
     Ok(())
 }
 
-async fn read_multipart_bytes(field: axum::extract::multipart::Field<'_>) -> Result<Bytes, Response> {
+async fn read_multipart_bytes(field: axum::extract::multipart::Field<'_>) -> HttpResult<Bytes> {
     tokio::time::timeout(std::time::Duration::from_secs(MULTIPART_READ_TIMEOUT_SECS), field.bytes())
         .await
-        .map_err(|_| HttpError::bad_request("Multipart field read timeout").into_response())?
-        .map_err(|error| HttpError::bad_request(format!("Failed to read multipart field: {error}")).into_response())
+        .map_err(|_| HttpError::bad_request("Multipart field read timeout"))?
+        .map_err(|error| HttpError::bad_request(format!("Failed to read multipart field: {error}")))
 }
 
 fn map_domain_error(error: anyhow::Error) -> HttpError {
@@ -333,6 +390,22 @@ fn map_domain_error(error: anyhow::Error) -> HttpError {
     }
 }
 
-fn map_domain_error_response(error: anyhow::Error) -> Response {
-    map_domain_error(error).into_response()
+fn log_http_error(action: &str, subject: &str, error: &HttpError) {
+    if error.status.is_server_error() {
+        tracing::error!(
+            action = action,
+            subject = subject,
+            status = error.status.as_u16(),
+            detail = %error.message,
+            "Littlemice request failed"
+        );
+    } else {
+        tracing::warn!(
+            action = action,
+            subject = subject,
+            status = error.status.as_u16(),
+            detail = %error.message,
+            "Littlemice request rejected"
+        );
+    }
 }
