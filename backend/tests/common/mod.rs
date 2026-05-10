@@ -26,6 +26,7 @@ pub struct TestApp {
     pub address: String,
     pub client: Client,
     pub db: DatabaseConnection,
+    pub config: AppConfig,
     _db_path: PathBuf,
     _server_task: tokio::task::JoinHandle<()>,
     _mock_s3_server_task: tokio::task::JoinHandle<()>,
@@ -116,6 +117,16 @@ impl TestApp {
                 secret_access_key: "test".to_string(),
                 force_path_style: true,
             },
+            littlemice: auth::app::config::LittlemiceConfig {
+                push_ttl_seconds: 60,
+                screenshot_max_bytes: 10 * 1024 * 1024,
+                log_max_bytes: 1024 * 1024,
+                info_max_bytes: 1024 * 1024,
+                expiry_check_interval_seconds: 5,
+                cleanup_interval_seconds: 3600,
+                retention_days: 30,
+                discord_log_channel_id: None,
+            },
             shop,
             receipts: ReceiptsConfig {
                 enabled: false,
@@ -130,7 +141,7 @@ impl TestApp {
         };
 
         let state: SharedAppState = Arc::new(RwLock::new(AppState::new(
-            config,
+            config.clone(),
             db.clone(),
             test_s3_client(&s3_endpoint).await,
         )));
@@ -148,6 +159,7 @@ impl TestApp {
             address,
             client: Client::new(),
             db,
+            config,
             _db_path: db_path,
             _server_task: server_task,
             _mock_s3_server_task: mock_s3_server_task,
@@ -201,6 +213,16 @@ impl TestApp {
             .await
     }
 
+    pub async fn get_json_value_without_auth(&self, path: &str) -> serde_json::Value {
+        let response = self.get_without_auth(path).await;
+        assert!(
+            response.status().is_success(),
+            "get without auth failed: {}",
+            response.text().await.unwrap_or_default()
+        );
+        response.json().await.expect("json body")
+    }
+
     pub async fn post_json(
         &self,
         path: &str,
@@ -214,6 +236,33 @@ impl TestApp {
                 .json(&body)
         })
         .await
+    }
+
+    pub async fn create_service_token(
+        &self,
+        admin: &IssuedUser,
+        system_name: &str,
+    ) -> String {
+        let response = self
+            .post_json(
+                "/api/admin/service-tokens",
+                &admin.access_token,
+                serde_json::json!({
+                    "systemName": system_name,
+                    "description": format!("token for {system_name}")
+                }),
+            )
+            .await;
+        assert!(
+            response.status().is_success(),
+            "create service token failed: {}",
+            response.text().await.unwrap_or_default()
+        );
+        let body: serde_json::Value = response.json().await.expect("service token json");
+        body["plaintextToken"]
+            .as_str()
+            .expect("plaintextToken")
+            .to_string()
     }
 
     pub async fn patch_json(
@@ -541,6 +590,43 @@ impl TestApp {
         .await
     }
 
+    pub async fn post_raw_json(
+        &self,
+        path: &str,
+        token: &str,
+        body: impl Into<String>,
+    ) -> reqwest::Response {
+        let body = body.into();
+        self.send_with_retry(|| {
+            self.client
+                .post(self.url(path))
+                .bearer_auth(token)
+                .header(reqwest::header::CONTENT_TYPE, "application/json")
+                .body(body.clone())
+        })
+        .await
+    }
+
+    pub async fn post_multipart_without_auth_fields(
+        &self,
+        path: &str,
+        parts: Vec<MultipartPart>,
+    ) -> reqwest::Response {
+        let url = self.url(path);
+        self.send_with_retry(move || {
+            let boundary = "----codex-form-boundary";
+            let body = build_multipart_body(boundary, &parts);
+            self.client
+                .post(url.clone())
+                .header(
+                    reqwest::header::CONTENT_TYPE,
+                    format!("multipart/form-data; boundary={boundary}"),
+                )
+                .body(body)
+        })
+        .await
+    }
+
     pub async fn get_bytes_without_auth(&self, path: &str) -> reqwest::Response {
         self.send_with_retry(|| self.client.get(self.url(path)))
             .await
@@ -566,6 +652,20 @@ impl TestApp {
     }
 }
 
+#[derive(Clone)]
+pub enum MultipartPart {
+    Text {
+        name: String,
+        value: String,
+    },
+    File {
+        name: String,
+        file_name: String,
+        content_type: String,
+        bytes: Vec<u8>,
+    },
+}
+
 impl Drop for TestApp {
     fn drop(&mut self) {
         self._server_task.abort();
@@ -583,7 +683,41 @@ fn normalize_sqlite_path(path: &Path) -> String {
     path.to_string_lossy().replace('\\', "/")
 }
 
-async fn test_s3_client(endpoint: &str) -> aws_sdk_s3::Client {
+fn build_multipart_body(boundary: &str, parts: &[MultipartPart]) -> Vec<u8> {
+    let mut body = Vec::new();
+    for part in parts {
+        body.extend_from_slice(format!("--{boundary}\r\n").as_bytes());
+        match part {
+            MultipartPart::Text { name, value } => {
+                body.extend_from_slice(
+                    format!("Content-Disposition: form-data; name=\"{name}\"\r\n\r\n").as_bytes(),
+                );
+                body.extend_from_slice(value.as_bytes());
+                body.extend_from_slice(b"\r\n");
+            }
+            MultipartPart::File {
+                name,
+                file_name,
+                content_type,
+                bytes,
+            } => {
+                body.extend_from_slice(
+                    format!(
+                        "Content-Disposition: form-data; name=\"{name}\"; filename=\"{file_name}\"\r\n"
+                    )
+                    .as_bytes(),
+                );
+                body.extend_from_slice(format!("Content-Type: {content_type}\r\n\r\n").as_bytes());
+                body.extend_from_slice(bytes);
+                body.extend_from_slice(b"\r\n");
+            }
+        }
+    }
+    body.extend_from_slice(format!("--{boundary}--\r\n").as_bytes());
+    body
+}
+
+pub async fn test_s3_client(endpoint: &str) -> aws_sdk_s3::Client {
     let credentials = Credentials::new("test", "test", None, None, "tests");
     let shared_config = aws_config::defaults(aws_config::BehaviorVersion::latest())
         .credentials_provider(credentials)

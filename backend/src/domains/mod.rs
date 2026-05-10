@@ -4,6 +4,7 @@ pub mod compat;
 pub mod discord;
 pub mod gunskins;
 pub mod lootboxes;
+pub mod littlemice;
 pub mod meta;
 pub mod ownership;
 pub mod shop;

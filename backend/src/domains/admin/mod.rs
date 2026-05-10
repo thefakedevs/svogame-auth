@@ -1,6 +1,7 @@
 pub mod discord;
 pub mod email;
 pub mod handlers;
+pub mod littlemice;
 pub mod service_tokens;
 pub mod skins;
 pub mod squads;
@@ -60,6 +61,26 @@ pub fn router() -> Router<crate::app::state::SharedAppState> {
         .route(
             "/api/admin/users/{user_id}/revoke-superuser",
             post(handlers::revoke_superuser),
+        )
+        .route(
+            "/api/admin/littlemice/checks",
+            get(littlemice::list_checks),
+        )
+        .route(
+            "/api/admin/littlemice/checks/{check_id}",
+            get(littlemice::get_check),
+        )
+        .route(
+            "/api/admin/littlemice/checks/{check_id}/screenshot",
+            get(littlemice::get_screenshot),
+        )
+        .route(
+            "/api/admin/littlemice/checks/{check_id}/log",
+            get(littlemice::get_log),
+        )
+        .route(
+            "/api/admin/users/{player_uuid}/littlemice-checks",
+            get(littlemice::list_checks_by_player),
         )
         .route(
             "/api/admin/service-tokens",
