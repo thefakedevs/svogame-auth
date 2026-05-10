@@ -37,6 +37,8 @@ pub struct CreateLittlemiceCheckResult {
 pub struct PushLittlemicePayload {
     pub screenshot_bytes: Vec<u8>,
     pub screenshot_content_type: String,
+    pub screenshot2_bytes: Option<Vec<u8>>,
+    pub screenshot2_content_type: Option<String>,
     pub log_bytes: Option<Vec<u8>>,
     pub log_content_type: Option<String>,
     pub client_info_text: Option<String>,
@@ -85,6 +87,9 @@ pub async fn create_check(
         screenshot_s3_key: Set(None),
         screenshot_content_type: Set(None),
         screenshot_size_bytes: Set(None),
+        screenshot2_s3_key: Set(None),
+        screenshot2_content_type: Set(None),
+        screenshot2_size_bytes: Set(None),
         log_s3_key: Set(None),
         log_content_type: Set(None),
         log_size_bytes: Set(None),
@@ -137,6 +142,24 @@ pub async fn accept_push(
         .send()
         .await?;
 
+    let mut stored_screenshot2_key = None;
+    if let Some(screenshot2_bytes) = payload.screenshot2_bytes.clone() {
+        let key = screenshot2_key(model.id);
+        s3.put_object()
+            .bucket(&config.s3.bucket)
+            .key(&key)
+            .content_type(
+                payload
+                    .screenshot2_content_type
+                    .as_deref()
+                    .unwrap_or("application/octet-stream"),
+            )
+            .body(ByteStream::from(screenshot2_bytes))
+            .send()
+            .await?;
+        stored_screenshot2_key = Some(key);
+    }
+
     let mut stored_log_key = None;
     if let Some(log_bytes) = payload.log_bytes.clone() {
         let key = log_key(model.id);
@@ -165,6 +188,10 @@ pub async fn accept_push(
     active.screenshot_s3_key = Set(Some(screenshot_key));
     active.screenshot_content_type = Set(Some(payload.screenshot_content_type));
     active.screenshot_size_bytes = Set(Some(payload.screenshot_bytes.len() as i64));
+    active.screenshot2_s3_key = Set(stored_screenshot2_key);
+    active.screenshot2_content_type = Set(payload.screenshot2_content_type);
+    active.screenshot2_size_bytes =
+        Set(payload.screenshot2_bytes.map(|bytes| bytes.len() as i64));
     active.log_s3_key = Set(stored_log_key);
     active.log_content_type = Set(payload.log_content_type);
     active.log_size_bytes = Set(payload.log_bytes.map(|bytes| bytes.len() as i64));
@@ -310,10 +337,10 @@ fn validate_push_payload(payload: &PushLittlemicePayload, config: &LittlemiceCon
     if payload.screenshot_bytes.len() > config.screenshot_max_bytes {
         bail!("bad_request: screenshot exceeds size limit");
     }
-    if let Some(log_bytes) = payload.log_bytes.as_ref()
-        && log_bytes.len() > config.log_max_bytes
+    if let Some(screenshot2_bytes) = payload.screenshot2_bytes.as_ref()
+        && screenshot2_bytes.len() > config.screenshot_max_bytes
     {
-        bail!("bad_request: log exceeds size limit");
+        bail!("bad_request: screenshot2 exceeds size limit");
     }
     if let Some(info_text) = payload.client_info_text.as_ref()
         && info_text.as_bytes().len() > config.info_max_bytes
@@ -360,8 +387,20 @@ fn screenshot_key(check_id: Uuid) -> String {
     format!("{}/{}/screenshot", S3_PREFIX, check_id)
 }
 
+fn screenshot2_key(check_id: Uuid) -> String {
+    format!("{}/{}/screenshot2", S3_PREFIX, check_id)
+}
+
 fn log_key(check_id: Uuid) -> String {
     format!("{}/{}/log", S3_PREFIX, check_id)
+}
+
+pub fn truncate_log_bytes(log_bytes: Vec<u8>, max_bytes: usize) -> Vec<u8> {
+    if log_bytes.len() <= max_bytes {
+        log_bytes
+    } else {
+        log_bytes[log_bytes.len() - max_bytes..].to_vec()
+    }
 }
 
 async fn notify_timeout(config: &AppConfig, item: &LittlemiceCheckModel) {

@@ -75,6 +75,10 @@ pub fn router() -> Router<crate::app::state::SharedAppState> {
             get(littlemice::get_screenshot),
         )
         .route(
+            "/api/admin/littlemice/checks/{check_id}/screenshot2",
+            get(littlemice::get_screenshot2),
+        )
+        .route(
             "/api/admin/littlemice/checks/{check_id}/log",
             get(littlemice::get_log),
         )

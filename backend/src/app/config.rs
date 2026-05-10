@@ -406,8 +406,9 @@ impl LittlemiceConfig {
             anyhow::bail!("LITTLEMICE_PUSH_TTL_SECONDS must be positive");
         }
 
+        const DEFAULT_4K_UNCOMPRESSED_RGBA_BYTES: usize = 3840 * 2160 * 4;
         let screenshot_max_bytes = std::env::var("LITTLEMICE_SCREENSHOT_MAX_BYTES")
-            .unwrap_or_else(|_| (10 * 1024 * 1024).to_string())
+            .unwrap_or_else(|_| DEFAULT_4K_UNCOMPRESSED_RGBA_BYTES.to_string())
             .parse::<usize>()
             .context("LITTLEMICE_SCREENSHOT_MAX_BYTES must be a valid integer")?;
         let log_max_bytes = std::env::var("LITTLEMICE_LOG_MAX_BYTES")

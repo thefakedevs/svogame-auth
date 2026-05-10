@@ -110,6 +110,7 @@ use utoipa::OpenApi;
         crate::domains::admin::littlemice::list_checks_by_player,
         crate::domains::admin::littlemice::get_check,
         crate::domains::admin::littlemice::get_screenshot,
+        crate::domains::admin::littlemice::get_screenshot2,
         crate::domains::admin::littlemice::get_log,
         ownership_handlers::list_public_assets,
         ownership_handlers::get_public_asset,

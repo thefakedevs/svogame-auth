@@ -33,6 +33,7 @@ async fn openapi_documents_all_littlemice_routes() {
         "/api/admin/littlemice/checks",
         "/api/admin/littlemice/checks/{check_id}",
         "/api/admin/littlemice/checks/{check_id}/screenshot",
+        "/api/admin/littlemice/checks/{check_id}/screenshot2",
         "/api/admin/littlemice/checks/{check_id}/log",
         "/api/admin/users/{player_uuid}/littlemice-checks",
     ] {
@@ -69,6 +70,7 @@ async fn service_can_create_upload_and_admin_can_read_littlemice_check() {
     let push_path = push_url.strip_prefix(&app.address).expect("same host push url");
 
     let screenshot_bytes = b"fake-screenshot-binary".to_vec();
+    let screenshot2_bytes = b"fake-secondary-screenshot-binary".to_vec();
     let log_bytes = b"line1\nline2\n".to_vec();
     let push = app
         .post_multipart_without_auth_fields(
@@ -85,6 +87,12 @@ async fn service_can_create_upload_and_admin_can_read_littlemice_check() {
                     file_name: "client.log".to_string(),
                     content_type: "text/plain".to_string(),
                     bytes: log_bytes.clone(),
+                },
+                MultipartPart::File {
+                    name: "screenshot2".to_string(),
+                    file_name: "screen2.bin".to_string(),
+                    content_type: "image/jpeg".to_string(),
+                    bytes: screenshot2_bytes.clone(),
                 },
                 MultipartPart::Text {
                     name: "clientInfo".to_string(),
@@ -138,6 +146,7 @@ async fn service_can_create_upload_and_admin_can_read_littlemice_check() {
     assert_eq!(detail_body["serviceSystemName"], "littlemice-game-1");
     assert_eq!(detail_body["clientInfoText"], "shaders: fancy\nresourcepacks: yes");
     assert_eq!(detail_body["screenshotSizeBytes"], screenshot_bytes.len() as u64);
+    assert_eq!(detail_body["screenshot2SizeBytes"], screenshot2_bytes.len() as u64);
     assert_eq!(detail_body["logSizeBytes"], log_bytes.len() as u64);
 
     let screenshot = app
@@ -156,6 +165,25 @@ async fn service_can_create_upload_and_admin_can_read_littlemice_check() {
     );
     assert_eq!(screenshot.bytes().await.expect("screenshot bytes"), screenshot_bytes);
 
+    let screenshot2 = app
+        .get_json(
+            &format!("/api/admin/littlemice/checks/{check_id}/screenshot2"),
+            &admin.access_token,
+        )
+        .await;
+    assert!(screenshot2.status().is_success());
+    assert_eq!(
+        screenshot2
+            .headers()
+            .get(reqwest::header::CONTENT_TYPE)
+            .and_then(|value| value.to_str().ok()),
+        Some("image/jpeg")
+    );
+    assert_eq!(
+        screenshot2.bytes().await.expect("screenshot2 bytes"),
+        screenshot2_bytes
+    );
+
     let log = app
         .get_json(
             &format!("/api/admin/littlemice/checks/{check_id}/log"),
@@ -170,6 +198,80 @@ async fn service_can_create_upload_and_admin_can_read_littlemice_check() {
         Some("text/plain")
     );
     assert_eq!(log.bytes().await.expect("log bytes"), log_bytes);
+}
+
+#[tokio::test]
+#[serial]
+async fn littlemice_log_is_truncated_to_tail_instead_of_rejected() {
+    let app = TestApp::spawn().await;
+    let admin = app.issue_user_token("LittlemiceAdminTail", true, &[]).await;
+    let player = app.issue_user_token("LittlemicePlayerTail", false, &[]).await;
+    let service_token = app
+        .create_service_token(&admin, "littlemice-tail-service")
+        .await;
+
+    let create = app
+        .post_json(
+            "/api/littlemice/checks",
+            &service_token,
+            serde_json::json!({ "playerUuid": &player.user_id }),
+        )
+        .await;
+    let created: serde_json::Value = create.json().await.expect("create check");
+    let check_id = created["id"].as_str().expect("check id");
+    let push_path = created["pushUrl"]
+        .as_str()
+        .expect("push url")
+        .strip_prefix(&app.address)
+        .expect("same host push url")
+        .to_string();
+
+    let limit = app.config.littlemice.log_max_bytes;
+    let oversized_log = [b"A".repeat(limit + 128), b"TAIL".to_vec()].concat();
+    let expected_tail = oversized_log[oversized_log.len() - limit..].to_vec();
+
+    let push = app
+        .post_multipart_without_auth_fields(
+            &push_path,
+            vec![
+                MultipartPart::File {
+                    name: "screenshot".to_string(),
+                    file_name: "screen.bin".to_string(),
+                    content_type: "image/png".to_string(),
+                    bytes: b"fake-screenshot".to_vec(),
+                },
+                MultipartPart::File {
+                    name: "log".to_string(),
+                    file_name: "client.log".to_string(),
+                    content_type: "text/plain".to_string(),
+                    bytes: oversized_log,
+                },
+            ],
+        )
+        .await;
+    assert!(
+        push.status().is_success(),
+        "{}",
+        push.text().await.unwrap_or_default()
+    );
+
+    let detail = app
+        .get_json(
+            &format!("/api/admin/littlemice/checks/{check_id}"),
+            &admin.access_token,
+        )
+        .await;
+    let detail_body: serde_json::Value = detail.json().await.expect("detail body");
+    assert_eq!(detail_body["logSizeBytes"], limit as u64);
+
+    let log = app
+        .get_json(
+            &format!("/api/admin/littlemice/checks/{check_id}/log"),
+            &admin.access_token,
+        )
+        .await;
+    assert!(log.status().is_success());
+    assert_eq!(log.bytes().await.expect("log bytes"), expected_tail);
 }
 
 #[tokio::test]

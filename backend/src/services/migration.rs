@@ -265,6 +265,17 @@ impl MigrationTrait for CreateLittlemiceCheckTable {
                             .big_integer()
                             .null(),
                     )
+                    .col(ColumnDef::new(LittlemiceCheck::Screenshot2S3Key).string().null())
+                    .col(
+                        ColumnDef::new(LittlemiceCheck::Screenshot2ContentType)
+                            .string()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(LittlemiceCheck::Screenshot2SizeBytes)
+                            .big_integer()
+                            .null(),
+                    )
                     .col(ColumnDef::new(LittlemiceCheck::LogS3Key).string().null())
                     .col(ColumnDef::new(LittlemiceCheck::LogContentType).string().null())
                     .col(
@@ -319,6 +330,9 @@ enum LittlemiceCheck {
     ScreenshotS3Key,
     ScreenshotContentType,
     ScreenshotSizeBytes,
+    Screenshot2S3Key,
+    Screenshot2ContentType,
+    Screenshot2SizeBytes,
     LogS3Key,
     LogContentType,
     LogSizeBytes,
@@ -326,6 +340,47 @@ enum LittlemiceCheck {
     ClientInfoSizeBytes,
     CreatedAt,
     UpdatedAt,
+}
+
+pub struct AddLittlemiceCheckScreenshot2Columns;
+
+impl MigrationName for AddLittlemiceCheckScreenshot2Columns {
+    fn name(&self) -> &str {
+        "m20260510_000002_add_littlemice_check_screenshot2_columns"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for AddLittlemiceCheckScreenshot2Columns {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        let backend = manager.get_database_backend();
+        let statements = match backend {
+            DatabaseBackend::Postgres | DatabaseBackend::Sqlite => vec![
+                r#"ALTER TABLE "littlemice_check" ADD COLUMN "screenshot2_s3_key" varchar NULL"#,
+                r#"ALTER TABLE "littlemice_check" ADD COLUMN "screenshot2_content_type" varchar NULL"#,
+                r#"ALTER TABLE "littlemice_check" ADD COLUMN "screenshot2_size_bytes" bigint NULL"#,
+            ],
+            _ => return Ok(()),
+        };
+
+        for sql in statements {
+            match manager
+                .get_connection()
+                .execute(Statement::from_string(backend, sql.to_string()))
+                .await
+            {
+                Ok(_) => {}
+                Err(error) if is_duplicate_column_error(&error) => {}
+                Err(error) => return Err(error),
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn down(&self, _manager: &SchemaManager) -> Result<(), DbErr> {
+        Ok(())
+    }
 }
 
 pub struct AddUserSuperuserColumn;

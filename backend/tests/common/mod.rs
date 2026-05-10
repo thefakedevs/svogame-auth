@@ -124,7 +124,7 @@ impl TestApp {
             littlemice: auth::app::config::LittlemiceConfig {
                 public_base_url: address.clone(),
                 push_ttl_seconds: 60,
-                screenshot_max_bytes: 10 * 1024 * 1024,
+                screenshot_max_bytes: 3840 * 2160 * 4,
                 log_max_bytes: 1024 * 1024,
                 info_max_bytes: 1024 * 1024,
                 expiry_check_interval_seconds: 5,

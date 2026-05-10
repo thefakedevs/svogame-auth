@@ -11,8 +11,6 @@ use crate::app::auth::{get_actor_from_headers, AuthenticatedActor};
 use crate::app::http::{HttpError, HttpResult};
 use crate::app::state::AppStateExtractor;
 use crate::services::littlemice::{self, FailLittlemiceCheckPayload, PushLittlemicePayload};
-
-const MAX_MULTIPART_BODY_SIZE: usize = 13 * 1024 * 1024;
 const MULTIPART_READ_TIMEOUT_SECS: u64 = 10;
 
 #[derive(Debug, Deserialize, ToSchema)]
@@ -144,13 +142,16 @@ pub async fn push_check(
     Path(push_token): Path<String>,
     mut multipart: Multipart,
 ) -> Result<Json<LittlemicePushAckResponse>, Response> {
-    validate_multipart_headers(&headers).map_err(|error| {
+    let state = state.read().await;
+    validate_multipart_headers(&headers, &state.config.littlemice).map_err(|error| {
         log_http_error("littlemice.push_check", &push_token, &error);
         error.into_response()
     })?;
 
     let mut screenshot_bytes = None;
     let mut screenshot_content_type = None;
+    let mut screenshot2_bytes = None;
+    let mut screenshot2_content_type = None;
     let mut log_bytes = None;
     let mut log_content_type = None;
     let mut client_info_text = None;
@@ -173,12 +174,31 @@ pub async fn push_check(
                     error.into_response()
                 })?);
             }
-            "log" => {
-                log_content_type = field.content_type().map(|value| value.to_string());
-                log_bytes = Some(read_multipart_bytes(field).await.map_err(|error| {
+            "screenshot2" => {
+                screenshot2_content_type = field.content_type().map(|value| value.to_string());
+                screenshot2_bytes = Some(read_multipart_bytes(field).await.map_err(|error| {
                     log_http_error("littlemice.push_check", &push_token, &error);
                     error.into_response()
                 })?);
+            }
+            "log" => {
+                log_content_type = field.content_type().map(|value| value.to_string());
+                let bytes = read_multipart_bytes(field).await.map_err(|error| {
+                    log_http_error("littlemice.push_check", &push_token, &error);
+                    error.into_response()
+                })?;
+                let original_len = bytes.len();
+                let truncated = littlemice::truncate_log_bytes(bytes.to_vec(), state.config.littlemice.log_max_bytes);
+                if truncated.len() < original_len {
+                    tracing::warn!(
+                        action = "littlemice.push_check",
+                        subject = push_token,
+                        original_size = original_len,
+                        stored_size = truncated.len(),
+                        "Littlemice log exceeded size limit and was truncated to the tail"
+                    );
+                }
+                log_bytes = Some(Bytes::from(truncated));
             }
             "clientInfo" => {
                 let data = read_multipart_bytes(field).await.map_err(|error| {
@@ -209,12 +229,13 @@ pub async fn push_check(
             .to_vec(),
         screenshot_content_type: screenshot_content_type
             .unwrap_or_else(|| "application/octet-stream".to_string()),
+        screenshot2_bytes: screenshot2_bytes.map(|bytes| bytes.to_vec()),
+        screenshot2_content_type,
         log_bytes: log_bytes.map(|bytes| bytes.to_vec()),
         log_content_type,
         client_info_text,
     };
 
-    let state = state.read().await;
     let saved = littlemice::accept_push(&state.db, &state.s3, &state.config, &push_token, payload)
         .await
         .map_err(|error| {
@@ -353,10 +374,15 @@ fn map_status_response(item: crate::entities::LittlemiceCheckModel) -> Littlemic
     }
 }
 
-fn validate_multipart_headers(headers: &HeaderMap) -> HttpResult<()> {
+fn validate_multipart_headers(
+    headers: &HeaderMap,
+    config: &crate::app::config::LittlemiceConfig,
+) -> HttpResult<()> {
+    let max_body_size =
+        (config.screenshot_max_bytes * 2) + config.log_max_bytes + config.info_max_bytes + (512 * 1024);
     if let Some(content_length) = headers.get(header::CONTENT_LENGTH)
         && let Ok(len) = content_length.to_str().unwrap_or_default().parse::<usize>()
-        && len > MAX_MULTIPART_BODY_SIZE
+        && len > max_body_size
     {
         return Err(HttpError::bad_request(
             "Littlemice upload exceeds body size limit",

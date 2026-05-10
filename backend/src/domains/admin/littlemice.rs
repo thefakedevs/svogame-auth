@@ -78,6 +78,8 @@ pub struct LittlemiceCheckDetailResponse {
     pub expires_at: chrono::DateTime<chrono::Utc>,
     #[serde(rename = "screenshotSizeBytes")]
     pub screenshot_size_bytes: Option<i64>,
+    #[serde(rename = "screenshot2SizeBytes")]
+    pub screenshot2_size_bytes: Option<i64>,
     #[serde(rename = "logSizeBytes")]
     pub log_size_bytes: Option<i64>,
     #[serde(rename = "clientInfoText")]
@@ -86,6 +88,8 @@ pub struct LittlemiceCheckDetailResponse {
     pub client_info_size_bytes: Option<i64>,
     #[serde(rename = "screenshotUrl")]
     pub screenshot_url: Option<String>,
+    #[serde(rename = "screenshot2Url")]
+    pub screenshot2_url: Option<String>,
     #[serde(rename = "logUrl")]
     pub log_url: Option<String>,
 }
@@ -251,6 +255,54 @@ pub async fn get_screenshot(
 
 #[utoipa::path(
     get,
+    path = "/api/admin/littlemice/checks/{check_id}/screenshot2",
+    params(
+        ("check_id" = String, Path, description = "Littlemice check UUID.")
+    ),
+    responses(
+        (status = 200, description = "Stored littlemice secondary screenshot binary."),
+        (status = 400, description = "Invalid check ID."),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden"),
+        (status = 404, description = "Screenshot2 not found.")
+    ),
+    security(("bearer_auth" = [])),
+    tag = "admin"
+)]
+pub async fn get_screenshot2(
+    State(state): AppStateExtractor,
+    headers: HeaderMap,
+    Path(check_id): Path<String>,
+) -> Result<Response, Response> {
+    let state = state.read().await;
+    require_human_superuser(&headers, &state)
+        .await
+        .map_err(IntoResponse::into_response)?;
+    let check_id = Uuid::parse_str(&check_id)
+        .map_err(|_| HttpError::bad_request("Invalid check ID").into_response())?;
+    let item = littlemice::get_check(&state.db, check_id)
+        .await
+        .map_err(map_domain_error_response)?;
+    let key = item
+        .screenshot2_s3_key
+        .ok_or_else(|| HttpError::not_found("Screenshot2 not found").into_response())?;
+    let bytes = littlemice::load_s3_object(&state.s3, &state.config.s3.bucket, &key)
+        .await
+        .map_err(|error| {
+            HttpError::internal_error(format!("Failed to load screenshot2: {error}")).into_response()
+        })?
+        .ok_or_else(|| HttpError::not_found("Screenshot2 not found").into_response())?;
+
+    Ok(binary_response(
+        item.screenshot2_content_type
+            .as_deref()
+            .unwrap_or("application/octet-stream"),
+        bytes,
+    ))
+}
+
+#[utoipa::path(
+    get,
     path = "/api/admin/littlemice/checks/{check_id}/log",
     params(
         ("check_id" = String, Path, description = "Littlemice check UUID.")
@@ -323,10 +375,15 @@ fn map_detail_item(item: crate::entities::LittlemiceCheckModel) -> LittlemiceChe
         completed_at: item.completed_at,
         expires_at: item.push_token_expires_at,
         screenshot_size_bytes: item.screenshot_size_bytes,
+        screenshot2_size_bytes: item.screenshot2_size_bytes,
         log_size_bytes: item.log_size_bytes,
         client_info_text: item.client_info_text,
         client_info_size_bytes: item.client_info_size_bytes,
         screenshot_url: item.screenshot_s3_key.as_ref().map(|_| format!("{base}/screenshot")),
+        screenshot2_url: item
+            .screenshot2_s3_key
+            .as_ref()
+            .map(|_| format!("{base}/screenshot2")),
         log_url: item.log_s3_key.as_ref().map(|_| format!("{base}/log")),
     }
 }
