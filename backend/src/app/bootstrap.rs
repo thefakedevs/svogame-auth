@@ -29,6 +29,8 @@ pub async fn run() -> Result<()> {
     spawn_receipt_worker(state.clone());
     spawn_email_delivery_worker(state.clone());
     spawn_discord_delivery_worker(state.clone());
+    spawn_littlemice_expiry_worker(state.clone());
+    spawn_littlemice_cleanup_worker(state.clone());
 
     let app = build_router(state);
     let listener = TcpListener::bind(&config.binding_address).await?;
@@ -215,6 +217,52 @@ fn spawn_discord_delivery_worker(state: SharedAppState) {
                     .await
             {
                 warn!("Discord delivery worker failed: {error}");
+            }
+        }
+    });
+}
+
+fn spawn_littlemice_expiry_worker(state: SharedAppState) {
+    tokio::spawn(async move {
+        let interval_seconds = {
+            let state_guard = state.read().await;
+            state_guard.config.littlemice.expiry_check_interval_seconds
+        };
+        let mut interval = tokio::time::interval(std::time::Duration::from_secs(interval_seconds));
+        loop {
+            interval.tick().await;
+            let (db, config) = {
+                let state_guard = state.read().await;
+                (state_guard.db.clone(), state_guard.config.clone())
+            };
+            if let Err(error) = crate::services::littlemice::expire_due_checks(&db, &config).await {
+                warn!("Littlemice expiry worker failed: {error}");
+            }
+        }
+    });
+}
+
+fn spawn_littlemice_cleanup_worker(state: SharedAppState) {
+    tokio::spawn(async move {
+        let interval_seconds = {
+            let state_guard = state.read().await;
+            state_guard.config.littlemice.cleanup_interval_seconds
+        };
+        let mut interval = tokio::time::interval(std::time::Duration::from_secs(interval_seconds));
+        loop {
+            interval.tick().await;
+            let (db, s3, config) = {
+                let state_guard = state.read().await;
+                (
+                    state_guard.db.clone(),
+                    state_guard.s3.clone(),
+                    state_guard.config.clone(),
+                )
+            };
+            if let Err(error) =
+                crate::services::littlemice::cleanup_old_checks(&db, &s3, &config).await
+            {
+                warn!("Littlemice cleanup worker failed: {error}");
             }
         }
     });

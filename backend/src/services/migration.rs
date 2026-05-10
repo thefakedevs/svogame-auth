@@ -198,6 +198,136 @@ enum User {
     CreatedAt,
 }
 
+pub struct CreateLittlemiceCheckTable;
+
+impl MigrationName for CreateLittlemiceCheckTable {
+    fn name(&self) -> &str {
+        "m20260510_000001_create_littlemice_check_table"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for CreateLittlemiceCheckTable {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .create_table(
+                Table::create()
+                    .table(LittlemiceCheck::Table)
+                    .if_not_exists()
+                    .col(
+                        ColumnDef::new(LittlemiceCheck::Id)
+                            .uuid()
+                            .not_null()
+                            .primary_key(),
+                    )
+                    .col(ColumnDef::new(LittlemiceCheck::PlayerUuid).uuid().not_null())
+                    .col(
+                        ColumnDef::new(LittlemiceCheck::ServiceTokenId)
+                            .uuid()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(LittlemiceCheck::ServiceSystemName)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(ColumnDef::new(LittlemiceCheck::Status).string().not_null())
+                    .col(ColumnDef::new(LittlemiceCheck::FailureReason).string().null())
+                    .col(ColumnDef::new(LittlemiceCheck::PushTokenHash).string().null())
+                    .col(
+                        ColumnDef::new(LittlemiceCheck::PushTokenExpiresAt)
+                            .timestamp_with_time_zone()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(LittlemiceCheck::RequestedAt)
+                            .timestamp_with_time_zone()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(LittlemiceCheck::ReceivedAt)
+                            .timestamp_with_time_zone()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(LittlemiceCheck::CompletedAt)
+                            .timestamp_with_time_zone()
+                            .null(),
+                    )
+                    .col(ColumnDef::new(LittlemiceCheck::ScreenshotS3Key).string().null())
+                    .col(
+                        ColumnDef::new(LittlemiceCheck::ScreenshotContentType)
+                            .string()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(LittlemiceCheck::ScreenshotSizeBytes)
+                            .big_integer()
+                            .null(),
+                    )
+                    .col(ColumnDef::new(LittlemiceCheck::LogS3Key).string().null())
+                    .col(ColumnDef::new(LittlemiceCheck::LogContentType).string().null())
+                    .col(
+                        ColumnDef::new(LittlemiceCheck::LogSizeBytes)
+                            .big_integer()
+                            .null(),
+                    )
+                    .col(ColumnDef::new(LittlemiceCheck::ClientInfoText).text().null())
+                    .col(
+                        ColumnDef::new(LittlemiceCheck::ClientInfoSizeBytes)
+                            .big_integer()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(LittlemiceCheck::CreatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .col(
+                        ColumnDef::new(LittlemiceCheck::UpdatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .to_owned(),
+            )
+            .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_table(Table::drop().table(LittlemiceCheck::Table).to_owned())
+            .await
+    }
+}
+
+#[derive(DeriveIden)]
+enum LittlemiceCheck {
+    Table,
+    Id,
+    PlayerUuid,
+    ServiceTokenId,
+    ServiceSystemName,
+    Status,
+    FailureReason,
+    PushTokenHash,
+    PushTokenExpiresAt,
+    RequestedAt,
+    ReceivedAt,
+    CompletedAt,
+    ScreenshotS3Key,
+    ScreenshotContentType,
+    ScreenshotSizeBytes,
+    LogS3Key,
+    LogContentType,
+    LogSizeBytes,
+    ClientInfoText,
+    ClientInfoSizeBytes,
+    CreatedAt,
+    UpdatedAt,
+}
+
 pub struct AddUserSuperuserColumn;
 
 impl MigrationName for AddUserSuperuserColumn {

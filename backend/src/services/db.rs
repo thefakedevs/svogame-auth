@@ -6,6 +6,7 @@ use crate::services::migration::{
     AddUserSuperuserColumn, CreateAppKvTable, CreateAssetDefinitionTable, CreateAuditLogTable,
     CreateAuthRayTable, CreateDefaultSkinTable, CreateDiscordBroadcastTable,
     CreateDiscordDeliveryTable, CreateEmailDeliveryTable, CreateInventoryOperationTable,
+    CreateLittlemiceCheckTable,
     CreateLootboxDefinitionTable, CreateLootboxDropDefinitionTable,
     CreateLootboxOpenOperationTable, CreateServiceTokenAuditTable, CreateServiceTokenTable,
     CreateShopOrderTable, CreateShopPaymentAttemptTable, CreateShopProductLocaleTable,
@@ -42,6 +43,7 @@ pub async fn run_migrations(db: &DatabaseConnection) -> Result<()> {
     CreateUserEntitlementTable.up(&schema_manager).await?;
     CreateUserExpirableAssetTable.up(&schema_manager).await?;
     CreateInventoryOperationTable.up(&schema_manager).await?;
+    CreateLittlemiceCheckTable.up(&schema_manager).await?;
     CreateWalletBalanceTable.up(&schema_manager).await?;
     CreateWalletTransactionTable.up(&schema_manager).await?;
     CreateDefaultSkinTable.up(&schema_manager).await?;
