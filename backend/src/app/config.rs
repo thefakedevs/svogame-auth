@@ -78,6 +78,7 @@ pub struct S3Config {
 
 #[derive(Debug, Clone)]
 pub struct LittlemiceConfig {
+    pub public_base_url: String,
     pub push_ttl_seconds: i64,
     pub screenshot_max_bytes: usize,
     pub log_max_bytes: usize,
@@ -389,6 +390,14 @@ impl ShopConfig {
 
 impl LittlemiceConfig {
     fn from_env() -> Result<Self> {
+        let public_base_url = std::env::var("LITTLEMICE_PUBLIC_BASE_URL")
+            .context("LITTLEMICE_PUBLIC_BASE_URL not set")?
+            .trim()
+            .trim_end_matches('/')
+            .to_string();
+        if public_base_url.is_empty() {
+            anyhow::bail!("LITTLEMICE_PUBLIC_BASE_URL must not be empty");
+        }
         let push_ttl_seconds = std::env::var("LITTLEMICE_PUSH_TTL_SECONDS")
             .unwrap_or_else(|_| "60".to_string())
             .parse::<i64>()
@@ -431,6 +440,7 @@ impl LittlemiceConfig {
             .filter(|value| !value.is_empty());
 
         Ok(Self {
+            public_base_url,
             push_ttl_seconds,
             screenshot_max_bytes,
             log_max_bytes,

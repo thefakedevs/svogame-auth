@@ -97,7 +97,6 @@ pub async fn create_check(
     let created = littlemice::create_check(
         &state.db,
         &state.config,
-        &resolve_base_url(&headers),
         &service,
         player_uuid,
     )
@@ -297,20 +296,6 @@ fn map_status_response(item: crate::entities::LittlemiceCheckModel) -> Littlemic
         completed_at: item.completed_at,
         expires_at: item.push_token_expires_at,
     }
-}
-
-fn resolve_base_url(headers: &HeaderMap) -> String {
-    let scheme = headers
-        .get("x-forwarded-proto")
-        .and_then(|value| value.to_str().ok())
-        .filter(|value| !value.trim().is_empty())
-        .unwrap_or("http");
-    let host = headers
-        .get(header::HOST)
-        .and_then(|value| value.to_str().ok())
-        .filter(|value| !value.trim().is_empty())
-        .unwrap_or("localhost:3000");
-    format!("{scheme}://{host}")
 }
 
 fn validate_multipart_headers(headers: &HeaderMap) -> Result<(), Response> {

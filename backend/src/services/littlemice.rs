@@ -64,7 +64,6 @@ pub struct LittlemiceListResult {
 pub async fn create_check(
     db: &DatabaseConnection,
     config: &AppConfig,
-    base_url: &str,
     service: &AuthenticatedServiceToken,
     player_uuid: Uuid,
 ) -> Result<CreateLittlemiceCheckResult> {
@@ -100,7 +99,7 @@ pub async fn create_check(
     Ok(CreateLittlemiceCheckResult {
         push_url: format!(
             "{}/api/littlemice/push/{}",
-            base_url.trim_end_matches('/'),
+            config.littlemice.public_base_url,
             push_secret
         ),
         model,

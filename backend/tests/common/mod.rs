@@ -78,6 +78,10 @@ impl TestApp {
 
     pub async fn spawn_with_shop_config(shop: ShopConfig) -> Self {
         let (s3_endpoint, mock_s3_server_task) = spawn_mock_s3_server().await;
+        let listener = TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind test port");
+        let address = format!("http://{}", listener.local_addr().expect("local addr"));
 
         let db_path = test_db_path();
         let s3_bucket = format!("test-bucket-{}", Uuid::new_v4().as_simple());
@@ -118,6 +122,7 @@ impl TestApp {
                 force_path_style: true,
             },
             littlemice: auth::app::config::LittlemiceConfig {
+                public_base_url: address.clone(),
                 push_ttl_seconds: 60,
                 screenshot_max_bytes: 10 * 1024 * 1024,
                 log_max_bytes: 1024 * 1024,
@@ -146,10 +151,6 @@ impl TestApp {
             test_s3_client(&s3_endpoint).await,
         )));
         let app = build_router(state);
-        let listener = TcpListener::bind("127.0.0.1:0")
-            .await
-            .expect("bind test port");
-        let address = format!("http://{}", listener.local_addr().expect("local addr"));
         let server_task = tokio::spawn(async move {
             if let Err(error) = axum::serve(listener, app.into_make_service()).await {
                 panic!("serve test app: {error}");
