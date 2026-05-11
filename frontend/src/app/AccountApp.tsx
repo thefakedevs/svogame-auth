@@ -165,6 +165,7 @@ function adminRouteForPath(
   | { type: 'tokenAudit'; tokenId: string }
   | { type: 'shopProduct'; productId: string }
   | { type: 'lootbox'; lootboxId: string }
+  | { type: 'littlemice' }
   | { type: 'userLootboxHistory'; userId: string }
   | { type: 'userLittlemice'; userId: string; checkId?: string }
   | null {
@@ -214,6 +215,10 @@ function adminRouteForPath(
   const lootboxMatch = pathname.match(/^\/admin\/lootboxes\/([^/]+)$/)
   if (lootboxMatch) {
     return { type: 'lootbox', lootboxId: decodeURIComponent(lootboxMatch[1]) }
+  }
+
+  if (pathname === `${paths.admin}/littlemice`) {
+    return { type: 'littlemice' }
   }
 
   return null

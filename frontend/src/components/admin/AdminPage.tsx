@@ -32,7 +32,7 @@ import {
 } from '../../api/admin'
 import type { SquadMemberResponse } from '../../api/squads'
 import { buildSkinUrl, type SkinModel } from '../../api/skins'
-import { adminSquadPath, adminTokenAuditPath, adminUserPath, paths } from '../../routes/paths'
+import { adminLittlemicePath, adminSquadPath, adminTokenAuditPath, adminUserPath, paths } from '../../routes/paths'
 import { pushUrl, replaceUrl, usePathname } from '../../shared/navigation/history'
 import { getAuthToken } from '../../shared/session/auth-session'
 import { useQuery } from '../../util/query'
@@ -40,6 +40,7 @@ import AdminAssetsPanel from './AdminAssetsPanel'
 import AdminGunskinShopWizard from './AdminGunskinShopWizard'
 import AdminLootboxesPanel from './AdminLootboxesPanel'
 import AdminLootboxView from './AdminLootboxView'
+import AdminLittlemiceTimelineView from './AdminLittlemiceTimelineView'
 import AdminShopPanel from './AdminShopPanel'
 import AdminShopProductView from './AdminShopProductView'
 import AdminSquadProfile from './AdminSquadProfile'
@@ -57,6 +58,7 @@ type AdminRoute =
   | { type: 'tokenAudit'; tokenId: string }
   | { type: 'shopProduct'; productId: string }
   | { type: 'lootbox'; lootboxId: string }
+  | { type: 'littlemice' }
   | { type: 'userLootboxHistory'; userId: string }
   | { type: 'userLittlemice'; userId: string; checkId?: string }
 type AccessState = 'loading' | 'allowed' | 'denied' | 'error'
@@ -125,6 +127,8 @@ function parseRoute(pathname: string): AdminRoute {
 
   const lootboxMatch = pathname.match(/^\/admin\/lootboxes\/([^/]+)$/)
   if (lootboxMatch) return { type: 'lootbox', lootboxId: decodeURIComponent(lootboxMatch[1]) }
+
+  if (pathname === adminLittlemicePath()) return { type: 'littlemice' }
 
   return { type: 'home' }
 }
@@ -336,6 +340,10 @@ export default function AdminPage() {
 
   if (route.type === 'lootbox') {
     return <AdminLootboxView token={token!} lootboxId={route.lootboxId} />
+  }
+
+  if (route.type === 'littlemice') {
+    return <AdminLittlemiceTimelineView token={token!} />
   }
 
   return (
@@ -551,6 +559,7 @@ function AdminHome({
           <button type="button" className={`admin-tab ${tab === 'shop' ? 'is-active' : ''}`} onClick={() => setHomeTab('shop')}>Магазин</button>
           <button type="button" className={`admin-tab ${tab === 'skinShop' ? 'is-active' : ''}`} onClick={() => setHomeTab('skinShop')}>Скины → магазин</button>
           <button type="button" className={`admin-tab ${tab === 'lootboxes' ? 'is-active' : ''}`} onClick={() => setHomeTab('lootboxes')}>Лутбоксы</button>
+          <button type="button" className="admin-tab" onClick={() => pushUrl(adminLittlemicePath())}>Littlemice</button>
           <button type="button" className={`admin-tab ${tab === 'tokens' ? 'is-active' : ''}`} onClick={() => setHomeTab('tokens')}>Сервисные токены</button>
         </nav>
       </section>

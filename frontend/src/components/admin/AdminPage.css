@@ -602,6 +602,43 @@
   font-size: 0.82rem;
 }
 
+.admin-littlemice-summary-badges,
+.admin-littlemice-global-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.admin-littlemice-timeline--global {
+  padding-left: 20px;
+}
+
+.admin-littlemice-global-item {
+  cursor: default;
+}
+
+.admin-littlemice-player-button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ui-text);
+  font: inherit;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+
+.admin-littlemice-player-button:hover,
+.admin-littlemice-player-button:focus-visible {
+  color: #f7a41d;
+}
+
+.admin-littlemice-global-actions code {
+  color: var(--ui-text-muted);
+  overflow-wrap: anywhere;
+}
+
 .admin-littlemice-kv {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }

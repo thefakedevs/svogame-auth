@@ -45,6 +45,10 @@ export function adminLootboxPath(lootboxId: string) {
   return `${paths.admin}/lootboxes/${encodeURIComponent(lootboxId)}`
 }
 
+export function adminLittlemicePath() {
+  return `${paths.admin}/littlemice`
+}
+
 export function adminUserLootboxHistoryPath(userId: string) {
   return `${paths.admin}/users/${encodeURIComponent(userId)}/lootboxes/open-history`
 }

@@ -55,6 +55,25 @@ export function listAdminUserLittlemiceChecks(
   )
 }
 
+export function listAdminLittlemiceChecks(
+  token: string,
+  query?: {
+    page?: number
+    perPage?: number
+  },
+): Promise<LittlemiceCheckListResponse> {
+  const params = new URLSearchParams()
+  if (query?.page) params.set('page', String(query.page))
+  if (query?.perPage) params.set('perPage', String(query.perPage))
+
+  const suffix = params.toString()
+  return request<LittlemiceCheckListResponse>(`/api/admin/littlemice/checks${suffix ? `?${suffix}` : ''}`, {
+    headers: authHeaders(token, {
+      'Content-Type': 'application/json',
+    }),
+  })
+}
+
 export function getAdminLittlemiceCheck(
   token: string,
   checkId: string,

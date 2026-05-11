@@ -40,6 +40,9 @@ export function pageTitleForPath(pathname: string) {
   if (pathname.startsWith(`${paths.admin}/lootboxes/`)) {
     return 'Лутбокс | Админка | SvoCraft'
   }
+  if (pathname === `${paths.admin}/littlemice`) {
+    return 'Все проверки littlemice | Админка | SvoCraft'
+  }
   if (pathname === paths.token) return 'Завершение авторизации | SvoCraft'
   if (pathname === paths.uiKit) return 'UI Kit | SvoCraft'
   if (pathname === paths.legal) return 'Правовые документы | SvoCraft'
