@@ -23,6 +23,12 @@ export function pageTitleForPath(pathname: string) {
   if (pathname.match(/^\/admin\/users\/[^/]+\/lootboxes\/open-history$/)) {
     return 'Открытые кейсы игрока | Админка | SvoCraft'
   }
+  if (pathname.match(/^\/admin\/users\/[^/]+\/littlemice\/[^/]+$/)) {
+    return 'Проверка littlemice | Админка | SvoCraft'
+  }
+  if (pathname.match(/^\/admin\/users\/[^/]+\/littlemice$/)) {
+    return 'Проверки littlemice | Админка | SvoCraft'
+  }
   if (pathname.startsWith(`${paths.admin}/users/`)) return 'Профиль игрока | Админка | SvoCraft'
   if (pathname.startsWith(`${paths.admin}/squads/`)) return 'Профиль сквада | Админка | SvoCraft'
   if (pathname.startsWith(`${paths.admin}/tokens/`) && pathname.endsWith('/audit')) {
