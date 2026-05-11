@@ -747,6 +747,7 @@ async fn spawn_mock_s3_server() -> (String, tokio::task::JoinHandle<()>) {
                 .put(mock_s3_put)
                 .delete(mock_s3_delete),
         )
+        .layer(axum::extract::DefaultBodyLimit::max(80 * 1024 * 1024))
         .with_state(storage);
 
     let server_task = tokio::spawn(async move {

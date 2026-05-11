@@ -276,6 +276,61 @@ async fn littlemice_log_is_truncated_to_tail_instead_of_rejected() {
 
 #[tokio::test]
 #[serial]
+async fn littlemice_push_accepts_payload_larger_than_axum_default_body_limit() {
+    let app = TestApp::spawn().await;
+    let admin = app.issue_user_token("LittlemiceAdminLarge", true, &[]).await;
+    let player = app.issue_user_token("LittlemicePlayerLarge", false, &[]).await;
+    let service_token = app
+        .create_service_token(&admin, "littlemice-large-service")
+        .await;
+
+    let create = app
+        .post_json(
+            "/api/littlemice/checks",
+            &service_token,
+            serde_json::json!({ "playerUuid": &player.user_id }),
+        )
+        .await;
+    let created: serde_json::Value = create.json().await.expect("create check");
+    let check_id = created["id"].as_str().expect("check id");
+    let push_path = created["pushUrl"]
+        .as_str()
+        .expect("push url")
+        .strip_prefix(&app.address)
+        .expect("same host push url")
+        .to_string();
+
+    let screenshot_bytes = vec![42; (2 * 1024 * 1024) + 256 * 1024];
+    let push = app
+        .post_multipart_without_auth_fields(
+            &push_path,
+            vec![MultipartPart::File {
+                name: "screenshot".to_string(),
+                file_name: "large.png".to_string(),
+                content_type: "image/png".to_string(),
+                bytes: screenshot_bytes.clone(),
+            }],
+        )
+        .await;
+    assert!(
+        push.status().is_success(),
+        "{}",
+        push.text().await.unwrap_or_default()
+    );
+
+    let detail = app
+        .get_json(
+            &format!("/api/admin/littlemice/checks/{check_id}"),
+            &admin.access_token,
+        )
+        .await;
+    assert!(detail.status().is_success());
+    let detail_body: serde_json::Value = detail.json().await.expect("detail body");
+    assert_eq!(detail_body["screenshotSizeBytes"], screenshot_bytes.len() as u64);
+}
+
+#[tokio::test]
+#[serial]
 async fn service_can_finish_check_with_client_error_and_stacktrace() {
     let app = TestApp::spawn().await;
     let admin = app.issue_user_token("LittlemiceAdmin2", true, &[]).await;

@@ -11,7 +11,7 @@ use crate::app::auth::{get_actor_from_headers, AuthenticatedActor};
 use crate::app::http::{HttpError, HttpResult};
 use crate::app::state::AppStateExtractor;
 use crate::services::littlemice::{self, FailLittlemiceCheckPayload, PushLittlemicePayload};
-const MULTIPART_READ_TIMEOUT_SECS: u64 = 10;
+const MULTIPART_READ_TIMEOUT_SECS: u64 = 60;
 
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct CreateLittlemiceCheckRequest {

@@ -1,7 +1,10 @@
 pub mod handlers;
 
 use axum::Router;
+use axum::extract::DefaultBodyLimit;
 use axum::routing::{get, post};
+
+const MAX_PUSH_BODY_BYTES: usize = 80 * 1024 * 1024;
 
 pub fn router() -> Router<crate::app::state::SharedAppState> {
     Router::new()
@@ -21,4 +24,5 @@ pub fn router() -> Router<crate::app::state::SharedAppState> {
             "/api/littlemice/checks/{check_id}/fail",
             post(handlers::fail_check),
         )
+        .layer(DefaultBodyLimit::max(MAX_PUSH_BODY_BYTES))
 }
