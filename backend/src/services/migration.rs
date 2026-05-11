@@ -198,6 +198,191 @@ enum User {
     CreatedAt,
 }
 
+pub struct CreateLittlemiceCheckTable;
+
+impl MigrationName for CreateLittlemiceCheckTable {
+    fn name(&self) -> &str {
+        "m20260510_000001_create_littlemice_check_table"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for CreateLittlemiceCheckTable {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .create_table(
+                Table::create()
+                    .table(LittlemiceCheck::Table)
+                    .if_not_exists()
+                    .col(
+                        ColumnDef::new(LittlemiceCheck::Id)
+                            .uuid()
+                            .not_null()
+                            .primary_key(),
+                    )
+                    .col(ColumnDef::new(LittlemiceCheck::PlayerUuid).uuid().not_null())
+                    .col(
+                        ColumnDef::new(LittlemiceCheck::ServiceTokenId)
+                            .uuid()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(LittlemiceCheck::ServiceSystemName)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(ColumnDef::new(LittlemiceCheck::Status).string().not_null())
+                    .col(ColumnDef::new(LittlemiceCheck::FailureReason).string().null())
+                    .col(ColumnDef::new(LittlemiceCheck::PushTokenHash).string().null())
+                    .col(
+                        ColumnDef::new(LittlemiceCheck::PushTokenExpiresAt)
+                            .timestamp_with_time_zone()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(LittlemiceCheck::RequestedAt)
+                            .timestamp_with_time_zone()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(LittlemiceCheck::ReceivedAt)
+                            .timestamp_with_time_zone()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(LittlemiceCheck::CompletedAt)
+                            .timestamp_with_time_zone()
+                            .null(),
+                    )
+                    .col(ColumnDef::new(LittlemiceCheck::ScreenshotS3Key).string().null())
+                    .col(
+                        ColumnDef::new(LittlemiceCheck::ScreenshotContentType)
+                            .string()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(LittlemiceCheck::ScreenshotSizeBytes)
+                            .big_integer()
+                            .null(),
+                    )
+                    .col(ColumnDef::new(LittlemiceCheck::Screenshot2S3Key).string().null())
+                    .col(
+                        ColumnDef::new(LittlemiceCheck::Screenshot2ContentType)
+                            .string()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(LittlemiceCheck::Screenshot2SizeBytes)
+                            .big_integer()
+                            .null(),
+                    )
+                    .col(ColumnDef::new(LittlemiceCheck::LogS3Key).string().null())
+                    .col(ColumnDef::new(LittlemiceCheck::LogContentType).string().null())
+                    .col(
+                        ColumnDef::new(LittlemiceCheck::LogSizeBytes)
+                            .big_integer()
+                            .null(),
+                    )
+                    .col(ColumnDef::new(LittlemiceCheck::ClientInfoText).text().null())
+                    .col(
+                        ColumnDef::new(LittlemiceCheck::ClientInfoSizeBytes)
+                            .big_integer()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(LittlemiceCheck::CreatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .col(
+                        ColumnDef::new(LittlemiceCheck::UpdatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .to_owned(),
+            )
+            .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_table(Table::drop().table(LittlemiceCheck::Table).to_owned())
+            .await
+    }
+}
+
+#[derive(DeriveIden)]
+enum LittlemiceCheck {
+    Table,
+    Id,
+    PlayerUuid,
+    ServiceTokenId,
+    ServiceSystemName,
+    Status,
+    FailureReason,
+    PushTokenHash,
+    PushTokenExpiresAt,
+    RequestedAt,
+    ReceivedAt,
+    CompletedAt,
+    ScreenshotS3Key,
+    ScreenshotContentType,
+    ScreenshotSizeBytes,
+    Screenshot2S3Key,
+    Screenshot2ContentType,
+    Screenshot2SizeBytes,
+    LogS3Key,
+    LogContentType,
+    LogSizeBytes,
+    ClientInfoText,
+    ClientInfoSizeBytes,
+    CreatedAt,
+    UpdatedAt,
+}
+
+pub struct AddLittlemiceCheckScreenshot2Columns;
+
+impl MigrationName for AddLittlemiceCheckScreenshot2Columns {
+    fn name(&self) -> &str {
+        "m20260510_000002_add_littlemice_check_screenshot2_columns"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for AddLittlemiceCheckScreenshot2Columns {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        let backend = manager.get_database_backend();
+        let statements = match backend {
+            DatabaseBackend::Postgres | DatabaseBackend::Sqlite => vec![
+                r#"ALTER TABLE "littlemice_check" ADD COLUMN "screenshot2_s3_key" varchar NULL"#,
+                r#"ALTER TABLE "littlemice_check" ADD COLUMN "screenshot2_content_type" varchar NULL"#,
+                r#"ALTER TABLE "littlemice_check" ADD COLUMN "screenshot2_size_bytes" bigint NULL"#,
+            ],
+            _ => return Ok(()),
+        };
+
+        for sql in statements {
+            match manager
+                .get_connection()
+                .execute(Statement::from_string(backend, sql.to_string()))
+                .await
+            {
+                Ok(_) => {}
+                Err(error) if is_duplicate_column_error(&error) => {}
+                Err(error) => return Err(error),
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn down(&self, _manager: &SchemaManager) -> Result<(), DbErr> {
+        Ok(())
+    }
+}
+
 pub struct AddUserSuperuserColumn;
 
 impl MigrationName for AddUserSuperuserColumn {

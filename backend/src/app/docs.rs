@@ -12,6 +12,7 @@ use crate::domains::compat::gamervii as compat_gamervii;
 use crate::domains::discord as discord_handlers;
 use crate::domains::gunskins::handlers as gunskin_handlers;
 use crate::domains::lootboxes::handlers as lootbox_handlers;
+use crate::domains::littlemice::handlers as littlemice_handlers;
 use crate::domains::meta::handlers as meta_handlers;
 use crate::domains::ownership::handlers as ownership_handlers;
 use crate::domains::shop::handlers as shop_handlers;
@@ -101,6 +102,16 @@ use utoipa::OpenApi;
         lootbox_handlers::open_user_lootbox,
         lootbox_handlers::get_user_lootbox_open_history,
         lootbox_handlers::get_all_lootbox_open_history,
+        littlemice_handlers::create_check,
+        littlemice_handlers::push_check,
+        littlemice_handlers::get_check_status,
+        littlemice_handlers::fail_check,
+        crate::domains::admin::littlemice::list_checks,
+        crate::domains::admin::littlemice::list_checks_by_player,
+        crate::domains::admin::littlemice::get_check,
+        crate::domains::admin::littlemice::get_screenshot,
+        crate::domains::admin::littlemice::get_screenshot2,
+        crate::domains::admin::littlemice::get_log,
         ownership_handlers::list_public_assets,
         ownership_handlers::get_public_asset,
         ownership_handlers::get_public_asset_image,
@@ -200,6 +211,9 @@ use utoipa::OpenApi;
             admin_handlers::DeactivateAdminUserRequest,
             admin_handlers::RestrictionReasonRequest,
             admin_handlers::AdminUserRestrictionResponse,
+            crate::domains::admin::littlemice::LittlemiceCheckListItemResponse,
+            crate::domains::admin::littlemice::LittlemiceCheckListResponse,
+            crate::domains::admin::littlemice::LittlemiceCheckDetailResponse,
             admin_service_tokens::CreateServiceTokenRequest,
             admin_service_tokens::RotateServiceTokenRequest,
             admin_service_tokens::RevokeServiceTokenRequest,
@@ -218,6 +232,11 @@ use utoipa::OpenApi;
             auth_handlers::RegisterRequest,
             auth_polling::PollResponse,
             auth_verification::VerifyQuery,
+            littlemice_handlers::CreateLittlemiceCheckRequest,
+            littlemice_handlers::FailLittlemiceCheckRequest,
+            littlemice_handlers::LittlemiceCreateCheckResponse,
+            littlemice_handlers::LittlemiceCheckStatusResponse,
+            littlemice_handlers::LittlemicePushAckResponse,
             auth_verification::VerifyResponse,
             handlers::UserResponse,
             handlers::UserSearchItemResponse,
@@ -311,6 +330,7 @@ use utoipa::OpenApi;
         (name = "debug", description = "Debug and test-only endpoints"),
         (name = "lootboxes", description = "Public and self-service lootbox catalog, ownership, and opening API"),
         (name = "lootboxes-admin", description = "Administrative lootbox configuration and investigation API"),
+        (name = "littlemice", description = "Service anti-cheat verification API for creating checks, uploading snapshots, and reporting client-side failures"),
         (name = "ownership", description = "Public and self-service ownership catalog and inventory API"),
         (name = "ownership-admin", description = "Administrative inventory and asset catalog API"),
         (name = "meta", description = "Public metadata used by clients to drive UI and validation"),

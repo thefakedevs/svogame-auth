@@ -166,6 +166,7 @@ function adminRouteForPath(
   | { type: 'shopProduct'; productId: string }
   | { type: 'lootbox'; lootboxId: string }
   | { type: 'userLootboxHistory'; userId: string }
+  | { type: 'userLittlemice'; userId: string; checkId?: string }
   | null {
   if (pathname === paths.admin) {
     return { type: 'home' }
@@ -179,6 +180,20 @@ function adminRouteForPath(
   const userLootboxHistoryMatch = pathname.match(/^\/admin\/users\/([^/]+)\/lootboxes\/open-history$/)
   if (userLootboxHistoryMatch) {
     return { type: 'userLootboxHistory', userId: decodeURIComponent(userLootboxHistoryMatch[1]) }
+  }
+
+  const userLittlemiceCheckMatch = pathname.match(/^\/admin\/users\/([^/]+)\/littlemice\/([^/]+)$/)
+  if (userLittlemiceCheckMatch) {
+    return {
+      type: 'userLittlemice',
+      userId: decodeURIComponent(userLittlemiceCheckMatch[1]),
+      checkId: decodeURIComponent(userLittlemiceCheckMatch[2]),
+    }
+  }
+
+  const userLittlemiceMatch = pathname.match(/^\/admin\/users\/([^/]+)\/littlemice$/)
+  if (userLittlemiceMatch) {
+    return { type: 'userLittlemice', userId: decodeURIComponent(userLittlemiceMatch[1]) }
   }
 
   const squadMatch = pathname.match(/^\/admin\/squads\/([^/]+)$/)

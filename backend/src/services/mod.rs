@@ -9,6 +9,7 @@ pub mod email_templates;
 pub mod gml;
 pub mod gunskins;
 pub mod lootboxes;
+pub mod littlemice;
 pub mod migration;
 pub mod ownership;
 pub mod pow;

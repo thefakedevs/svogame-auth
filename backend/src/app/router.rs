@@ -19,6 +19,7 @@ pub fn build_router(state: SharedAppState) -> Router {
         .merge(domains::gunskins::router())
         .merge(domains::ownership::router())
         .merge(domains::lootboxes::router())
+        .merge(domains::littlemice::router())
         .merge(domains::shop::router())
         .merge(domains::admin::router())
         .merge(domains::auth::router())

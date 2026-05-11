@@ -43,6 +43,7 @@ import AdminLootboxView from './AdminLootboxView'
 import AdminShopPanel from './AdminShopPanel'
 import AdminShopProductView from './AdminShopProductView'
 import AdminSquadProfile from './AdminSquadProfile'
+import AdminUserLittlemiceChecksView from './AdminUserLittlemiceChecksView'
 import AdminUserLootboxHistoryView from './AdminUserLootboxHistoryView'
 import AdminUserProfile from './AdminUserProfile'
 import ErrorState from '../ErrorState'
@@ -57,6 +58,7 @@ type AdminRoute =
   | { type: 'shopProduct'; productId: string }
   | { type: 'lootbox'; lootboxId: string }
   | { type: 'userLootboxHistory'; userId: string }
+  | { type: 'userLittlemice'; userId: string; checkId?: string }
 type AccessState = 'loading' | 'allowed' | 'denied' | 'error'
 type HomeTab = 'overview' | 'users' | 'squads' | 'tokens' | 'assets' | 'shop' | 'skinShop' | 'lootboxes'
 const PAGE_SIZE = 30
@@ -99,6 +101,18 @@ function parseRoute(pathname: string): AdminRoute {
 
   const userLootboxHistoryMatch = pathname.match(/^\/admin\/users\/([^/]+)\/lootboxes\/open-history$/)
   if (userLootboxHistoryMatch) return { type: 'userLootboxHistory', userId: decodeURIComponent(userLootboxHistoryMatch[1]) }
+
+  const userLittlemiceCheckMatch = pathname.match(/^\/admin\/users\/([^/]+)\/littlemice\/([^/]+)$/)
+  if (userLittlemiceCheckMatch) {
+    return {
+      type: 'userLittlemice',
+      userId: decodeURIComponent(userLittlemiceCheckMatch[1]),
+      checkId: decodeURIComponent(userLittlemiceCheckMatch[2]),
+    }
+  }
+
+  const userLittlemiceMatch = pathname.match(/^\/admin\/users\/([^/]+)\/littlemice$/)
+  if (userLittlemiceMatch) return { type: 'userLittlemice', userId: decodeURIComponent(userLittlemiceMatch[1]) }
 
   const squadMatch = pathname.match(/^\/admin\/squads\/([^/]+)$/)
   if (squadMatch) return { type: 'squad', squadId: decodeURIComponent(squadMatch[1]) }
@@ -306,6 +320,10 @@ export default function AdminPage() {
 
   if (route.type === 'userLootboxHistory') {
     return <AdminUserLootboxHistoryView token={token!} userId={route.userId} />
+  }
+
+  if (route.type === 'userLittlemice') {
+    return <AdminUserLittlemiceChecksView token={token!} userId={route.userId} checkId={route.checkId} />
   }
 
   if (route.type === 'tokenAudit') {

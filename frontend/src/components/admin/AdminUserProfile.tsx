@@ -17,7 +17,7 @@ import {
 import { toDisplayError } from '../../api/http'
 import { getRestrictionMeta, type RestrictionMetaResponse } from '../../api/meta'
 import { buildSkinUrl } from '../../api/skins'
-import { adminSquadPath, adminUserLootboxHistoryPath, paths } from '../../routes/paths'
+import { adminSquadPath, adminUserLittlemicePath, adminUserLootboxHistoryPath, paths } from '../../routes/paths'
 import { pushUrl } from '../../shared/navigation/history'
 import AppPortal from '../../shared/ui/portal/AppPortal'
 import LoadingState from '../LoadingState'
@@ -262,6 +262,13 @@ export default function AdminUserProfile({
                   onClick={() => setIsResetAuthEpochModalOpen(true)}
                 >
                   {isResettingAuthEpoch ? 'Очищаем...' : 'Очистить сессии'}
+                </button>
+                <button
+                  className="btn btn-sm"
+                  type="button"
+                  onClick={() => pushUrl(adminUserLittlemicePath(user.id))}
+                >
+                  Проверки littlemice
                 </button>
                 <button
                   className="btn btn-sm"
