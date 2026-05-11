@@ -1,6 +1,9 @@
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import communityRulesMarkdown from '../markdown/legal/community_rules.md?raw'
+import ctfRulesMarkdown from '../markdown/legal/ctf_rules.md?raw'
 import privacyPolicyMarkdown from '../markdown/legal/privacy_policy.md?raw'
+import projectRulesMarkdown from '../markdown/legal/project_rules.md?raw'
 import publicOfferMarkdown from '../markdown/legal/public_offer.md?raw'
 import refundPolicyMarkdown from '../markdown/legal/refund_policy.md?raw'
 import userAgreementMarkdown from '../markdown/legal/user_agreement.md?raw'
@@ -15,6 +18,11 @@ type LegalDocument = {
 
 type LegalDocumentEntry = LegalDocument & {
   path: string
+}
+
+type LegalDocumentGroup = {
+  title: string
+  documents: LegalDocumentEntry[]
 }
 
 const legalDocuments: Record<string, LegalDocumentEntry> = {
@@ -42,6 +50,24 @@ const legalDocuments: Record<string, LegalDocumentEntry> = {
     title: 'User Agreement',
     markdown: userAgreementMarkdown,
   },
+  [paths.legalProjectRules]: {
+    path: paths.legalProjectRules,
+    eyebrow: 'Правила',
+    title: 'Общие правила проекта',
+    markdown: projectRulesMarkdown,
+  },
+  [paths.legalCommunityRules]: {
+    path: paths.legalCommunityRules,
+    eyebrow: 'Правила',
+    title: 'Правила сообщества',
+    markdown: communityRulesMarkdown,
+  },
+  [paths.legalCtfRules]: {
+    path: paths.legalCtfRules,
+    eyebrow: 'Правила',
+    title: 'Правила режима CTF',
+    markdown: ctfRulesMarkdown,
+  },
 }
 
 const legalDocumentList = [
@@ -49,6 +75,29 @@ const legalDocumentList = [
   legalDocuments[paths.legalPublicOffer],
   legalDocuments[paths.legalRefundPolicy],
   legalDocuments[paths.legalUserAgreement],
+  legalDocuments[paths.legalProjectRules],
+  legalDocuments[paths.legalCommunityRules],
+  legalDocuments[paths.legalCtfRules],
+]
+
+const legalDocumentGroups: LegalDocumentGroup[] = [
+  {
+    title: 'Юридические документы',
+    documents: [
+      legalDocuments[paths.legalPrivacyPolicy],
+      legalDocuments[paths.legalPublicOffer],
+      legalDocuments[paths.legalRefundPolicy],
+      legalDocuments[paths.legalUserAgreement],
+    ],
+  },
+  {
+    title: 'Правила',
+    documents: [
+      legalDocuments[paths.legalProjectRules],
+      legalDocuments[paths.legalCommunityRules],
+      legalDocuments[paths.legalCtfRules],
+    ],
+  },
 ]
 
 export function isLegalPath(pathname: string) {
@@ -65,6 +114,9 @@ export function legalPageHeading(pathname: string) {
     [paths.legalPublicOffer]: 'Публичная оферта',
     [paths.legalRefundPolicy]: 'Политика возвратов',
     [paths.legalUserAgreement]: 'Пользовательское соглашение',
+    [paths.legalProjectRules]: 'Общие правила проекта',
+    [paths.legalCommunityRules]: 'Правила сообщества',
+    [paths.legalCtfRules]: 'Правила режима CTF',
   }
 
   return headings[pathname] ?? 'Правовые документы'
@@ -80,18 +132,31 @@ export default function LegalPage({ pathname }: { pathname: string }) {
           <p className="legal-page__lead">
             Здесь собраны документы, которые регулируют использование сервиса и покупки внутри проекта.
           </p>
-          <nav aria-label="Список правовых документов">
-            <ul className="legal-page__list">
-              {legalDocumentList.map((document) => (
-                <li key={document.path} className="legal-page__list-item">
-                  <a href={document.path} className="legal-page__list-link">
-                    <span className="legal-page__list-title">{document.title}</span>
-                    <span className="legal-page__list-arrow" aria-hidden>→</span>
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </nav>
+          <div className="legal-page__groups">
+            {legalDocumentGroups.map((group) => (
+              <section
+                key={group.title}
+                className="legal-page__group"
+                aria-labelledby={`legal-group-${group.title}`}
+              >
+                <h2 id={`legal-group-${group.title}`} className="legal-page__section-title">
+                  {group.title}
+                </h2>
+                <nav aria-label={group.title}>
+                  <ul className="legal-page__list">
+                    {group.documents.map((document) => (
+                      <li key={document.path} className="legal-page__list-item">
+                        <a href={document.path} className="legal-page__list-link">
+                          <span className="legal-page__list-title">{document.title}</span>
+                          <span className="legal-page__list-arrow" aria-hidden>→</span>
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </nav>
+              </section>
+            ))}
+          </div>
         </section>
       </div>
     )
