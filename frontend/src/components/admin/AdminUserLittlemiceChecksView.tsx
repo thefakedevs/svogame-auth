@@ -124,7 +124,6 @@ function LittlemiceCheckSummary({ item, userId }: { item: LittlemiceCheckListIte
           <span className={statusClassName(item.status)}>{statusLabel(item.status)}</span>
         </span>
         <span className="admin-littlemice-timeline-meta">
-          <span>{item.serviceSystemName}</span>
           <span>ID: {item.id}</span>
           <span>Завершение: {formatDateTime(finishTime(item))}</span>
         </span>

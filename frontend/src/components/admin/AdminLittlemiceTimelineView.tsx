@@ -183,29 +183,44 @@ export default function AdminLittlemiceTimelineView({ token }: { token: string }
                 {response.items.map((item) => {
                   const user = usersById[item.playerUuid]
                   return (
-                    <article key={item.id} className="admin-littlemice-timeline-item admin-littlemice-global-item">
+                    <button
+                      key={item.id}
+                      type="button"
+                      className="admin-littlemice-timeline-item admin-littlemice-global-item"
+                      onClick={() => pushUrl(adminUserLittlemiceCheckPath(item.playerUuid, item.id))}
+                    >
                       <span className="admin-littlemice-timeline-point" aria-hidden="true" />
-                      <div className="admin-littlemice-timeline-main">
-                        <div className="admin-littlemice-timeline-head">
-                          <button type="button" className="admin-littlemice-player-button" onClick={() => pushUrl(adminUserLittlemicePath(item.playerUuid))}>
+                      <span className="admin-littlemice-timeline-main">
+                        <span className="admin-littlemice-timeline-head">
+                          <span
+                            role="button"
+                            tabIndex={0}
+                            className="admin-littlemice-player-button"
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              pushUrl(adminUserLittlemicePath(item.playerUuid))
+                            }}
+                            onKeyDown={(event) => {
+                              if (event.key !== 'Enter' && event.key !== ' ') return
+                              event.preventDefault()
+                              event.stopPropagation()
+                              pushUrl(adminUserLittlemicePath(item.playerUuid))
+                            }}
+                          >
                             {playerLabel(user, item.playerUuid)}
-                          </button>
+                          </span>
                           <span className={statusClassName(item.status)}>{statusLabel(item.status)}</span>
-                        </div>
-                        <div className="admin-littlemice-timeline-meta">
-                          <span>Запрошена: {formatDateTime(item.requestedAt)}</span>
+                        </span>
+                        <span className="admin-littlemice-timeline-meta">
+                          <span>ID: {item.id}</span>
                           <span>Завершение: {formatDateTime(finishTime(item))}</span>
-                          <span>Сервис: {item.serviceSystemName}</span>
-                        </div>
-                        <div className="admin-littlemice-global-actions">
+                        </span>
+                        <span className="admin-littlemice-global-actions">
                           <code>{item.playerUuid}</code>
-                          <button type="button" className="btn btn-sm" onClick={() => pushUrl(adminUserLittlemiceCheckPath(item.playerUuid, item.id))}>
-                            Открыть проверку
-                          </button>
-                        </div>
+                        </span>
                         {item.failureReason ? <span className="admin-littlemice-failure">{item.failureReason}</span> : null}
-                      </div>
-                    </article>
+                      </span>
+                    </button>
                   )
                 })}
               </div>
