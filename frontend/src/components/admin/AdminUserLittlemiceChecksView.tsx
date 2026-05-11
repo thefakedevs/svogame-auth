@@ -11,6 +11,7 @@ import {
 import { toDisplayError } from '../../api/http'
 import { adminUserLittlemiceCheckPath, adminUserLittlemicePath, adminUserPath } from '../../routes/paths'
 import { pushUrl } from '../../shared/navigation/history'
+import AppPortal from '../../shared/ui/portal/AppPortal'
 import ErrorState from '../ErrorState'
 import LoadingState from '../LoadingState'
 
@@ -35,6 +36,15 @@ function formatBytes(value?: number | null) {
   if (value < 1024) return `${value} Б`
   if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} КБ`
   return `${(value / 1024 / 1024).toFixed(1)} МБ`
+}
+
+function downloadText(filename: string, text: string, type = 'text/plain;charset=utf-8') {
+  const objectUrl = URL.createObjectURL(new Blob([text], { type }))
+  const link = document.createElement('a')
+  link.href = objectUrl
+  link.download = filename
+  link.click()
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0)
 }
 
 function statusLabel(status: string) {
@@ -187,6 +197,166 @@ function AdminUserLittlemiceListView({ token, userId }: { token: string; userId:
   )
 }
 
+type ClientInfoResourcePack = {
+  id?: unknown
+  n?: unknown
+  d?: unknown
+  r?: unknown
+  loaded?: unknown
+  x?: unknown
+}
+
+type ClientInfoShaderPack = {
+  name?: unknown
+  loaded?: unknown
+}
+
+type ClientInfoMod = {
+  id?: unknown
+  name?: unknown
+  version?: unknown
+  namespace?: unknown
+}
+
+type ParsedClientInfo = {
+  t?: unknown
+  mc?: unknown
+  vt?: unknown
+  pn?: unknown
+  pu?: unknown
+  srv?: unknown
+  rp?: {
+    items?: ClientInfoResourcePack[]
+  }
+  sp?: {
+    active?: unknown
+    items?: ClientInfoShaderPack[]
+  }
+  mods?: ClientInfoMod[]
+}
+
+function asText(value: unknown) {
+  if (typeof value === 'string') return value || '—'
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value)
+  return '—'
+}
+
+function parseClientInfo(text: string): ParsedClientInfo | null {
+  try {
+    const parsed = JSON.parse(text) as unknown
+    return parsed && typeof parsed === 'object' ? parsed as ParsedClientInfo : null
+  } catch {
+    return null
+  }
+}
+
+function ClientInfoHumanView({ text }: { text: string }) {
+  const info = parseClientInfo(text)
+  if (!info) return <pre>{text}</pre>
+
+  const resourcePacks = Array.isArray(info.rp?.items) ? info.rp.items : []
+  const shaderPacks = Array.isArray(info.sp?.items) ? info.sp.items : []
+  const mods = Array.isArray(info.mods) ? info.mods : []
+
+  return (
+    <div className="admin-littlemice-client-info">
+      <dl className="admin-kv admin-kv--compact admin-littlemice-kv">
+        <div><dt>Время формирования</dt><dd>{formatDateTime(asText(info.t))}</dd></div>
+        <div><dt>Minecraft</dt><dd>{asText(info.mc)}</dd></div>
+        <div><dt>Тип сборки</dt><dd>{asText(info.vt)}</dd></div>
+        <div><dt>Игрок</dt><dd>{asText(info.pn)}</dd></div>
+        <div><dt>UUID профиля</dt><dd><code>{asText(info.pu)}</code></dd></div>
+        <div><dt>Сервер клиента</dt><dd>{asText(info.srv)}</dd></div>
+      </dl>
+
+      <section className="admin-littlemice-client-section">
+        <h3>Resource packs</h3>
+        {resourcePacks.length ? (
+          <div className="admin-littlemice-data-table-wrap">
+            <table className="admin-littlemice-data-table">
+              <thead>
+                <tr>
+                  <th>Имя</th>
+                  <th>ID</th>
+                  <th>Описание</th>
+                  <th>Required</th>
+                  <th>Loaded</th>
+                  <th>Источник</th>
+                </tr>
+              </thead>
+              <tbody>
+                {resourcePacks.map((item, index) => (
+                  <tr key={`${asText(item.id)}-${index}`}>
+                    <td>{asText(item.n)}</td>
+                    <td><code>{asText(item.id)}</code></td>
+                    <td>{asText(item.d)}</td>
+                    <td>{asText(item.r)}</td>
+                    <td>{asText(item.loaded)}</td>
+                    <td>{asText(item.x)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : <p className="admin-inline-muted">Нет resource packs.</p>}
+      </section>
+
+      <section className="admin-littlemice-client-section">
+        <h3>Shader packs</h3>
+        <p className="admin-inline-muted">Активный: <strong>{asText(info.sp?.active)}</strong></p>
+        {shaderPacks.length ? (
+          <div className="admin-littlemice-data-table-wrap">
+            <table className="admin-littlemice-data-table">
+              <thead>
+                <tr>
+                  <th>Имя</th>
+                  <th>Loaded</th>
+                </tr>
+              </thead>
+              <tbody>
+                {shaderPacks.map((item, index) => (
+                  <tr key={`${asText(item.name)}-${index}`}>
+                    <td>{asText(item.name)}</td>
+                    <td>{asText(item.loaded)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : <p className="admin-inline-muted">Нет shader packs.</p>}
+      </section>
+
+      <section className="admin-littlemice-client-section">
+        <h3>Forge mods</h3>
+        {mods.length ? (
+          <div className="admin-littlemice-data-table-wrap">
+            <table className="admin-littlemice-data-table">
+              <thead>
+                <tr>
+                  <th>Mod ID</th>
+                  <th>Название</th>
+                  <th>Версия</th>
+                  <th>Namespace</th>
+                </tr>
+              </thead>
+              <tbody>
+                {mods.map((item, index) => (
+                  <tr key={`${asText(item.id)}-${index}`}>
+                    <td><code>{asText(item.id)}</code></td>
+                    <td>{asText(item.name)}</td>
+                    <td>{asText(item.version)}</td>
+                    <td>{asText(item.namespace)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : <p className="admin-inline-muted">Моды не найдены.</p>}
+      </section>
+    </div>
+  )
+}
+
 function useAuthorizedImageUrl(token: string, url: string | null) {
   const [loadedImage, setLoadedImage] = useState<{ sourceUrl: string; objectUrl: string } | null>(null)
   const [loadError, setLoadError] = useState<{ sourceUrl: string; message: string } | null>(null)
@@ -225,13 +395,16 @@ function ScreenshotPanel({
   url,
   sizeBytes,
   token,
+  onOpen,
 }: {
   title: string
   url: string | null
   sizeBytes: number | null
   token: string
+  onOpen: (image: { title: string; src: string }) => void
 }) {
   const image = useAuthorizedImageUrl(token, url)
+  const objectUrl = image.objectUrl
 
   return (
     <section className="admin-littlemice-media-panel">
@@ -240,9 +413,13 @@ function ScreenshotPanel({
         <small>{formatBytes(sizeBytes)}</small>
       </div>
       {!url ? <p className="admin-inline-muted">Файл не загружен.</p> : null}
-      {url && !image.objectUrl && !image.error ? <LoadingState title="Загружаем скриншот" /> : null}
+      {url && !objectUrl && !image.error ? <LoadingState title="Загружаем скриншот" /> : null}
       {image.error ? <ErrorState message={image.error} /> : null}
-      {image.objectUrl ? <img className="admin-littlemice-screenshot" src={image.objectUrl} alt={title} /> : null}
+      {objectUrl ? (
+        <button type="button" className="admin-littlemice-screenshot-button" onClick={() => onOpen({ title, src: objectUrl })}>
+          <img className="admin-littlemice-screenshot" src={objectUrl} alt={title} />
+        </button>
+      ) : null}
     </section>
   )
 }
@@ -252,6 +429,8 @@ function AdminUserLittlemiceDetailView({ token, userId, checkId }: { token: stri
   const [logText, setLogText] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [logError, setLogError] = useState('')
+  const [fullscreenImage, setFullscreenImage] = useState<{ title: string; src: string } | null>(null)
+  const [activeTextModal, setActiveTextModal] = useState<'clientInfo' | 'log' | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -315,30 +494,34 @@ function AdminUserLittlemiceDetailView({ token, userId, checkId }: { token: stri
 
             <dl className="admin-kv admin-kv--compact admin-littlemice-kv">
               <div><dt>Игрок</dt><dd><code>{check.playerUuid}</code></dd></div>
-              <div><dt>Сервис</dt><dd>{check.serviceSystemName}</dd></div>
-              <div><dt>Service token</dt><dd><code>{check.serviceTokenId}</code></dd></div>
-              <div><dt>Запрошена</dt><dd>{formatDateTime(check.requestedAt)}</dd></div>
-              <div><dt>Данные получены</dt><dd>{formatDateTime(check.receivedAt)}</dd></div>
               <div><dt>Завершена</dt><dd>{formatDateTime(check.completedAt)}</dd></div>
-              <div><dt>Истекает</dt><dd>{formatDateTime(check.expiresAt)}</dd></div>
-              <div><dt>Причина ошибки</dt><dd>{check.failureReason ?? '—'}</dd></div>
+              {check.failureReason ? <div><dt>Причина ошибки</dt><dd>{check.failureReason}</dd></div> : null}
             </dl>
 
             <div className="admin-littlemice-media-grid">
-              <ScreenshotPanel title="Скриншот" url={check.screenshotUrl} sizeBytes={check.screenshotSizeBytes} token={token} />
-              <ScreenshotPanel title="Скриншот 2" url={check.screenshot2Url} sizeBytes={check.screenshot2SizeBytes} token={token} />
+              <ScreenshotPanel title="Скриншот" url={check.screenshotUrl} sizeBytes={check.screenshotSizeBytes} token={token} onOpen={setFullscreenImage} />
+              <ScreenshotPanel title="Скриншот 2" url={check.screenshot2Url} sizeBytes={check.screenshot2SizeBytes} token={token} onOpen={setFullscreenImage} />
             </div>
 
             <section className="admin-littlemice-info-grid">
-              <article className="admin-littlemice-text-panel">
+              <article className="admin-littlemice-file-card">
                 <div className="admin-littlemice-media-head">
                   <h3>Client info</h3>
                   <small>{formatBytes(check.clientInfoSizeBytes)}</small>
                 </div>
-                {check.clientInfoText ? <pre>{check.clientInfoText}</pre> : <p className="admin-inline-muted">Client info не загружен.</p>}
+                {check.clientInfoText ? (
+                  <div className="admin-littlemice-file-actions">
+                    <button type="button" className="btn btn-sm" onClick={() => setActiveTextModal('clientInfo')}>
+                      Открыть
+                    </button>
+                    <button type="button" className="btn btn-sm" onClick={() => downloadText(`littlemice-${check.id}-client-info.json`, check.clientInfoText ?? '', 'application/json;charset=utf-8')}>
+                      Скачать
+                    </button>
+                  </div>
+                ) : <p className="admin-inline-muted">Client info не загружен.</p>}
               </article>
 
-              <article className="admin-littlemice-text-panel">
+              <article className="admin-littlemice-file-card">
                 <div className="admin-littlemice-media-head">
                   <h3>Log</h3>
                   <small>{formatBytes(check.logSizeBytes)}</small>
@@ -346,12 +529,60 @@ function AdminUserLittlemiceDetailView({ token, userId, checkId }: { token: stri
                 {!check.logUrl ? <p className="admin-inline-muted">Лог не загружен.</p> : null}
                 {check.logUrl && logText == null && !logError ? <LoadingState title="Загружаем лог" /> : null}
                 {logError ? <ErrorState message={logError} /> : null}
-                {logText != null ? <pre>{logText}</pre> : null}
+                {logText != null ? (
+                  <div className="admin-littlemice-file-actions">
+                    <button type="button" className="btn btn-sm" onClick={() => setActiveTextModal('log')}>
+                      Открыть
+                    </button>
+                    <button type="button" className="btn btn-sm" onClick={() => downloadText(`littlemice-${check.id}.log`, logText)}>
+                      Скачать
+                    </button>
+                  </div>
+                ) : null}
               </article>
             </section>
           </div>
         ) : null}
       </section>
+
+      {fullscreenImage ? (
+        <AppPortal>
+          <div className="admin-littlemice-fullscreen" role="presentation" onClick={() => setFullscreenImage(null)}>
+            <button type="button" className="admin-littlemice-fullscreen-close" aria-label="Закрыть" onClick={() => setFullscreenImage(null)}>×</button>
+            <img src={fullscreenImage.src} alt={fullscreenImage.title} onClick={(event) => event.stopPropagation()} />
+          </div>
+        </AppPortal>
+      ) : null}
+
+      {check && activeTextModal ? (
+        <AppPortal>
+          <div className="ui-modal-backdrop" role="presentation" onClick={() => setActiveTextModal(null)}>
+            <div className="ui-modal admin-littlemice-text-modal" role="dialog" aria-modal="true" aria-labelledby="littlemice-text-modal-title" onClick={(event) => event.stopPropagation()}>
+              <div className="ui-modal-header">
+                <h2 id="littlemice-text-modal-title" className="ui-modal-title">{activeTextModal === 'clientInfo' ? 'Client info' : 'Log'}</h2>
+                <button className="ui-modal-close" type="button" aria-label="Закрыть" onClick={() => setActiveTextModal(null)}>×</button>
+              </div>
+              <div className="ui-modal-body admin-littlemice-text-modal-body">
+                {activeTextModal === 'clientInfo' && check.clientInfoText ? <ClientInfoHumanView text={check.clientInfoText} /> : null}
+                {activeTextModal === 'log' && logText != null ? <pre>{logText}</pre> : null}
+              </div>
+              <div className="ui-modal-footer">
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  onClick={() => {
+                    if (activeTextModal === 'clientInfo') downloadText(`littlemice-${check.id}-client-info.json`, check.clientInfoText ?? '', 'application/json;charset=utf-8')
+                    if (activeTextModal === 'log') downloadText(`littlemice-${check.id}.log`, logText ?? '')
+                  }}
+                >
+                  Скачать
+                </button>
+                <button type="button" className="btn btn-sm" onClick={() => setActiveTextModal(null)}>Закрыть</button>
+              </div>
+            </div>
+          </div>
+        </AppPortal>
+      ) : null}
     </div>
   )
 }
