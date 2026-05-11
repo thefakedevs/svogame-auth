@@ -10,6 +10,7 @@ pub struct AppConfig {
     pub email: EmailConfig,
     pub database: DatabaseConfig,
     pub s3: S3Config,
+    pub littlemice: LittlemiceConfig,
     pub shop: ShopConfig,
     pub receipts: ReceiptsConfig,
     pub pow_complexity: i16,
@@ -76,6 +77,19 @@ pub struct S3Config {
 }
 
 #[derive(Debug, Clone)]
+pub struct LittlemiceConfig {
+    pub public_base_url: String,
+    pub push_ttl_seconds: i64,
+    pub screenshot_max_bytes: usize,
+    pub log_max_bytes: usize,
+    pub info_max_bytes: usize,
+    pub expiry_check_interval_seconds: u64,
+    pub cleanup_interval_seconds: u64,
+    pub retention_days: i64,
+    pub discord_log_channel_id: Option<String>,
+}
+
+#[derive(Debug, Clone)]
 pub struct ShopConfig {
     pub payment_provider: ShopPaymentProviderKind,
     pub yookassa: Option<YooKassaConfig>,
@@ -129,6 +143,7 @@ impl AppConfig {
         let email = EmailConfig::from_env()?;
         let database = DatabaseConfig::from_env()?;
         let s3 = S3Config::from_env()?;
+        let littlemice = LittlemiceConfig::from_env()?;
         let shop = ShopConfig::from_env()?;
         let receipts = ReceiptsConfig::from_env()?;
         let pow_complexity = std::env::var("POW_COMPLEXITY")
@@ -144,6 +159,7 @@ impl AppConfig {
             email,
             database,
             s3,
+            littlemice,
             shop,
             receipts,
             pow_complexity,
@@ -368,6 +384,72 @@ impl ShopConfig {
             yookassa,
             pending_payment_ttl_seconds,
             reconciliation_interval_seconds,
+        })
+    }
+}
+
+impl LittlemiceConfig {
+    fn from_env() -> Result<Self> {
+        let public_base_url = std::env::var("LITTLEMICE_PUBLIC_BASE_URL")
+            .context("LITTLEMICE_PUBLIC_BASE_URL not set")?
+            .trim()
+            .trim_end_matches('/')
+            .to_string();
+        if public_base_url.is_empty() {
+            anyhow::bail!("LITTLEMICE_PUBLIC_BASE_URL must not be empty");
+        }
+        let push_ttl_seconds = std::env::var("LITTLEMICE_PUSH_TTL_SECONDS")
+            .unwrap_or_else(|_| "60".to_string())
+            .parse::<i64>()
+            .context("LITTLEMICE_PUSH_TTL_SECONDS must be a valid integer")?;
+        if push_ttl_seconds <= 0 {
+            anyhow::bail!("LITTLEMICE_PUSH_TTL_SECONDS must be positive");
+        }
+
+        const DEFAULT_4K_UNCOMPRESSED_RGBA_BYTES: usize = 3840 * 2160 * 4;
+        let screenshot_max_bytes = std::env::var("LITTLEMICE_SCREENSHOT_MAX_BYTES")
+            .unwrap_or_else(|_| DEFAULT_4K_UNCOMPRESSED_RGBA_BYTES.to_string())
+            .parse::<usize>()
+            .context("LITTLEMICE_SCREENSHOT_MAX_BYTES must be a valid integer")?;
+        let log_max_bytes = std::env::var("LITTLEMICE_LOG_MAX_BYTES")
+            .unwrap_or_else(|_| (1024 * 1024).to_string())
+            .parse::<usize>()
+            .context("LITTLEMICE_LOG_MAX_BYTES must be a valid integer")?;
+        let info_max_bytes = std::env::var("LITTLEMICE_INFO_MAX_BYTES")
+            .unwrap_or_else(|_| (1024 * 1024).to_string())
+            .parse::<usize>()
+            .context("LITTLEMICE_INFO_MAX_BYTES must be a valid integer")?;
+        let expiry_check_interval_seconds = std::env::var("LITTLEMICE_EXPIRY_CHECK_INTERVAL_SECONDS")
+            .unwrap_or_else(|_| "5".to_string())
+            .parse::<u64>()
+            .context("LITTLEMICE_EXPIRY_CHECK_INTERVAL_SECONDS must be a valid integer")?;
+        let cleanup_interval_seconds = std::env::var("LITTLEMICE_CLEANUP_INTERVAL_SECONDS")
+            .unwrap_or_else(|_| "3600".to_string())
+            .parse::<u64>()
+            .context("LITTLEMICE_CLEANUP_INTERVAL_SECONDS must be a valid integer")?;
+        let retention_days = std::env::var("LITTLEMICE_RETENTION_DAYS")
+            .unwrap_or_else(|_| "30".to_string())
+            .parse::<i64>()
+            .context("LITTLEMICE_RETENTION_DAYS must be a valid integer")?;
+        if expiry_check_interval_seconds == 0 || cleanup_interval_seconds == 0 || retention_days <= 0
+        {
+            anyhow::bail!("Littlemice intervals and retention must be positive");
+        }
+        let discord_log_channel_id = std::env::var("LITTLEMICE_DISCORD_LOG_CHANNEL_ID")
+            .ok()
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty());
+
+        Ok(Self {
+            public_base_url,
+            push_ttl_seconds,
+            screenshot_max_bytes,
+            log_max_bytes,
+            info_max_bytes,
+            expiry_check_interval_seconds,
+            cleanup_interval_seconds,
+            retention_days,
+            discord_log_channel_id,
         })
     }
 }

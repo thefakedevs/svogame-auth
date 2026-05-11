@@ -20,6 +20,9 @@ export const paths = {
   legalPublicOffer: '/legal/public_offer',
   legalRefundPolicy: '/legal/refund_policy',
   legalUserAgreement: '/legal/user_agreement',
+  legalProjectRules: '/legal/project_rules',
+  legalCommunityRules: '/legal/community_rules',
+  legalCtfRules: '/legal/ctf_rules',
   wiki: '/wiki',
 } as const
 
@@ -45,6 +48,18 @@ export function adminLootboxPath(lootboxId: string) {
   return `${paths.admin}/lootboxes/${encodeURIComponent(lootboxId)}`
 }
 
+export function adminLittlemicePath() {
+  return `${paths.admin}/littlemice`
+}
+
 export function adminUserLootboxHistoryPath(userId: string) {
   return `${paths.admin}/users/${encodeURIComponent(userId)}/lootboxes/open-history`
+}
+
+export function adminUserLittlemicePath(userId: string) {
+  return `${paths.admin}/users/${encodeURIComponent(userId)}/littlemice`
+}
+
+export function adminUserLittlemiceCheckPath(userId: string, checkId: string) {
+  return `${adminUserLittlemicePath(userId)}/${encodeURIComponent(checkId)}`
 }
