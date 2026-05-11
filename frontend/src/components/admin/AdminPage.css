@@ -615,7 +615,7 @@
 }
 
 .admin-littlemice-global-item {
-  cursor: default;
+  cursor: pointer;
 }
 
 .admin-littlemice-player-button {
