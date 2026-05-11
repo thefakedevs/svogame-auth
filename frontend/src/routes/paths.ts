@@ -20,6 +20,9 @@ export const paths = {
   legalPublicOffer: '/legal/public_offer',
   legalRefundPolicy: '/legal/refund_policy',
   legalUserAgreement: '/legal/user_agreement',
+  legalProjectRules: '/legal/project_rules',
+  legalCommunityRules: '/legal/community_rules',
+  legalCtfRules: '/legal/ctf_rules',
   wiki: '/wiki',
 } as const
 

@@ -31,6 +31,23 @@
   line-height: 1.7;
 }
 
+.legal-page__groups {
+  display: grid;
+  gap: 28px;
+}
+
+.legal-page__group {
+  display: grid;
+  gap: 14px;
+}
+
+.legal-page__section-title {
+  margin: 0;
+  font-size: clamp(1.2rem, 2.2vw, 1.6rem);
+  line-height: 1.2;
+  color: #fff;
+}
+
 .legal-page__list {
   list-style: none;
   margin: 0;
