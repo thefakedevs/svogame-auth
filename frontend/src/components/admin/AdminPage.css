@@ -726,9 +726,43 @@
   gap: 8px;
 }
 
-.admin-littlemice-client-section h3 {
+.admin-littlemice-section-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.admin-littlemice-risk-list,
+.admin-littlemice-code-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-littlemice-code-list code {
+  max-width: 100%;
+  padding: 5px 7px;
+  border: 1px solid var(--ui-border);
+  background: rgba(0, 0, 0, 0.28);
+  overflow-wrap: anywhere;
+}
+
+.admin-littlemice-runtime-subsection {
+  display: grid;
+  gap: 8px;
+}
+
+.admin-littlemice-client-section h3,
+.admin-littlemice-runtime-subsection h4 {
   margin: 0;
   font-size: 1rem;
+}
+
+.admin-littlemice-runtime-subsection h4 {
+  font-size: 0.9rem;
+  color: var(--ui-text-muted);
 }
 
 .admin-littlemice-data-table-wrap {

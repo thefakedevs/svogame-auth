@@ -202,7 +202,8 @@ type ClientInfoResourcePack = {
   d?: unknown
   r?: unknown
   loaded?: unknown
-  x?: unknown
+  h?: unknown
+  hw?: unknown
 }
 
 type ClientInfoShaderPack = {
@@ -215,6 +216,29 @@ type ClientInfoMod = {
   name?: unknown
   version?: unknown
   namespace?: unknown
+}
+
+type ClientInfoRuntimeOddNative = {
+  n?: unknown
+  p?: unknown
+  r?: unknown
+}
+
+type ClientInfoRuntime = {
+  pid?: unknown
+  vm?: unknown
+  agentArgs?: unknown[]
+  attach?: {
+    api?: unknown
+    self?: unknown
+    disabled?: unknown
+    jmx?: unknown
+  }
+  native?: {
+    ok?: unknown
+    count?: unknown
+    odd?: ClientInfoRuntimeOddNative[]
+  }
 }
 
 type ParsedClientInfo = {
@@ -232,6 +256,7 @@ type ParsedClientInfo = {
     items?: ClientInfoShaderPack[]
   }
   mods?: ClientInfoMod[]
+  rt?: ClientInfoRuntime
 }
 
 function asText(value: unknown) {
@@ -247,6 +272,83 @@ function parseClientInfo(text: string): ParsedClientInfo | null {
   } catch {
     return null
   }
+}
+
+function RuntimeDiagnosticsView({ runtime }: { runtime?: ClientInfoRuntime }) {
+  if (!runtime) return null
+
+  const agentArgs = Array.isArray(runtime.agentArgs) ? runtime.agentArgs : []
+  const oddNative = Array.isArray(runtime.native?.odd) ? runtime.native.odd : []
+  const attachApiAvailable = runtime.attach?.api === true && runtime.attach?.disabled === false
+  const attachSelfEnabled = runtime.attach?.self === 'true'
+  const jmxEnabled = runtime.attach?.jmx != null
+
+  const risks = [
+    agentArgs.length > 0 ? { level: 'high', label: 'JVM agent args' } : null,
+    attachApiAvailable ? { level: 'medium', label: 'Attach API доступен' } : null,
+    attachSelfEnabled ? { level: 'medium', label: 'Attach self=true' } : null,
+    jmxEnabled ? { level: 'medium', label: 'JMX flag' } : null,
+    oddNative.length > 0 ? { level: 'high', label: 'Нетипичные DLL' } : null,
+  ].filter(Boolean) as Array<{ level: 'high' | 'medium'; label: string }>
+
+  return (
+    <section className="admin-littlemice-client-section">
+      <div className="admin-littlemice-section-head">
+        <h3>Runtime / Injection diagnostics</h3>
+        <div className="admin-littlemice-risk-list">
+          {risks.length ? risks.map((risk) => (
+            <span key={risk.label} className={`ui-badge ${risk.level === 'high' ? 'ui-badge-warning' : 'ui-badge-secondary'}`}>{risk.label}</span>
+          )) : <span className="ui-badge ui-badge-neutral">Явных рисков нет</span>}
+        </div>
+      </div>
+
+      <dl className="admin-kv admin-kv--compact admin-littlemice-kv">
+        <div><dt>PID</dt><dd>{asText(runtime.pid)}</dd></div>
+        <div><dt>JVM</dt><dd>{asText(runtime.vm)}</dd></div>
+        <div><dt>Attach API</dt><dd>{asText(runtime.attach?.api)}</dd></div>
+        <div><dt>Attach self</dt><dd>{asText(runtime.attach?.self)}</dd></div>
+        <div><dt>Disable attach</dt><dd>{asText(runtime.attach?.disabled)}</dd></div>
+        <div><dt>JMX remote</dt><dd>{asText(runtime.attach?.jmx)}</dd></div>
+        <div><dt>Native modules readable</dt><dd>{asText(runtime.native?.ok)}</dd></div>
+        <div><dt>DLL count</dt><dd>{asText(runtime.native?.count)}</dd></div>
+      </dl>
+
+      <section className="admin-littlemice-runtime-subsection">
+        <h4>Agent args</h4>
+        {agentArgs.length ? (
+          <div className="admin-littlemice-code-list">
+            {agentArgs.map((item, index) => <code key={`${asText(item)}-${index}`}>{asText(item)}</code>)}
+          </div>
+        ) : <p className="admin-inline-muted">Agent args не найдены.</p>}
+      </section>
+
+      <section className="admin-littlemice-runtime-subsection">
+        <h4>Нетипичные DLL</h4>
+        {oddNative.length ? (
+          <div className="admin-littlemice-data-table-wrap">
+            <table className="admin-littlemice-data-table">
+              <thead>
+                <tr>
+                  <th>Имя</th>
+                  <th>Путь</th>
+                  <th>Причина</th>
+                </tr>
+              </thead>
+              <tbody>
+                {oddNative.map((item, index) => (
+                  <tr key={`${asText(item.p)}-${index}`}>
+                    <td>{asText(item.n)}</td>
+                    <td><code>{asText(item.p)}</code></td>
+                    <td>{asText(item.r)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : <p className="admin-inline-muted">Нетипичные DLL не найдены.</p>}
+      </section>
+    </section>
+  )
 }
 
 function ClientInfoHumanView({ text }: { text: string }) {
@@ -268,6 +370,8 @@ function ClientInfoHumanView({ text }: { text: string }) {
         <div><dt>Сервер клиента</dt><dd>{asText(info.srv)}</dd></div>
       </dl>
 
+      <RuntimeDiagnosticsView runtime={info.rt} />
+
       <section className="admin-littlemice-client-section">
         <h3>Resource packs</h3>
         {resourcePacks.length ? (
@@ -280,7 +384,8 @@ function ClientInfoHumanView({ text }: { text: string }) {
                   <th>Описание</th>
                   <th>Required</th>
                   <th>Loaded</th>
-                  <th>Источник</th>
+                  <th>Hash</th>
+                  <th>Hash no whitespace</th>
                 </tr>
               </thead>
               <tbody>
@@ -291,7 +396,8 @@ function ClientInfoHumanView({ text }: { text: string }) {
                     <td>{asText(item.d)}</td>
                     <td>{asText(item.r)}</td>
                     <td>{asText(item.loaded)}</td>
-                    <td>{asText(item.x)}</td>
+                    <td><code>{asText(item.h)}</code></td>
+                    <td><code>{asText(item.hw)}</code></td>
                   </tr>
                 ))}
               </tbody>
