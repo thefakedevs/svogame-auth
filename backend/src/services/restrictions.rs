@@ -10,16 +10,21 @@ use crate::entities::{UserRestriction, UserRestrictionColumn, UserRestrictionMod
 pub enum RestrictionKind {
     CreateSquad,
     JoinSquad,
+    UploadSkin,
 }
 
 impl RestrictionKind {
-    pub const ALL: [RestrictionKind; 2] =
-        [RestrictionKind::CreateSquad, RestrictionKind::JoinSquad];
+    pub const ALL: [RestrictionKind; 3] = [
+        RestrictionKind::CreateSquad,
+        RestrictionKind::JoinSquad,
+        RestrictionKind::UploadSkin,
+    ];
 
     pub fn as_str(self) -> &'static str {
         match self {
             RestrictionKind::CreateSquad => "create_squad",
             RestrictionKind::JoinSquad => "join_squad",
+            RestrictionKind::UploadSkin => "upload_skin",
         }
     }
 
@@ -27,6 +32,7 @@ impl RestrictionKind {
         match self {
             RestrictionKind::CreateSquad => "Squad creation restricted",
             RestrictionKind::JoinSquad => "Squad joining restricted",
+            RestrictionKind::UploadSkin => "Skin uploads restricted",
         }
     }
 
@@ -37,6 +43,9 @@ impl RestrictionKind {
             }
             RestrictionKind::JoinSquad => {
                 "User cannot accept invites or join squads until this restriction is removed."
+            }
+            RestrictionKind::UploadSkin => {
+                "User cannot upload or replace their personal skin until this restriction is removed."
             }
         }
     }
@@ -49,6 +58,7 @@ impl std::str::FromStr for RestrictionKind {
         match s {
             "create_squad" => Ok(Self::CreateSquad),
             "join_squad" => Ok(Self::JoinSquad),
+            "upload_skin" => Ok(Self::UploadSkin),
             _ => Err(anyhow::anyhow!("Unknown restriction key")),
         }
     }

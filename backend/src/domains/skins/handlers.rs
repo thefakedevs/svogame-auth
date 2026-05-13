@@ -14,6 +14,7 @@ use crate::app::state::AppStateExtractor;
 use crate::domains::skins::types::{ModelParam, SkinError, SkinModel, UploadSkinResponse};
 use crate::entities::{DefaultSkin, DefaultSkinActiveModel, DefaultSkinModel};
 use crate::services::audit::{ACTION_ADMIN_DEFAULT_SKIN_UPDATED, write_audit_log};
+use crate::services::restrictions::{RestrictionKind, has_restriction};
 
 const DEFAULT_SKIN_ROW_ID: i32 = 1;
 const MIN_SIZE: usize = 78;
@@ -69,6 +70,20 @@ pub async fn upload_my_skin(
     let user = get_user_from_headers(&headers, &state)
         .await
         .map_err(IntoResponse::into_response)?;
+
+    if has_restriction(&state.db, user.id, RestrictionKind::UploadSkin)
+        .await
+        .map_err(|error| {
+            tracing::error!(
+                "Failed to check skin upload restriction for user {}: {}",
+                user.id,
+                error
+            );
+            SkinError::ReadFailed.into_response()
+        })?
+    {
+        return Err(SkinError::UploadRestricted.into_response());
+    }
 
     validate_multipart_headers(&headers)?;
 

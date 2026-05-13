@@ -78,6 +78,8 @@ pub enum SkinError {
     MultipartError(#[from] MultipartError),
     #[error("Skin not found")]
     NotFound,
+    #[error("User cannot upload skins")]
+    UploadRestricted,
     #[error("Failed to read skin from storage")]
     ReadFailed,
     #[error("Failed to store skin in storage")]
@@ -98,6 +100,7 @@ impl IntoResponse for SkinError {
             Self::NoFile => (StatusCode::BAD_REQUEST, "no_file"),
             Self::MultipartError(_) => (StatusCode::BAD_REQUEST, "multipart_error"),
             Self::NotFound => (StatusCode::NOT_FOUND, "not_found"),
+            Self::UploadRestricted => (StatusCode::FORBIDDEN, "upload_restricted"),
             Self::ReadFailed => (StatusCode::INTERNAL_SERVER_ERROR, "read_error"),
             Self::WriteFailed => (StatusCode::INTERNAL_SERVER_ERROR, "write_error"),
         };
