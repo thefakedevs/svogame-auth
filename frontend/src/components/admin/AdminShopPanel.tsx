@@ -367,7 +367,6 @@ export default function AdminShopPanel({ token }: { token: string }) {
         : `Найдено: ${displayedProducts.length} из ${items.length}. Страница ${shopPage} из ${totalPages}`
   const activeProductCount = items?.filter((item) => item.isActive).length ?? 0
   const hiddenProductCount = items?.filter((item) => !item.isPublic).length ?? 0
-  const availableProductCount = items?.filter((item) => item.isAvailableNow).length ?? 0
 
   return (
     <div className="admin-shop-layout">

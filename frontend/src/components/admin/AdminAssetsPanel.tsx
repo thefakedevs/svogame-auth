@@ -251,7 +251,6 @@ export default function AdminAssetsPanel({ token }: { token: string }) {
   const totalPages = state.status === 'ready' ? Math.max(1, state.totalPages) : 1
   const activeAssets = state.status === 'ready' ? state.items.filter((item) => item.isActive).length : 0
   const hiddenAssets = state.status === 'ready' ? state.items.filter((item) => !item.isPublic).length : 0
-  const currencyAssets = state.status === 'ready' ? state.items.filter((item) => item.isCurrency).length : 0
 
   return (
     <section className="card admin-card">
