@@ -430,6 +430,14 @@ export function createAdminAsset(
   })
 }
 
+export function getAdminAsset(token: string, assetId: string): Promise<AssetResponse> {
+  return request<AssetResponse>(`/api/admin/assets/${encodeURIComponent(assetId)}`, {
+    headers: authHeaders(token, {
+      'Content-Type': 'application/json',
+    }),
+  })
+}
+
 export function patchAdminAsset(
   token: string,
   assetId: string,

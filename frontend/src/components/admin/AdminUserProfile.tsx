@@ -18,10 +18,10 @@ import { toDisplayError } from '../../api/http'
 import { getRestrictionMeta, type RestrictionMetaResponse } from '../../api/meta'
 import { buildSkinUrl } from '../../api/skins'
 import { adminSquadPath, adminUserLittlemicePath, adminUserLootboxHistoryPath, paths } from '../../routes/paths'
-import { pushUrl } from '../../shared/navigation/history'
 import AppPortal from '../../shared/ui/portal/AppPortal'
 import LoadingState from '../LoadingState'
 import SkinViewer3D from '../SkinViewer3D'
+import AdminLink from './AdminLink'
 import AdminUserOwnershipPanel from './AdminUserOwnershipPanel'
 
 function formatDateTime(value?: string | null) {
@@ -229,9 +229,9 @@ export default function AdminUserProfile({
   return (
     <div className="admin-page">
       <section className="admin-top-actions">
-        <button type="button" className="btn btn-sm" onClick={() => pushUrl(`${paths.admin}?tab=users`)}>
+        <AdminLink className="btn btn-sm" href={`${paths.admin}?tab=users`}>
           ← К пользователям
-        </button>
+        </AdminLink>
       </section>
 
       <section className="card admin-card">
@@ -239,7 +239,7 @@ export default function AdminUserProfile({
           <LoadingState title="Загружаем профиль игрока" />
         ) : (
           <>
-            <div className="admin-user-headbar">
+            <div className="admin-user-headbar admin-detail-hero">
               <div className="admin-user-headbar-meta">
                 <span className={`ui-badge ${user.isSuperuser ? 'ui-badge-secondary' : 'ui-badge-neutral'}`}>
                   {user.isSuperuser ? 'Superuser' : 'Player'}
@@ -263,20 +263,18 @@ export default function AdminUserProfile({
                 >
                   {isResettingAuthEpoch ? 'Очищаем...' : 'Очистить сессии'}
                 </button>
-                <button
+                <AdminLink
                   className="btn btn-sm"
-                  type="button"
-                  onClick={() => pushUrl(adminUserLittlemicePath(user.id))}
+                  href={adminUserLittlemicePath(user.id)}
                 >
                   Проверки littlemice
-                </button>
-                <button
+                </AdminLink>
+                <AdminLink
                   className="btn btn-sm"
-                  type="button"
-                  onClick={() => pushUrl(adminUserLootboxHistoryPath(user.id))}
+                  href={adminUserLootboxHistoryPath(user.id)}
                 >
                   Открытые кейсы
-                </button>
+                </AdminLink>
               </div>
             </div>
 
@@ -329,9 +327,9 @@ export default function AdminUserProfile({
                     {userSquad === undefined ? (
                       'Поиск...'
                     ) : userSquad ? (
-                      <button type="button" className="btn btn-sm" onClick={() => pushUrl(adminSquadPath(userSquad.id))}>
+                      <AdminLink className="btn btn-sm" href={adminSquadPath(userSquad.id)}>
                         {userSquad.name}
-                      </button>
+                      </AdminLink>
                     ) : (
                       'Не состоит в скваде'
                     )}

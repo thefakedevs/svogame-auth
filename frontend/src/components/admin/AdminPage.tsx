@@ -33,10 +33,11 @@ import {
 import type { SquadMemberResponse } from '../../api/squads'
 import { buildSkinUrl, type SkinModel } from '../../api/skins'
 import { adminLittlemicePath, adminSquadPath, adminTokenAuditPath, adminUserPath, paths } from '../../routes/paths'
-import { pushUrl, replaceUrl, usePathname } from '../../shared/navigation/history'
+import { pushUrl, usePathname } from '../../shared/navigation/history'
 import { getAuthToken } from '../../shared/session/auth-session'
 import { useQuery } from '../../util/query'
 import AdminAssetsPanel from './AdminAssetsPanel'
+import AdminAssetView from './AdminAssetView'
 import AdminGunskinShopWizard from './AdminGunskinShopWizard'
 import AdminLootboxesPanel from './AdminLootboxesPanel'
 import AdminLootboxView from './AdminLootboxView'
@@ -47,6 +48,7 @@ import AdminSquadProfile from './AdminSquadProfile'
 import AdminUserLittlemiceChecksView from './AdminUserLittlemiceChecksView'
 import AdminUserLootboxHistoryView from './AdminUserLootboxHistoryView'
 import AdminUserProfile from './AdminUserProfile'
+import AdminLink from './AdminLink'
 import ErrorState from '../ErrorState'
 import LoadingState from '../LoadingState'
 import './AdminPage.css'
@@ -56,6 +58,7 @@ type AdminRoute =
   | { type: 'user'; userId: string }
   | { type: 'squad'; squadId: string }
   | { type: 'tokenAudit'; tokenId: string }
+  | { type: 'asset'; assetId: string }
   | { type: 'shopProduct'; productId: string }
   | { type: 'lootbox'; lootboxId: string }
   | { type: 'littlemice' }
@@ -122,6 +125,9 @@ function parseRoute(pathname: string): AdminRoute {
   const auditMatch = pathname.match(/^\/admin\/tokens\/([^/]+)\/audit$/)
   if (auditMatch) return { type: 'tokenAudit', tokenId: decodeURIComponent(auditMatch[1]) }
 
+  const assetMatch = pathname.match(/^\/admin\/assets\/([^/]+)$/)
+  if (assetMatch) return { type: 'asset', assetId: decodeURIComponent(assetMatch[1]) }
+
   const shopProductMatch = pathname.match(/^\/admin\/shop\/products\/([^/]+)$/)
   if (shopProductMatch) return { type: 'shopProduct', productId: decodeURIComponent(shopProductMatch[1]) }
 
@@ -145,11 +151,8 @@ function tabFromQuery(tab: string | null): HomeTab {
   return 'overview'
 }
 
-function setHomeTab(tab: HomeTab) {
-  if (typeof window === 'undefined') return
-  const url = new URL(window.location.href)
-  url.searchParams.set('tab', tab)
-  replaceUrl(url.pathname + url.search)
+function adminHomeTabPath(tab: HomeTab) {
+  return `${paths.admin}?tab=${tab}`
 }
 
 export default function AdminPage() {
@@ -250,7 +253,7 @@ export default function AdminPage() {
       .then(setUser)
       .catch((cause) => setError(toDisplayError(cause, 'Ошибка загрузки профиля игрока.')))
 
-    setUserSquad(undefined)
+    queueMicrotask(() => setUserSquad(undefined))
     void getAdminUserSquad(token, route.userId)
       .then(setUserSquad)
       .catch(() => setUserSquad(null))
@@ -287,7 +290,7 @@ export default function AdminPage() {
     return (
       <div className="admin-page">
         <section className="card admin-state-card">
-          <h1 className="card-title">Доступ запрещенн</h1>
+          <h1 className="card-title">Доступ запрещен</h1>
         </section>
       </div>
     )
@@ -332,6 +335,10 @@ export default function AdminPage() {
 
   if (route.type === 'tokenAudit') {
     return <AdminTokenAuditView token={token!} tokenId={route.tokenId} />
+  }
+
+  if (route.type === 'asset') {
+    return <AdminAssetView token={token!} assetId={route.assetId} />
   }
 
   if (route.type === 'shopProduct') {
@@ -552,15 +559,15 @@ function AdminHome({
     <div className="admin-page">
       <section className="admin-top-actions">
         <nav className="admin-tabs">
-          <button type="button" className={`admin-tab ${tab === 'overview' ? 'is-active' : ''}`} onClick={() => setHomeTab('overview')}>Обзор</button>
-          <button type="button" className={`admin-tab ${tab === 'users' ? 'is-active' : ''}`} onClick={() => setHomeTab('users')}>Пользователи</button>
-          <button type="button" className={`admin-tab ${tab === 'squads' ? 'is-active' : ''}`} onClick={() => setHomeTab('squads')}>Сквады</button>
-          <button type="button" className={`admin-tab ${tab === 'assets' ? 'is-active' : ''}`} onClick={() => setHomeTab('assets')}>Ассеты</button>
-          <button type="button" className={`admin-tab ${tab === 'shop' ? 'is-active' : ''}`} onClick={() => setHomeTab('shop')}>Магазин</button>
-          <button type="button" className={`admin-tab ${tab === 'skinShop' ? 'is-active' : ''}`} onClick={() => setHomeTab('skinShop')}>Скины → магазин</button>
-          <button type="button" className={`admin-tab ${tab === 'lootboxes' ? 'is-active' : ''}`} onClick={() => setHomeTab('lootboxes')}>Лутбоксы</button>
-          <button type="button" className="admin-tab" onClick={() => pushUrl(adminLittlemicePath())}>Littlemice</button>
-          <button type="button" className={`admin-tab ${tab === 'tokens' ? 'is-active' : ''}`} onClick={() => setHomeTab('tokens')}>Сервисные токены</button>
+          <AdminLink href={adminHomeTabPath('overview')} replace className={`admin-tab ${tab === 'overview' ? 'is-active' : ''}`}>Обзор</AdminLink>
+          <AdminLink href={adminHomeTabPath('users')} replace className={`admin-tab ${tab === 'users' ? 'is-active' : ''}`}>Пользователи</AdminLink>
+          <AdminLink href={adminHomeTabPath('squads')} replace className={`admin-tab ${tab === 'squads' ? 'is-active' : ''}`}>Сквады</AdminLink>
+          <AdminLink href={adminHomeTabPath('assets')} replace className={`admin-tab ${tab === 'assets' ? 'is-active' : ''}`}>Ассеты</AdminLink>
+          <AdminLink href={adminHomeTabPath('shop')} replace className={`admin-tab ${tab === 'shop' ? 'is-active' : ''}`}>Магазин</AdminLink>
+          <AdminLink href={adminHomeTabPath('skinShop')} replace className={`admin-tab ${tab === 'skinShop' ? 'is-active' : ''}`}>Скины → магазин</AdminLink>
+          <AdminLink href={adminHomeTabPath('lootboxes')} replace className={`admin-tab ${tab === 'lootboxes' ? 'is-active' : ''}`}>Лутбоксы</AdminLink>
+          <AdminLink href={adminLittlemicePath()} className="admin-tab">Littlemice</AdminLink>
+          <AdminLink href={adminHomeTabPath('tokens')} replace className={`admin-tab ${tab === 'tokens' ? 'is-active' : ''}`}>Сервисные токены</AdminLink>
         </nav>
       </section>
 
@@ -573,19 +580,19 @@ function AdminHome({
           {overviewStats ? (
             <>
               <div className="admin-stat-grid">
-                <article className="admin-stat-card">
+                <AdminLink className="admin-stat-card" href={adminHomeTabPath('users')}>
                   <span>Пользователи</span>
                   <strong>{overviewStats.usersTotal}</strong>
-                </article>
-                <article className="admin-stat-card">
+                </AdminLink>
+                <AdminLink className="admin-stat-card" href={adminHomeTabPath('squads')}>
                   <span>Сквады</span>
                   <strong>{overviewStats.squadsTotal}</strong>
-                </article>
-                <article className="admin-stat-card">
+                </AdminLink>
+                <AdminLink className="admin-stat-card" href={adminHomeTabPath('tokens')}>
                   <span>Сервисные токены</span>
                   <strong>{overviewStats.serviceTokensTotal}</strong>
                   <small>{overviewStats.activeServiceTokensTotal} активных</small>
-                </article>
+                </AdminLink>
               </div>
 
               <section className="card admin-card admin-default-skin-card">
@@ -656,11 +663,36 @@ function AdminHome({
 
       {tab === 'users' ? (
         <section className="card admin-card">
-          <input className="ui-input" value={usersQuery} onChange={(event) => onUsersQueryChange(event.target.value)} placeholder="Поиск пользователей" />
-          <p className="admin-inline-muted">Найдено: {usersTotal}. Страница {usersPage} из {Math.max(1, usersTotalPages)}</p>
+          <div className="admin-section-head">
+            <div>
+              <h2 className="card-title">Пользователи</h2>
+              <p className="card-text">Поиск, профиль игрока, ограничения, инвентарь и проверки.</p>
+            </div>
+            <span className="ui-badge ui-badge-neutral">Страница {usersPage} из {Math.max(1, usersTotalPages)}</span>
+          </div>
+          <div className="admin-metric-strip admin-metric-strip--compact">
+            <div className="admin-metric">
+              <span>Найдено</span>
+              <strong>{usersTotal}</strong>
+            </div>
+            <div className="admin-metric">
+              <span>На странице</span>
+              <strong>{users.length}</strong>
+            </div>
+            <div className="admin-metric">
+              <span>Superuser</span>
+              <strong>{users.filter((item) => item.isSuperuser).length}</strong>
+            </div>
+          </div>
+          <div className="admin-filter-bar">
+            <label className="admin-shop-field">
+              <span>Поиск</span>
+              <input className="ui-input" value={usersQuery} onChange={(event) => onUsersQueryChange(event.target.value)} placeholder="Ник, email или UUID" />
+            </label>
+          </div>
           <div className="admin-list">
             {users.map((user) => (
-              <button key={user.id} type="button" className="admin-row" onClick={() => pushUrl(adminUserPath(user.id))}>
+              <AdminLink key={user.id} href={adminUserPath(user.id)} className="admin-row">
                 <span className="admin-row-user">
                   {user.avatarUrl ? <img src={user.avatarUrl} alt={user.username} className="admin-avatar" /> : <span className="ui-avatar ui-avatar-sm">{initials(user.username)}</span>}
                   <span className="admin-row-user-text">
@@ -673,7 +705,7 @@ function AdminHome({
                     <span className="ui-badge ui-badge-secondary">Superuser</span>
                   </span>
                 ) : null}
-              </button>
+              </AdminLink>
             ))}
             {users.length === 0 ? <p className="admin-inline-muted">Пользователи не найдены.</p> : null}
           </div>
@@ -683,12 +715,36 @@ function AdminHome({
 
       {tab === 'squads' ? (
         <section className="card admin-card">
-          <h2 className="card-title">Все сквады</h2>
-          <input className="ui-input" value={squadsQuery} onChange={(event) => onSquadsQueryChange(event.target.value)} placeholder="Поиск сквадов" />
-          <p className="admin-inline-muted">Найдено: {squadsTotal}. Страница {squadsPage} из {Math.max(1, squadsTotalPages)}</p>
+          <div className="admin-section-head">
+            <div>
+              <h2 className="card-title">Сквады</h2>
+              <p className="card-text">Составы, лидеры, ограничения и управление аватарками.</p>
+            </div>
+            <span className="ui-badge ui-badge-neutral">Страница {squadsPage} из {Math.max(1, squadsTotalPages)}</span>
+          </div>
+          <div className="admin-metric-strip admin-metric-strip--compact">
+            <div className="admin-metric">
+              <span>Найдено</span>
+              <strong>{squadsTotal}</strong>
+            </div>
+            <div className="admin-metric">
+              <span>На странице</span>
+              <strong>{squads.length}</strong>
+            </div>
+            <div className="admin-metric admin-metric--warning">
+              <span>Ограничены</span>
+              <strong>{squads.filter((item) => item.isRestricted).length}</strong>
+            </div>
+          </div>
+          <div className="admin-filter-bar">
+            <label className="admin-shop-field">
+              <span>Поиск</span>
+              <input className="ui-input" value={squadsQuery} onChange={(event) => onSquadsQueryChange(event.target.value)} placeholder="Название или ID сквада" />
+            </label>
+          </div>
           <div className="admin-list">
             {squads.map((squadItem) => (
-              <button key={squadItem.id} type="button" className="admin-row" onClick={() => pushUrl(adminSquadPath(squadItem.id))}>
+              <AdminLink key={squadItem.id} href={adminSquadPath(squadItem.id)} className="admin-row">
                 <span className="admin-row-user">
                   {squadItem.imageUrl ? <img src={squadItem.imageUrl} alt={squadItem.name} className="admin-avatar" /> : <span className="ui-avatar ui-avatar-sm">{initials(squadItem.name)}</span>}
                   <span className="admin-row-user-text">
@@ -699,7 +755,7 @@ function AdminHome({
                 <span className="admin-row-badges">
                   <span className="ui-badge ui-badge-neutral">{squadItem.memberCount}/{squadItem.maxMembers}</span>
                 </span>
-              </button>
+              </AdminLink>
             ))}
             {squads.length === 0 ? <p className="admin-inline-muted">Сквады не найдены.</p> : null}
           </div>
@@ -709,9 +765,32 @@ function AdminHome({
 
       {tab === 'tokens' ? (
         <section className="card admin-card">
-          <div className="admin-token-create">
-            <input className="ui-input" value={systemName} onChange={(event) => setSystemName(event.target.value.toLowerCase())} placeholder="system_name" />
-            <button className="btn primary" type="button" onClick={() => void createToken()}>Выдать</button>
+          <div className="admin-section-head">
+            <div>
+              <h2 className="card-title">Сервисные токены</h2>
+              <p className="card-text">Интеграционные токены, ротация, отзыв и аудит действий.</p>
+            </div>
+          </div>
+          <div className="admin-metric-strip admin-metric-strip--compact">
+            <div className="admin-metric">
+              <span>Всего</span>
+              <strong>{tokens.length}</strong>
+            </div>
+            <div className="admin-metric admin-metric--success">
+              <span>Активны</span>
+              <strong>{tokens.filter((item) => item.isActive).length}</strong>
+            </div>
+            <div className="admin-metric admin-metric--warning">
+              <span>Отозваны</span>
+              <strong>{tokens.filter((item) => !item.isActive).length}</strong>
+            </div>
+          </div>
+          <div className="admin-token-create admin-filter-bar">
+            <label className="admin-shop-field">
+              <span>systemName</span>
+              <input className="ui-input" value={systemName} onChange={(event) => setSystemName(event.target.value.toLowerCase())} placeholder="discord-worker" />
+            </label>
+            <button className="btn primary" type="button" onClick={() => void createToken()}>Выдать токен</button>
           </div>
 
           <div className="admin-token-list">
@@ -731,9 +810,9 @@ function AdminHome({
                   <button type="button" className="btn btn-sm danger" onClick={() => void revokeToken(tokenItem.id)}>
                     Отзыв
                   </button>
-                  <button type="button" className="btn btn-sm" onClick={() => pushUrl(adminTokenAuditPath(tokenItem.id))}>
+                  <AdminLink className="btn btn-sm" href={adminTokenAuditPath(tokenItem.id)}>
                     Аудит
-                  </button>
+                  </AdminLink>
                 </div>
               </article>
             ))}
@@ -789,9 +868,9 @@ function AdminTokenAuditView({ token, tokenId }: { token: string; tokenId: strin
   return (
     <div className="admin-page">
       <section className="admin-top-actions">
-        <button type="button" className="btn btn-sm" onClick={() => pushUrl(`${paths.admin}?tab=tokens`)}>
+        <AdminLink className="btn btn-sm" href={`${paths.admin}?tab=tokens`}>
           ← К токенам
-        </button>
+        </AdminLink>
       </section>
 
       <section className="card admin-card">
@@ -896,9 +975,9 @@ function AdminUserView({
   return (
     <div className="admin-page">
       <section className="admin-top-actions">
-        <button type="button" className="btn btn-sm" onClick={() => pushUrl(`${paths.admin}?tab=users`)}>
+        <AdminLink className="btn btn-sm" href={`${paths.admin}?tab=users`}>
           ← К пользователям
-        </button>
+        </AdminLink>
       </section>
 
       <section className="card admin-card">
@@ -933,7 +1012,7 @@ function AdminUserView({
               <div><dt>Создан</dt><dd>{formatDateTime(user.createdAt)}</dd></div>
               <div>
                 <dt>Сквад</dt>
-                <dd>{userSquad === undefined ? 'Поиск...' : userSquad ? <button type="button" className="btn btn-sm" onClick={() => pushUrl(adminSquadPath(userSquad.id))}>{userSquad.name}</button> : 'Не состоит в скваде'}</dd>
+                <dd>{userSquad === undefined ? 'Поиск...' : userSquad ? <AdminLink className="btn btn-sm" href={adminSquadPath(userSquad.id)}>{userSquad.name}</AdminLink> : 'Не состоит в скваде'}</dd>
               </div>
             </dl>
           </div>
@@ -1060,9 +1139,9 @@ function AdminSquadView({
   return (
     <div className="admin-page">
       <section className="admin-top-actions">
-        <button type="button" className="btn btn-sm" onClick={() => pushUrl(`${paths.admin}?tab=squads`)}>
+        <AdminLink className="btn btn-sm" href={`${paths.admin}?tab=squads`}>
           ← К сквадам
-        </button>
+        </AdminLink>
       </section>
 
       <section className="card admin-card">
@@ -1193,10 +1272,10 @@ function AdminSquadView({
                 <ul className="admin-member-list">
                   {activeMembers.map((member) => (
                     <li key={member.id}>
-                      <div className="admin-member-card-main" onClick={() => pushUrl(adminUserPath(member.id))}>
+                      <AdminLink className="admin-member-card-main" href={adminUserPath(member.id)}>
                         {member.avatarUrl ? <img src={member.avatarUrl} alt={member.username} className="admin-avatar" /> : <span className="ui-avatar ui-avatar-sm">{initials(member.username)}</span>}
                         <span className="admin-member-name">{member.username}</span>
-                      </div>
+                      </AdminLink>
                       {member.id === squad.leaderUserId && <span className="ui-badge ui-badge-secondary">Лидер</span>}
                     </li>
                   ))}
@@ -1208,10 +1287,10 @@ function AdminSquadView({
                 <ul className="admin-member-list">
                   {outgoingInvites.map((member) => (
                     <li key={member.inviteId ?? member.id}>
-                      <div className="admin-member-card-main" onClick={() => pushUrl(adminUserPath(member.id))}>
+                      <AdminLink className="admin-member-card-main" href={adminUserPath(member.id)}>
                         {member.avatarUrl ? <img src={member.avatarUrl} alt={member.username} className="admin-avatar" /> : <span className="ui-avatar ui-avatar-sm">{initials(member.username)}</span>}
                         <span className="admin-member-name">{member.username}</span>
-                      </div>
+                      </AdminLink>
                       <span className="ui-badge ui-badge-warning">Invite</span>
                     </li>
                   ))}

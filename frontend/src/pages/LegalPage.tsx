@@ -70,16 +70,6 @@ const legalDocuments: Record<string, LegalDocumentEntry> = {
   },
 }
 
-const legalDocumentList = [
-  legalDocuments[paths.legalPrivacyPolicy],
-  legalDocuments[paths.legalPublicOffer],
-  legalDocuments[paths.legalRefundPolicy],
-  legalDocuments[paths.legalUserAgreement],
-  legalDocuments[paths.legalProjectRules],
-  legalDocuments[paths.legalCommunityRules],
-  legalDocuments[paths.legalCtfRules],
-]
-
 const legalDocumentGroups: LegalDocumentGroup[] = [
   {
     title: 'Юридические документы',
@@ -168,13 +158,24 @@ export default function LegalPage({ pathname }: { pathname: string }) {
     <div className="page legal-page">
       <article className="card legal-page__card">
         <span className="legal-page__eyebrow">{document.eyebrow}</span>
-        <nav className="legal-page__subnav" aria-label="Другие правовые документы">
-          <a href={paths.legal}>Все документы</a>
-          {legalDocumentList
-            .filter((entry) => entry.path !== pathname)
-            .map((entry) => (
-              <a key={entry.path} href={entry.path}>{entry.title}</a>
-            ))}
+        <nav className="legal-page__subnav" aria-label="Другие документы">
+          <a className="legal-page__subnav-home" href={paths.legal}>Все документы</a>
+          {legalDocumentGroups.map((group) => (
+            <div key={group.title} className="legal-page__subnav-row" aria-label={group.title}>
+              <span className="legal-page__subnav-label">{group.title}</span>
+              <div className="legal-page__subnav-links">
+                {group.documents.map((entry) => (
+                  <a
+                    key={entry.path}
+                    href={entry.path}
+                    aria-current={entry.path === pathname ? 'page' : undefined}
+                  >
+                    {entry.title}
+                  </a>
+                ))}
+              </div>
+            </div>
+          ))}
         </nav>
         <div className="legal-page__content">
           <ReactMarkdown remarkPlugins={[remarkGfm]}>{document.markdown}</ReactMarkdown>

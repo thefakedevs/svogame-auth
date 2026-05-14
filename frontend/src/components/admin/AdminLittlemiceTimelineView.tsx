@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { getAdminUser, type AdminUserResponse } from '../../api/admin'
 import { toDisplayError } from '../../api/http'
 import {
@@ -7,9 +7,9 @@ import {
   type LittlemiceCheckListResponse,
 } from '../../api/littlemice'
 import { adminUserLittlemiceCheckPath, adminUserLittlemicePath, paths } from '../../routes/paths'
-import { pushUrl } from '../../shared/navigation/history'
 import ErrorState from '../ErrorState'
 import LoadingState from '../LoadingState'
+import AdminLink from './AdminLink'
 
 const PAGE_SIZE = 30
 
@@ -42,8 +42,19 @@ function statusClassName(status: string) {
   return 'ui-badge ui-badge-neutral'
 }
 
+function statusTone(status: string) {
+  if (status === 'passed') return 'success'
+  if (status === 'pending') return 'pending'
+  if (status.startsWith('failed')) return 'failed'
+  return 'neutral'
+}
+
 function finishTime(item: LittlemiceCheckListItemResponse) {
   return item.completedAt ?? item.receivedAt ?? null
+}
+
+function formatShortId(value: string) {
+  return value.length > 14 ? `${value.slice(0, 8)}...${value.slice(-4)}` : value
 }
 
 function getPaginationPages(page: number, totalPages: number) {
@@ -147,29 +158,25 @@ export default function AdminLittlemiceTimelineView({ token }: { token: string }
   }, [response, token, usersById])
 
   const totalPages = Math.max(1, response?.totalPages ?? 1)
-  const loadedUserCount = useMemo(() => {
-    if (!response) return 0
-    return new Set(response.items.map((item) => item.playerUuid)).size
-  }, [response])
 
   return (
     <div className="admin-page">
-      <section className="admin-top-actions">
-        <button type="button" className="btn btn-sm" onClick={() => pushUrl(paths.admin)}>
+      <section className="admin-top-actions admin-page-toolbar">
+        <AdminLink className="btn btn-sm" href={paths.admin}>
           ← К админке
-        </button>
+        </AdminLink>
       </section>
 
       <section className="card admin-card">
         <div className="admin-littlemice-head">
           <div>
             <h2 className="card-title">Все проверки littlemice</h2>
-            <p className="card-text">Общий таймлайн проверок по всем игрокам.</p>
+            <p className="card-text">Последние проверки по всем игрокам. Карточка открывает конкретную проверку, имя игрока ведет в его историю.</p>
           </div>
           {response ? (
             <div className="admin-littlemice-summary-badges">
               <span className="ui-badge ui-badge-neutral">Всего: {response.total}</span>
-              <span className="ui-badge ui-badge-neutral">Игроков на странице: {loadedUserCount}</span>
+              <span className="ui-badge ui-badge-neutral">Страница {page} из {totalPages}</span>
             </div>
           ) : null}
         </div>
@@ -183,44 +190,34 @@ export default function AdminLittlemiceTimelineView({ token }: { token: string }
                 {response.items.map((item) => {
                   const user = usersById[item.playerUuid]
                   return (
-                    <button
+                    <article
                       key={item.id}
-                      type="button"
-                      className="admin-littlemice-timeline-item admin-littlemice-global-item"
-                      onClick={() => pushUrl(adminUserLittlemiceCheckPath(item.playerUuid, item.id))}
+                      className={`admin-littlemice-timeline-item admin-littlemice-global-item admin-littlemice-timeline-item--${statusTone(item.status)}`}
                     >
+                      <AdminLink
+                        href={adminUserLittlemiceCheckPath(item.playerUuid, item.id)}
+                        className="admin-littlemice-card-hitbox"
+                        aria-label={`Открыть проверку ${item.id}`}
+                      />
                       <span className="admin-littlemice-timeline-point" aria-hidden="true" />
                       <span className="admin-littlemice-timeline-main">
                         <span className="admin-littlemice-timeline-head">
-                          <span
-                            role="button"
-                            tabIndex={0}
-                            className="admin-littlemice-player-button"
-                            onClick={(event) => {
-                              event.stopPropagation()
-                              pushUrl(adminUserLittlemicePath(item.playerUuid))
-                            }}
-                            onKeyDown={(event) => {
-                              if (event.key !== 'Enter' && event.key !== ' ') return
-                              event.preventDefault()
-                              event.stopPropagation()
-                              pushUrl(adminUserLittlemicePath(item.playerUuid))
-                            }}
-                          >
-                            {playerLabel(user, item.playerUuid)}
+                          <span className="admin-littlemice-identity">
+                            <AdminLink className="admin-littlemice-player-button" href={adminUserLittlemicePath(item.playerUuid)}>
+                              {playerLabel(user, item.playerUuid)}
+                            </AdminLink>
+                            <code title={item.playerUuid}>{formatShortId(item.playerUuid)}</code>
                           </span>
                           <span className={statusClassName(item.status)}>{statusLabel(item.status)}</span>
                         </span>
                         <span className="admin-littlemice-timeline-meta">
-                          <span>ID: {item.id}</span>
+                          <span>Запрошена: {formatDateTime(item.requestedAt)}</span>
                           <span>Завершение: {formatDateTime(finishTime(item))}</span>
+                          <span title={item.id}>Check: {formatShortId(item.id)}</span>
                         </span>
-                        <span className="admin-littlemice-global-actions">
-                          <code>{item.playerUuid}</code>
-                        </span>
-                        {item.failureReason ? <span className="admin-littlemice-failure">{item.failureReason}</span> : null}
+                        {item.failureReason ? <span className="admin-littlemice-failure">Причина: {item.failureReason}</span> : null}
                       </span>
-                    </button>
+                    </article>
                   )
                 })}
               </div>

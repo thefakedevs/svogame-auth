@@ -27,17 +27,21 @@ export default function AdminAssetImage({
 
   useEffect(() => {
     if (!asset) {
-      setImageUrl(null)
-      setIsLoading(false)
-      setIsImageFailed(false)
+      queueMicrotask(() => {
+        setImageUrl(null)
+        setIsLoading(false)
+        setIsImageFailed(false)
+      })
       return undefined
     }
 
     let isActive = true
     let objectUrl: string | null = null
 
-    setIsLoading(true)
-    setIsImageFailed(false)
+    queueMicrotask(() => {
+      setIsLoading(true)
+      setIsImageFailed(false)
+    })
 
     fetchAdminAssetImageObjectUrl(token, asset.id, `${asset.updatedAt}-${reloadKey}`)
       .then((url) => {

@@ -12,10 +12,10 @@ import {
   type LootboxDropResponse,
 } from '../../api/lootboxes'
 import { paths } from '../../routes/paths'
-import { pushUrl } from '../../shared/navigation/history'
 import ErrorState from '../ErrorState'
 import LoadingState from '../LoadingState'
 import AdminAssetImage from './AdminAssetImage'
+import AdminLink from './AdminLink'
 
 type DropDraft = {
   amount: string
@@ -284,9 +284,9 @@ export default function AdminLootboxView({ token, lootboxId }: { token: string; 
   return (
     <div className="admin-page">
       <section className="admin-top-actions">
-        <button type="button" className="btn btn-sm" onClick={() => pushUrl(`${paths.admin}?tab=lootboxes`)}>
+        <AdminLink className="btn btn-sm" href={`${paths.admin}?tab=lootboxes`}>
           ← К лутбоксам
-        </button>
+        </AdminLink>
       </section>
 
       {!detail && !loadError ? <LoadingState title="Загружаем лутбокс" /> : null}
@@ -294,10 +294,17 @@ export default function AdminLootboxView({ token, lootboxId }: { token: string; 
       {detail ? (
         <>
           <section className="card admin-card">
-            <h2 className="card-title">{detail.definition.assetDisplayName}</h2>
-            <p className="card-text">
-              <code>{detail.definition.assetKey}</code> · ID: <code>{detail.definition.id}</code>
-            </p>
+            <div className="admin-section-head admin-detail-hero">
+              <div>
+                <h2 className="card-title">{detail.definition.assetDisplayName}</h2>
+                <p className="card-text">
+                  <code>{detail.definition.assetKey}</code> · ID: <code>{detail.definition.id}</code>
+                </p>
+              </div>
+              <span className={`ui-badge ${detail.definition.isActive ? 'ui-badge-success' : 'ui-badge-warning'}`}>
+                {detail.definition.isActive ? 'active' : 'inactive'}
+              </span>
+            </div>
             <dl className="admin-kv admin-kv--compact">
               <div><dt>Asset definition</dt><dd>{detail.definition.assetDefinitionId}</dd></div>
               <div><dt>Видимость лутбокса</dt><dd>{detail.definition.isPublic ? 'public' : 'hidden'}</dd></div>

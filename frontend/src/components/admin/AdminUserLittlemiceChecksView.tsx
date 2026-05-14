@@ -10,10 +10,10 @@ import {
 } from '../../api/littlemice'
 import { toDisplayError } from '../../api/http'
 import { adminUserLittlemiceCheckPath, adminUserLittlemicePath, adminUserPath } from '../../routes/paths'
-import { pushUrl } from '../../shared/navigation/history'
 import AppPortal from '../../shared/ui/portal/AppPortal'
 import ErrorState from '../ErrorState'
 import LoadingState from '../LoadingState'
+import AdminLink from './AdminLink'
 
 const PAGE_SIZE = 20
 
@@ -62,8 +62,19 @@ function statusClassName(status: string) {
   return 'ui-badge ui-badge-neutral'
 }
 
+function statusTone(status: string) {
+  if (status === 'passed') return 'success'
+  if (status === 'pending') return 'pending'
+  if (status.startsWith('failed')) return 'failed'
+  return 'neutral'
+}
+
 function finishTime(item: LittlemiceCheckListItemResponse) {
   return item.completedAt ?? item.receivedAt ?? null
+}
+
+function formatShortId(value: string) {
+  return value.length > 14 ? `${value.slice(0, 8)}...${value.slice(-4)}` : value
 }
 
 function getPaginationPages(page: number, totalPages: number) {
@@ -112,10 +123,9 @@ function LittlemicePagination({
 
 function LittlemiceCheckSummary({ item, userId }: { item: LittlemiceCheckListItemResponse; userId: string }) {
   return (
-    <button
-      type="button"
-      className="admin-littlemice-timeline-item"
-      onClick={() => pushUrl(adminUserLittlemiceCheckPath(userId, item.id))}
+    <AdminLink
+      href={adminUserLittlemiceCheckPath(userId, item.id)}
+      className={`admin-littlemice-timeline-item admin-littlemice-timeline-item--${statusTone(item.status)}`}
     >
       <span className="admin-littlemice-timeline-point" aria-hidden="true" />
       <span className="admin-littlemice-timeline-main">
@@ -124,12 +134,12 @@ function LittlemiceCheckSummary({ item, userId }: { item: LittlemiceCheckListIte
           <span className={statusClassName(item.status)}>{statusLabel(item.status)}</span>
         </span>
         <span className="admin-littlemice-timeline-meta">
-          <span>ID: {item.id}</span>
+          <span title={item.id}>Check: {formatShortId(item.id)}</span>
           <span>Завершение: {formatDateTime(finishTime(item))}</span>
         </span>
-        {item.failureReason ? <span className="admin-littlemice-failure">{item.failureReason}</span> : null}
+        {item.failureReason ? <span className="admin-littlemice-failure">Причина: {item.failureReason}</span> : null}
       </span>
-    </button>
+    </AdminLink>
   )
 }
 
@@ -160,19 +170,25 @@ function AdminUserLittlemiceListView({ token, userId }: { token: string; userId:
 
   return (
     <div className="admin-page">
-      <section className="admin-top-actions">
-        <button type="button" className="btn btn-sm" onClick={() => pushUrl(adminUserPath(userId))}>
+      <section className="admin-top-actions admin-page-toolbar">
+        <AdminLink className="btn btn-sm" href={adminUserPath(userId)}>
           ← К профилю игрока
-        </button>
+        </AdminLink>
       </section>
 
       <section className="card admin-card">
         <div className="admin-littlemice-head">
           <div>
             <h2 className="card-title">Проверки littlemice</h2>
-            <p className="card-text">User ID: <code>{userId}</code></p>
+            <p className="card-text">История проверок конкретного игрока. Открывайте карточку, чтобы посмотреть скриншоты, client info и лог.</p>
+            <p className="admin-inline-muted">User ID: <code>{userId}</code></p>
           </div>
-          {response ? <span className="ui-badge ui-badge-neutral">Всего: {response.total}</span> : null}
+          {response ? (
+            <div className="admin-littlemice-summary-badges">
+              <span className="ui-badge ui-badge-neutral">Всего: {response.total}</span>
+              <span className="ui-badge ui-badge-neutral">Страница {page} из {totalPages}</span>
+            </div>
+          ) : null}
         </div>
 
         {!response && !error ? <LoadingState title="Загружаем проверки" /> : null}
@@ -571,13 +587,13 @@ function AdminUserLittlemiceDetailView({ token, userId, checkId }: { token: stri
 
   return (
     <div className="admin-page">
-      <section className="admin-top-actions">
-        <button type="button" className="btn btn-sm" onClick={() => pushUrl(adminUserLittlemicePath(userId))}>
+      <section className="admin-top-actions admin-page-toolbar">
+        <AdminLink className="btn btn-sm" href={adminUserLittlemicePath(userId)}>
           ← К проверкам littlemice
-        </button>
-        <button type="button" className="btn btn-sm" onClick={() => pushUrl(adminUserPath(userId))}>
+        </AdminLink>
+        <AdminLink className="btn btn-sm" href={adminUserPath(userId)}>
           К профилю игрока
-        </button>
+        </AdminLink>
       </section>
 
       <section className="card admin-card">
@@ -585,10 +601,11 @@ function AdminUserLittlemiceDetailView({ token, userId, checkId }: { token: stri
         {error ? <ErrorState title="Проверка недоступна" message={error} /> : null}
         {check ? (
           <div className="admin-littlemice-detail">
-            <div className="admin-littlemice-head">
+            <div className={`admin-littlemice-head admin-littlemice-detail-hero admin-littlemice-detail-hero--${statusTone(check.status)}`}>
               <div>
                 <h2 className="card-title">Проверка littlemice</h2>
-                <p className="card-text">Check ID: <code>{check.id}</code></p>
+                <p className="card-text">Сводка проверки, доказательства и диагностические файлы в одном месте.</p>
+                <p className="admin-inline-muted">Check ID: <code>{check.id}</code></p>
               </div>
               <span className={statusClassName(check.status)}>{statusLabel(check.status)}</span>
             </div>
@@ -599,9 +616,28 @@ function AdminUserLittlemiceDetailView({ token, userId, checkId }: { token: stri
 
             <dl className="admin-kv admin-kv--compact admin-littlemice-kv">
               <div><dt>Игрок</dt><dd><code>{check.playerUuid}</code></dd></div>
+              <div><dt>Сервис</dt><dd>{check.serviceSystemName}</dd></div>
+              <div><dt>Запрошена</dt><dd>{formatDateTime(check.requestedAt)}</dd></div>
+              <div><dt>Получена</dt><dd>{formatDateTime(check.receivedAt)}</dd></div>
               <div><dt>Завершена</dt><dd>{formatDateTime(check.completedAt)}</dd></div>
+              <div><dt>Истекает</dt><dd>{formatDateTime(check.expiresAt)}</dd></div>
               {check.failureReason ? <div><dt>Причина ошибки</dt><dd>{check.failureReason}</dd></div> : null}
             </dl>
+
+            <div className="admin-littlemice-evidence-summary">
+              <div className="admin-littlemice-evidence-card">
+                <span>Скриншоты</span>
+                <strong>{[check.screenshotUrl, check.screenshot2Url].filter(Boolean).length}/2</strong>
+              </div>
+              <div className="admin-littlemice-evidence-card">
+                <span>Client info</span>
+                <strong>{check.clientInfoText ? formatBytes(check.clientInfoSizeBytes) : 'нет'}</strong>
+              </div>
+              <div className="admin-littlemice-evidence-card">
+                <span>Лог</span>
+                <strong>{check.logUrl ? formatBytes(check.logSizeBytes) : 'нет'}</strong>
+              </div>
+            </div>
 
             <div className="admin-littlemice-media-grid">
               <ScreenshotPanel title="Скриншот" url={check.screenshotUrl} sizeBytes={check.screenshotSizeBytes} token={token} onOpen={setFullscreenImage} />

@@ -2,13 +2,13 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
 import { createAdminShopProduct, listAdminShopProducts, type CreateShopProductInput } from '../../api/admin'
 import { toDisplayError } from '../../api/http'
-import { listAllAdminAssets, type AssetResponse } from '../../api/inventory'
+import { listAllAdminAssets, type AssetResponse, type OwnershipModel } from '../../api/inventory'
 import type { ShopProductResponse } from '../../api/shop'
 import { adminShopProductPath } from '../../routes/paths'
 import AppPortal from '../../shared/ui/portal/AppPortal'
-import { pushUrl } from '../../shared/navigation/history'
 import ErrorState from '../ErrorState'
 import LoadingState from '../LoadingState'
+import AdminLink from './AdminLink'
 
 type LocaleRow = { locale: string; name: string; description: string }
 
@@ -94,6 +94,7 @@ function AdminPagination({
 function buildCreatePayload(
   key: string,
   assetKey: string,
+  ownershipModel: OwnershipModel,
   priceRub: number,
   localeRows: LocaleRow[],
   extras: {
@@ -125,16 +126,19 @@ function buildCreatePayload(
   }
 
   const stack = extras.stackableAmount.trim()
-  if (stack) body.stackable_amount = Number(stack)
-
   const dur = extras.durationSeconds.trim()
-  if (dur) body.durationSeconds = Number(dur)
-
   const mpp = extras.maxPerPurchase.trim()
-  if (mpp) body.max_per_purchase = Number(mpp)
-
   const moa = extras.maxOwnedAmount.trim()
-  if (moa) body.max_owned_amount = Number(moa)
+
+  if (ownershipModel === 'stackable') {
+    body.stackable_amount = Number(stack)
+    if (mpp) body.max_per_purchase = Number(mpp)
+    if (moa) body.max_owned_amount = Number(moa)
+  }
+
+  if (ownershipModel === 'expirable') {
+    body.durationSeconds = Number(dur)
+  }
 
   const so = extras.sortOrder.trim()
   if (so) body.sort_order = Number(so)
@@ -226,6 +230,11 @@ export default function AdminShopPanel({ token }: { token: string }) {
     return catalogAssets.filter((a) => !a.isCurrency && !usedShopAssetKeys.has(a.key))
   }, [catalogAssets, usedShopAssetKeys])
 
+  const selectedAsset = useMemo(
+    () => pickableAssets.find((asset) => asset.key === assetKey) ?? null,
+    [assetKey, pickableAssets],
+  )
+
   useEffect(() => {
     if (!assetKey || !catalogAssets) return
     const allowed = new Set(pickableAssets.map((a) => a.key))
@@ -283,9 +292,27 @@ export default function AdminShopPanel({ token }: { token: string }) {
       toast.error('Укажите корректную цену в рублях.')
       return
     }
+    if (!selectedAsset) {
+      toast.error('Выберите ассет для товара.')
+      return
+    }
+    if (selectedAsset.ownershipModel === 'stackable') {
+      const amount = Number(stackableAmount)
+      if (!Number.isFinite(amount) || amount <= 0) {
+        toast.error('Для stackable-товара укажите положительный stackable_amount.')
+        return
+      }
+    }
+    if (selectedAsset.ownershipModel === 'expirable') {
+      const duration = Number(durationSeconds)
+      if (!Number.isFinite(duration) || duration <= 0) {
+        toast.error('Для expirable-товара укажите положительный durationSeconds.')
+        return
+      }
+    }
     let payload: CreateShopProductInput
     try {
-      payload = buildCreatePayload(productKey, assetKey, price, localeRows, {
+      payload = buildCreatePayload(productKey, assetKey, selectedAsset.ownershipModel, price, localeRows, {
         stackableAmount,
         durationSeconds,
         maxPerPurchase,
@@ -338,12 +365,18 @@ export default function AdminShopPanel({ token }: { token: string }) {
       : productCatalogScope === 'active_only'
         ? `Найдено активных: ${displayedProducts.length}${items.length !== displayedProducts.length ? ` из ${items.length} загруженных` : ''}. Страница ${shopPage} из ${totalPages}`
         : `Найдено: ${displayedProducts.length} из ${items.length}. Страница ${shopPage} из ${totalPages}`
+  const activeProductCount = items?.filter((item) => item.isActive).length ?? 0
+  const hiddenProductCount = items?.filter((item) => !item.isPublic).length ?? 0
+  const availableProductCount = items?.filter((item) => item.isAvailableNow).length ?? 0
 
   return (
     <div className="admin-shop-layout">
       <section className="card admin-card admin-shop-list">
-        <div className="admin-shop-list-head">
-          <h2 className="card-title">Каталог</h2>
+        <div className="admin-section-head">
+          <div>
+            <h2 className="card-title">Магазин</h2>
+            <p className="card-text">Товары витрины, цены, локали, расписание доступности и привязанные ассеты.</p>
+          </div>
           <div className="admin-shop-list-toolbar">
             <button type="button" className="btn btn-sm" onClick={() => void loadProducts('')}>
               Обновить
@@ -354,9 +387,26 @@ export default function AdminShopPanel({ token }: { token: string }) {
           </div>
         </div>
 
-        <div className="admin-shop-list-controls">
+        {items ? (
+          <div className="admin-metric-strip">
+            <div className="admin-metric">
+              <span>Всего</span>
+              <strong>{items.length}</strong>
+            </div>
+            <div className="admin-metric admin-metric--success">
+              <span>Активны</span>
+              <strong>{activeProductCount}</strong>
+            </div>
+            <div className="admin-metric admin-metric--warning">
+              <span>Скрыты</span>
+              <strong>{hiddenProductCount}</strong>
+            </div>
+          </div>
+        ) : null}
+
+        <div className="admin-shop-list-controls admin-filter-bar">
           <div className="admin-shop-list-controls-row">
-            <label className="admin-shop-field" style={{ marginBottom: 0 }}>
+            <label className="admin-shop-field admin-filter-label">
               <span>Поиск</span>
               <input
                 className="ui-input"
@@ -365,7 +415,7 @@ export default function AdminShopPanel({ token }: { token: string }) {
                 placeholder="Название, key или asset"
               />
             </label>
-            <label className="admin-shop-field" style={{ marginBottom: 0 }}>
+            <label className="admin-shop-field admin-filter-label">
               <span>Сортировка</span>
               <select className="ui-input" value={shopSort} onChange={(e) => setShopSort(e.target.value as ShopAdminSortKey)} aria-label="Сортировка товаров">
                 <option value="catalog">Как в каталоге (sort_order)</option>
@@ -400,7 +450,7 @@ export default function AdminShopPanel({ token }: { token: string }) {
               </label>
             </fieldset>
           </div>
-          {listCountLabel ? <p className="admin-inline-muted" style={{ margin: 0 }}>{listCountLabel}</p> : null}
+          {listCountLabel ? <p className="admin-inline-muted admin-zero-margin">{listCountLabel}</p> : null}
         </div>
 
         {listError ? <ErrorState message={listError} /> : null}
@@ -412,7 +462,7 @@ export default function AdminShopPanel({ token }: { token: string }) {
         {displayedProducts.length > 0 ? (
           <div className="admin-list">
             {pagedProducts.map((p) => (
-              <button key={p.id} type="button" className="admin-row" onClick={() => pushUrl(adminShopProductPath(p.id))}>
+              <AdminLink key={p.id} href={adminShopProductPath(p.id)} className="admin-row">
                 <span className="admin-row-user">
                   <span className="admin-row-user-text">
                     <strong>{p.localizedName}</strong>
@@ -425,7 +475,7 @@ export default function AdminShopPanel({ token }: { token: string }) {
                   <span className={`ui-badge ${p.isActive ? 'ui-badge-success' : 'ui-badge-warning'}`}>{p.isActive ? 'Активен' : 'Выкл'}</span>
                   <span className={`ui-badge ${p.isPublic ? 'ui-badge-neutral' : 'ui-badge-secondary'}`}>{p.isPublic ? 'Публичный' : 'Скрыт'}</span>
                 </div>
-              </button>
+              </AdminLink>
             ))}
           </div>
         ) : null}
@@ -451,8 +501,8 @@ export default function AdminShopPanel({ token }: { token: string }) {
                 </button>
               </div>
               <div className="ui-modal-body">
-                <p className="card-text admin-inline-muted" style={{ marginTop: 0 }}>
-                  Привязка к существующему невалютному ассету. Для stackable укажите количество, для подписки — длительность в секундах; для entitlement не заполняйте оба поля.
+                <p className="card-text admin-inline-muted admin-modal-note">
+                  Выберите ассет, и форма покажет только поля, которые принимает его модель владения.
                 </p>
                 <div className="admin-shop-form-grid">
                   <label className="admin-shop-field">
@@ -487,22 +537,37 @@ export default function AdminShopPanel({ token }: { token: string }) {
                     <span>sort_order</span>
                     <input className="ui-input" type="number" value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} placeholder="опционально" />
                   </label>
-                  <label className="admin-shop-field">
-                    <span>stackable_amount</span>
-                    <input className="ui-input" type="number" min={1} value={stackableAmount} onChange={(e) => setStackableAmount(e.target.value)} placeholder="для stackable" />
-                  </label>
-                  <label className="admin-shop-field">
-                    <span>durationSeconds</span>
-                    <input className="ui-input" type="number" min={1} value={durationSeconds} onChange={(e) => setDurationSeconds(e.target.value)} placeholder="для expirable" />
-                  </label>
-                  <label className="admin-shop-field">
-                    <span>max_per_purchase</span>
-                    <input className="ui-input" type="number" min={1} value={maxPerPurchase} onChange={(e) => setMaxPerPurchase(e.target.value)} />
-                  </label>
-                  <label className="admin-shop-field">
-                    <span>max_owned_amount</span>
-                    <input className="ui-input" type="number" min={1} value={maxOwnedAmount} onChange={(e) => setMaxOwnedAmount(e.target.value)} />
-                  </label>
+                  {selectedAsset?.ownershipModel === 'stackable' ? (
+                    <>
+                      <label className="admin-shop-field">
+                        <span>stackable_amount</span>
+                        <input className="ui-input" type="number" min={1} value={stackableAmount} onChange={(e) => setStackableAmount(e.target.value)} placeholder="например 10" />
+                        <small>Обязательное поле: сколько единиц stackable-ассета начисляется за одну покупку.</small>
+                      </label>
+                      <label className="admin-shop-field">
+                        <span>max_per_purchase</span>
+                        <input className="ui-input" type="number" min={1} value={maxPerPurchase} onChange={(e) => setMaxPerPurchase(e.target.value)} placeholder="опционально" />
+                        <small>Только для stackable: максимум единиц товара за одну покупку.</small>
+                      </label>
+                      <label className="admin-shop-field">
+                        <span>max_owned_amount</span>
+                        <input className="ui-input" type="number" min={1} value={maxOwnedAmount} onChange={(e) => setMaxOwnedAmount(e.target.value)} placeholder="опционально" />
+                        <small>Только для stackable: максимум единиц ассета у игрока после покупки.</small>
+                      </label>
+                    </>
+                  ) : null}
+                  {selectedAsset?.ownershipModel === 'expirable' ? (
+                    <label className="admin-shop-field">
+                      <span>durationSeconds</span>
+                      <input className="ui-input" type="number" min={1} value={durationSeconds} onChange={(e) => setDurationSeconds(e.target.value)} placeholder="например 2592000" />
+                      <small>Обязательное поле: срок действия expirable-ассета в секундах.</small>
+                    </label>
+                  ) : null}
+                  {selectedAsset?.ownershipModel === 'entitlement' ? (
+                    <p className="admin-field-hint admin-shop-field--full">
+                      Для entitlement-товара дополнительных ownership-полей нет: сервер принимает только цену, локали, флаги и расписание.
+                    </p>
+                  ) : null}
                   <label className="admin-shop-field">
                     <span>starts_at (ISO 8601)</span>
                     <input className="ui-input" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} placeholder="2026-01-01T00:00:00Z" />

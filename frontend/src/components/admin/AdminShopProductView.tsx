@@ -4,9 +4,9 @@ import { getAdminShopProduct, patchAdminShopProduct, type UpdateShopProductInput
 import { toDisplayError } from '../../api/http'
 import type { ShopProductResponse } from '../../api/shop'
 import { paths } from '../../routes/paths'
-import { pushUrl } from '../../shared/navigation/history'
 import ErrorState from '../ErrorState'
 import LoadingState from '../LoadingState'
+import AdminLink from './AdminLink'
 
 type LocaleRow = { locale: string; name: string; description: string }
 
@@ -131,17 +131,31 @@ export default function AdminShopProductView({ token, productId }: { token: stri
       metadata,
     }
 
-    const stack = stackableAmount.trim()
-    patch.stackable_amount = stack ? Number(stack) : null
+    if (product.ownershipModel === 'stackable') {
+      const stack = stackableAmount.trim()
+      const stackValue = Number(stack)
+      if (!stack || !Number.isFinite(stackValue) || stackValue <= 0) {
+        toast.error('Для stackable-товара укажите положительный stackable_amount.')
+        return
+      }
+      patch.stackable_amount = stackValue
 
-    const dur = durationSeconds.trim()
-    patch.durationSeconds = dur ? Number(dur) : null
+      const mpp = maxPerPurchase.trim()
+      patch.max_per_purchase = mpp ? Number(mpp) : null
 
-    const mpp = maxPerPurchase.trim()
-    patch.max_per_purchase = mpp ? Number(mpp) : null
+      const moa = maxOwnedAmount.trim()
+      patch.max_owned_amount = moa ? Number(moa) : null
+    }
 
-    const moa = maxOwnedAmount.trim()
-    patch.max_owned_amount = moa ? Number(moa) : null
+    if (product.ownershipModel === 'expirable') {
+      const dur = durationSeconds.trim()
+      const durationValue = Number(dur)
+      if (!dur || !Number.isFinite(durationValue) || durationValue <= 0) {
+        toast.error('Для expirable-товара укажите положительный durationSeconds.')
+        return
+      }
+      patch.durationSeconds = durationValue
+    }
 
     patch.starts_at = startsAt.trim() || null
     patch.ends_at = endsAt.trim() || null
@@ -163,9 +177,9 @@ export default function AdminShopProductView({ token, productId }: { token: stri
   return (
     <div className="admin-page">
       <section className="admin-top-actions">
-        <button type="button" className="btn btn-sm" onClick={() => pushUrl(`${paths.admin}?tab=shop`)}>
+        <AdminLink className="btn btn-sm" href={`${paths.admin}?tab=shop`}>
           ← К магазину
-        </button>
+        </AdminLink>
       </section>
 
       <section className="card admin-card">
@@ -173,10 +187,17 @@ export default function AdminShopProductView({ token, productId }: { token: stri
         {loadError ? <ErrorState message={loadError} /> : null}
         {product ? (
           <>
-            <h2 className="card-title">{product.localizedName}</h2>
-            <p className="card-text">
-              <code>{product.key}</code> · ID: <code>{product.id}</code>
-            </p>
+            <div className="admin-section-head admin-detail-hero">
+              <div>
+                <h2 className="card-title">{product.localizedName}</h2>
+                <p className="card-text">
+                  <code>{product.key}</code> · ID: <code>{product.id}</code>
+                </p>
+              </div>
+              <span className={`ui-badge ${product.isAvailableNow ? 'ui-badge-success' : 'ui-badge-warning'}`}>
+                {product.isAvailableNow ? 'В витрине' : 'Недоступен'}
+              </span>
+            </div>
             <dl className="admin-kv admin-kv--compact">
               <div>
                 <dt>Ассет</dt>
@@ -194,8 +215,8 @@ export default function AdminShopProductView({ token, productId }: { token: stri
               </div>
             </dl>
 
-            <div className="admin-shop-list-toolbar" style={{ marginTop: '1rem' }}>
-              <label className="admin-shop-field" style={{ flex: 1, marginBottom: 0 }}>
+            <div className="admin-shop-list-toolbar admin-spaced-toolbar">
+              <label className="admin-shop-field admin-filter-label admin-filter-label--wide">
                 <span className="admin-inline-muted">Параметр locale при загрузке (опционально)</span>
                 <input className="ui-input" value={localeInputDraft} onChange={(e) => setLocaleInputDraft(e.target.value)} placeholder="ru-RU" />
               </label>
@@ -204,7 +225,7 @@ export default function AdminShopProductView({ token, productId }: { token: stri
               </button>
             </div>
 
-            <div className="admin-shop-form-grid" style={{ marginTop: '1.25rem' }}>
+            <div className="admin-shop-form-grid admin-spaced-form">
               <label className="admin-shop-field">
                 <span>Цена, ₽</span>
                 <input className="ui-input" type="number" min={0} step={1} value={priceRub} onChange={(e) => setPriceRub(e.target.value)} />
@@ -213,22 +234,37 @@ export default function AdminShopProductView({ token, productId }: { token: stri
                 <span>sort_order</span>
                 <input className="ui-input" type="number" value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} />
               </label>
-              <label className="admin-shop-field">
-                <span>stackable_amount</span>
-                <input className="ui-input" type="number" min={1} value={stackableAmount} onChange={(e) => setStackableAmount(e.target.value)} />
-              </label>
-              <label className="admin-shop-field">
-                <span>durationSeconds</span>
-                <input className="ui-input" type="number" min={1} value={durationSeconds} onChange={(e) => setDurationSeconds(e.target.value)} />
-              </label>
-              <label className="admin-shop-field">
-                <span>max_per_purchase</span>
-                <input className="ui-input" type="number" min={1} value={maxPerPurchase} onChange={(e) => setMaxPerPurchase(e.target.value)} />
-              </label>
-              <label className="admin-shop-field">
-                <span>max_owned_amount</span>
-                <input className="ui-input" type="number" min={1} value={maxOwnedAmount} onChange={(e) => setMaxOwnedAmount(e.target.value)} />
-              </label>
+              {product.ownershipModel === 'stackable' ? (
+                <>
+                  <label className="admin-shop-field">
+                    <span>stackable_amount</span>
+                    <input className="ui-input" type="number" min={1} value={stackableAmount} onChange={(e) => setStackableAmount(e.target.value)} />
+                    <small>Обязательное поле: сколько единиц stackable-ассета начисляется за одну покупку.</small>
+                  </label>
+                  <label className="admin-shop-field">
+                    <span>max_per_purchase</span>
+                    <input className="ui-input" type="number" min={1} value={maxPerPurchase} onChange={(e) => setMaxPerPurchase(e.target.value)} />
+                    <small>Только для stackable: максимум единиц товара за одну покупку.</small>
+                  </label>
+                  <label className="admin-shop-field">
+                    <span>max_owned_amount</span>
+                    <input className="ui-input" type="number" min={1} value={maxOwnedAmount} onChange={(e) => setMaxOwnedAmount(e.target.value)} />
+                    <small>Только для stackable: максимум единиц ассета у игрока после покупки.</small>
+                  </label>
+                </>
+              ) : null}
+              {product.ownershipModel === 'expirable' ? (
+                <label className="admin-shop-field">
+                  <span>durationSeconds</span>
+                  <input className="ui-input" type="number" min={1} value={durationSeconds} onChange={(e) => setDurationSeconds(e.target.value)} />
+                  <small>Обязательное поле: срок действия expirable-ассета в секундах.</small>
+                </label>
+              ) : null}
+              {product.ownershipModel === 'entitlement' ? (
+                <p className="admin-field-hint admin-shop-field--full">
+                  Для entitlement-товара дополнительных ownership-полей нет.
+                </p>
+              ) : null}
               <label className="admin-shop-field">
                 <span>starts_at</span>
                 <input className="ui-input" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} />

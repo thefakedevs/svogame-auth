@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react'
 import { getAdminUserLootboxOpenHistory, type LootboxOpenHistoryResponse } from '../../api/lootboxes'
 import { toDisplayError } from '../../api/http'
 import { adminUserPath } from '../../routes/paths'
-import { pushUrl } from '../../shared/navigation/history'
 import ErrorState from '../ErrorState'
 import LoadingState from '../LoadingState'
+import AdminLink from './AdminLink'
 
 const dateTimeFormatter = new Intl.DateTimeFormat('ru-RU', {
   day: '2-digit',
@@ -51,9 +51,9 @@ export default function AdminUserLootboxHistoryView({ token, userId }: { token: 
   return (
     <div className="admin-page">
       <section className="admin-top-actions">
-        <button type="button" className="btn btn-sm" onClick={() => pushUrl(adminUserPath(userId))}>
+        <AdminLink className="btn btn-sm" href={adminUserPath(userId)}>
           ← К профилю игрока
-        </button>
+        </AdminLink>
       </section>
 
       <section className="card admin-card">

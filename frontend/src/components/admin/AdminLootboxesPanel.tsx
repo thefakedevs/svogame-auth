@@ -6,6 +6,7 @@ import { adminLootboxPath } from '../../routes/paths'
 import { pushUrl } from '../../shared/navigation/history'
 import ErrorState from '../ErrorState'
 import LoadingState from '../LoadingState'
+import AdminLink from './AdminLink'
 import AdminLootboxWizard from './AdminLootboxWizard'
 
 type State =
@@ -85,7 +86,7 @@ export default function AdminLootboxesPanel({ token }: { token: string }) {
   }, [token])
 
   useEffect(() => {
-    if (activeTab === 'manage') void load()
+    if (activeTab === 'manage') queueMicrotask(() => void load())
   }, [activeTab, load])
 
   const visibleItems = useMemo(() => {
@@ -103,13 +104,15 @@ export default function AdminLootboxesPanel({ token }: { token: string }) {
   const pagedItems = visibleItems.slice((page - 1) * LOOTBOXES_PER_PAGE, page * LOOTBOXES_PER_PAGE)
 
   useEffect(() => {
-    setPage((current) => Math.min(current, totalPages))
+    queueMicrotask(() => setPage((current) => Math.min(current, totalPages)))
   }, [totalPages])
 
   const setQueryAndReset = (value: string) => {
     setQuery(value)
     setPage(1)
   }
+  const activeLootboxCount = state.status === 'ready' ? state.items.filter((item) => item.isActive).length : 0
+  const hiddenLootboxCount = state.status === 'ready' ? state.items.filter((item) => !item.isPublic).length : 0
 
   return (
     <div className="admin-lootbox-page">
@@ -134,19 +137,36 @@ export default function AdminLootboxesPanel({ token }: { token: string }) {
 
       {activeTab === 'manage' ? (
         <section className="card admin-card admin-lootbox-list">
-          <div className="admin-shop-list-head">
+          <div className="admin-section-head">
             <div>
               <h2 className="card-title">Лутбоксы</h2>
-              <p className="card-text">Список definition-ов, просмотр, изменение и управление содержимым.</p>
+              <p className="card-text">Definition-ы, видимость, активность и содержимое наград.</p>
             </div>
             <button type="button" className="btn btn-sm" onClick={() => void load()}>
               Обновить
             </button>
           </div>
 
-          <div className="admin-shop-list-controls">
+          {state.status === 'ready' ? (
+            <div className="admin-metric-strip">
+              <div className="admin-metric">
+                <span>Всего</span>
+                <strong>{state.items.length}</strong>
+              </div>
+              <div className="admin-metric admin-metric--success">
+                <span>Активны</span>
+                <strong>{activeLootboxCount}</strong>
+              </div>
+              <div className="admin-metric admin-metric--warning">
+                <span>Скрыты</span>
+                <strong>{hiddenLootboxCount}</strong>
+              </div>
+            </div>
+          ) : null}
+
+          <div className="admin-shop-list-controls admin-filter-bar">
             <div className="admin-shop-list-controls-row">
-              <label className="admin-shop-field" style={{ marginBottom: 0 }}>
+              <label className="admin-shop-field admin-filter-label">
                 <span>Поиск</span>
                 <input
                   className="ui-input"
@@ -155,7 +175,7 @@ export default function AdminLootboxesPanel({ token }: { token: string }) {
                   placeholder="key, название, описание"
                 />
               </label>
-              <label className="admin-shop-field" style={{ marginBottom: 0 }}>
+              <label className="admin-shop-field admin-filter-label">
                 <span>Сортировка</span>
                 <select className="ui-input" value={sort} onChange={(event) => setSort(event.target.value as SortKey)}>
                   <option value="updated_desc">Сначала обновленные</option>
@@ -175,11 +195,10 @@ export default function AdminLootboxesPanel({ token }: { token: string }) {
               <p className="admin-inline-muted">Показано: {visibleItems.length} из {state.items.length}. Страница {page} из {totalPages}</p>
               <div className="admin-list">
                 {pagedItems.map((item) => (
-                  <button
+                  <AdminLink
                     key={item.id}
-                    type="button"
                     className="admin-row"
-                    onClick={() => pushUrl(adminLootboxPath(item.id))}
+                    href={adminLootboxPath(item.id)}
                   >
                     <span className="admin-row-user-text">
                       <strong>{item.assetDisplayName}</strong>
@@ -193,7 +212,7 @@ export default function AdminLootboxesPanel({ token }: { token: string }) {
                         {item.isPublic ? 'public' : 'hidden'}
                       </span>
                     </span>
-                  </button>
+                  </AdminLink>
                 ))}
                 {!visibleItems.length ? <p className="admin-inline-muted">Лутбоксы не найдены.</p> : null}
               </div>
