@@ -9,7 +9,7 @@ import {
   type SkinRarity,
 } from '../../api/inventory'
 import { adminShopProductPath } from '../../routes/paths'
-import { pushUrl } from '../../shared/navigation/history'
+import AdminLink from './AdminLink'
 
 function normalizeAssetKey(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9_-]/g, '')
@@ -285,13 +285,12 @@ export default function AdminGunskinShopWizard({ token }: { token: string }) {
           {isSubmitting ? 'Создаём…' : 'Создать скин и товар'}
         </button>
         {lastProductId ? (
-          <button
-            type="button"
+          <AdminLink
             className="btn btn-sm"
-            onClick={() => pushUrl(adminShopProductPath(lastProductId))}
+            href={adminShopProductPath(lastProductId)}
           >
             Открыть последний товар
-          </button>
+          </AdminLink>
         ) : null}
       </div>
     </section>

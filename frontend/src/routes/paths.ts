@@ -44,6 +44,10 @@ export function adminShopProductPath(productId: string) {
   return `${paths.admin}/shop/products/${encodeURIComponent(productId)}`
 }
 
+export function adminAssetPath(assetId: string) {
+  return `${paths.admin}/assets/${encodeURIComponent(assetId)}`
+}
+
 export function adminLootboxPath(lootboxId: string) {
   return `${paths.admin}/lootboxes/${encodeURIComponent(lootboxId)}`
 }

@@ -16,6 +16,7 @@ import { adminUserPath, paths } from '../../routes/paths'
 import { pushUrl } from '../../shared/navigation/history'
 import AppPortal from '../../shared/ui/portal/AppPortal'
 import LoadingState from '../LoadingState'
+import AdminLink from './AdminLink'
 
 function formatDateTime(value?: string | null) {
   if (!value) return 'Нет данных'
@@ -63,6 +64,7 @@ export default function AdminSquadProfile({
   const [isDeletingAvatar, setIsDeletingAvatar] = useState(false)
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
   const [kickingMemberId, setKickingMemberId] = useState<string | null>(null)
+  const [memberToKick, setMemberToKick] = useState<SquadMemberResponse | null>(null)
   const [isDeleteSquadModalOpen, setIsDeleteSquadModalOpen] = useState(false)
   const [isDeleteAvatarModalOpen, setIsDeleteAvatarModalOpen] = useState(false)
   const [avatarVersion, setAvatarVersion] = useState(() => Date.now())
@@ -106,8 +108,6 @@ export default function AdminSquadProfile({
 
   const kickMember = async (member: SquadMemberResponse) => {
     if (!squad || kickingMemberId || member.id === squad.leaderUserId) return
-    const approved = window.confirm(`Кикнуть игрока "${member.username}" из сквада "${squad.name}"?`)
-    if (!approved) return
 
     setKickingMemberId(member.id)
     try {
@@ -117,6 +117,7 @@ export default function AdminSquadProfile({
         ...squad,
         memberCount: Math.max(0, squad.memberCount - 1),
       })
+      setMemberToKick(null)
       toast.success('Игрок кикнут из сквада.')
     } catch (cause) {
       toast.error(toDisplayError(cause, 'Не удалось кикнуть игрока из сквада.'))
@@ -203,15 +204,15 @@ export default function AdminSquadProfile({
   return (
     <div className="admin-page">
       <section className="admin-top-actions">
-        <button type="button" className="btn btn-sm" onClick={() => pushUrl(`${paths.admin}?tab=squads`)}>
+        <AdminLink className="btn btn-sm" href={`${paths.admin}?tab=squads`}>
           ← К сквадам
-        </button>
+        </AdminLink>
       </section>
 
       <section className="card admin-card">
         {!squad ? <LoadingState title="Загружаем профиль сквада" /> : (
           <>
-            <div className="admin-squad-head">
+            <div className="admin-squad-head admin-detail-hero">
               {squad.imageUrl ? <img src={appendVersion(squad.imageUrl, avatarVersion)} alt={squad.name} className="admin-avatar admin-avatar-lg" /> : <span className="ui-avatar">{initials(squad.name)}</span>}
               <div className="admin-row-user-text">
                 {!isEditingName ? (
@@ -345,17 +346,17 @@ export default function AdminSquadProfile({
                 <ul className="admin-member-list">
                   {activeMembers.map((member) => (
                     <li key={member.id}>
-                      <div className="admin-member-card-main" onClick={() => pushUrl(adminUserPath(member.id))}>
+                      <AdminLink className="admin-member-card-main" href={adminUserPath(member.id)}>
                         {member.avatarUrl ? <img src={member.avatarUrl} alt={member.username} className="admin-avatar" /> : <span className="ui-avatar ui-avatar-sm">{initials(member.username)}</span>}
                         <span className="admin-member-name">{member.username}</span>
-                      </div>
+                      </AdminLink>
                       {member.id === squad.leaderUserId && <span className="ui-badge ui-badge-secondary">Лидер</span>}
                       {member.id !== squad.leaderUserId ? (
                         <button
                           type="button"
                           className="btn btn-sm danger admin-member-kick-button"
                           disabled={kickingMemberId !== null}
-                          onClick={() => void kickMember(member)}
+                          onClick={() => setMemberToKick(member)}
                         >
                           {kickingMemberId === member.id ? 'Кикаем...' : 'Кикнуть'}
                         </button>
@@ -370,10 +371,10 @@ export default function AdminSquadProfile({
                 <ul className="admin-member-list">
                   {outgoingInvites.map((member) => (
                     <li key={member.inviteId ?? member.id}>
-                      <div className="admin-member-card-main" onClick={() => pushUrl(adminUserPath(member.id))}>
+                      <AdminLink className="admin-member-card-main" href={adminUserPath(member.id)}>
                         {member.avatarUrl ? <img src={member.avatarUrl} alt={member.username} className="admin-avatar" /> : <span className="ui-avatar ui-avatar-sm">{initials(member.username)}</span>}
                         <span className="admin-member-name">{member.username}</span>
-                      </div>
+                      </AdminLink>
                       <span className="ui-badge ui-badge-warning">Invite</span>
                     </li>
                   ))}
@@ -404,6 +405,35 @@ export default function AdminSquadProfile({
                 </button>
                 <button className="btn danger" type="button" onClick={() => void deleteSquadAvatar()} disabled={isDeletingAvatar}>
                   {isDeletingAvatar ? 'Удаление...' : 'Удалить'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </AppPortal>
+      ) : null}
+
+      {squad && memberToKick ? (
+        <AppPortal>
+          <div className="ui-modal-backdrop" role="presentation" onClick={() => !kickingMemberId && setMemberToKick(null)}>
+            <div className="ui-modal" role="dialog" aria-modal="true" aria-labelledby="kick-squad-member-modal-title" onClick={(event) => event.stopPropagation()}>
+              <div className="ui-modal-header">
+                <h2 id="kick-squad-member-modal-title" className="ui-modal-title">Кикнуть участника?</h2>
+                <button className="ui-modal-close" type="button" aria-label="Закрыть" onClick={() => setMemberToKick(null)} disabled={Boolean(kickingMemberId)}>
+                  ×
+                </button>
+              </div>
+              <div className="ui-modal-body">
+                <p>
+                  Игрок <strong>{memberToKick.username}</strong> будет удален из сквада <strong>{squad.name}</strong>.
+                  Приглашение или вступление придется оформить заново.
+                </p>
+              </div>
+              <div className="ui-modal-footer">
+                <button className="btn" type="button" onClick={() => setMemberToKick(null)} disabled={Boolean(kickingMemberId)}>
+                  Отмена
+                </button>
+                <button className="btn danger" type="button" onClick={() => void kickMember(memberToKick)} disabled={Boolean(kickingMemberId)}>
+                  {kickingMemberId ? 'Кикаем...' : 'Кикнуть'}
                 </button>
               </div>
             </div>

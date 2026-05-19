@@ -1307,13 +1307,20 @@ async fn meta_endpoints_expose_restrictions_and_squad_limits() {
         .json()
         .await
         .expect("restrictions meta json");
-    assert!(restrictions.as_array().expect("restrictions array").len() >= 2);
+    assert!(restrictions.as_array().expect("restrictions array").len() >= 3);
     assert!(
         restrictions
             .as_array()
             .expect("restrictions array")
             .iter()
             .any(|item| item["key"] == "create_squad" && item["locale"]["en"]["title"].is_string())
+    );
+    assert!(
+        restrictions
+            .as_array()
+            .expect("restrictions array")
+            .iter()
+            .any(|item| item["key"] == "upload_skin" && item["locale"]["en"]["title"].is_string())
     );
 
     let squad_config_response = app.get_without_auth("/api/meta/squads/config").await;
@@ -2642,6 +2649,33 @@ async fn personal_skin_takes_priority_over_default_skin() {
     let default_bytes = default_response.bytes().await.expect("default skin bytes");
 
     assert_ne!(response_bytes.as_ref(), default_bytes.as_ref());
+}
+
+#[tokio::test]
+#[serial]
+async fn upload_skin_restriction_blocks_personal_skin_upload() {
+    let app = TestApp::spawn().await;
+    let user = app
+        .issue_user_token("SkinUploadRestricted", false, &["upload_skin"])
+        .await;
+    let personal_png = make_skin_png([80, 40, 200, 255]);
+
+    let upload_personal = app
+        .post_multipart(
+            "/api/skins/me?model=default",
+            &user.access_token,
+            "personal.png",
+            "image/png",
+            personal_png,
+        )
+        .await;
+
+    assert_eq!(upload_personal.status(), reqwest::StatusCode::FORBIDDEN);
+    let body: serde_json::Value = upload_personal
+        .json()
+        .await
+        .expect("restricted upload response");
+    assert_eq!(body["code"], "upload_restricted");
 }
 
 #[tokio::test]

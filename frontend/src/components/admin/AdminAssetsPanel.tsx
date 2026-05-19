@@ -13,8 +13,10 @@ import {
   type OwnershipModel,
   type SkinRarity,
 } from '../../api/inventory'
+import { adminAssetPath } from '../../routes/paths'
 import AppPortal from '../../shared/ui/portal/AppPortal'
 import AdminAssetImage from './AdminAssetImage'
+import AdminLink from './AdminLink'
 import ErrorState from '../ErrorState'
 import LoadingState from '../LoadingState'
 
@@ -37,17 +39,6 @@ type CreateAssetDraft = {
   metadataText: string
 }
 
-type EditAssetDraft = {
-  displayName: string
-  description: string
-  rarity: SkinRarity | ''
-  weaponKey: string
-  isActive: boolean
-  isPublic: boolean
-  isUserPurchasable: boolean
-  metadataText: string
-}
-
 const emptyCreateDraft: CreateAssetDraft = {
   key: '',
   displayName: '',
@@ -62,6 +53,56 @@ const emptyCreateDraft: CreateAssetDraft = {
   metadataText: '{}',
 }
 
+type EditAssetDraft = {
+  displayName: string
+  description: string
+  rarity: SkinRarity | ''
+  weaponKey: string
+  isActive: boolean
+  isPublic: boolean
+  isUserPurchasable: boolean
+  metadataText: string
+}
+
+const assetKindOptions: AssetKind[] = ['item', 'skin', 'subscription', 'cosmetic', 'lootbox', 'currency', 'ticket', 'token', 'kit']
+
+function normalizeCreateDraftForType(draft: CreateAssetDraft): CreateAssetDraft {
+  if (draft.isCurrency) {
+    return {
+      ...draft,
+      assetKind: 'currency',
+      ownershipModel: 'stackable',
+      rarity: '',
+      weaponKey: '',
+    }
+  }
+
+  if (draft.assetKind === 'kit') {
+    return {
+      ...draft,
+      ownershipModel: 'stackable',
+      rarity: '',
+      weaponKey: '',
+    }
+  }
+
+  if (draft.assetKind !== 'skin') {
+    return {
+      ...draft,
+      rarity: '',
+      weaponKey: '',
+    }
+  }
+
+  return draft
+}
+
+function parseMetadata(value: string) {
+  const trimmed = value.trim()
+  if (!trimmed) return null
+  return JSON.parse(trimmed) as unknown
+}
+
 function metadataToText(value: unknown) {
   if (value == null) return '{}'
   try {
@@ -69,12 +110,6 @@ function metadataToText(value: unknown) {
   } catch {
     return String(value)
   }
-}
-
-function parseMetadata(value: string) {
-  const trimmed = value.trim()
-  if (!trimmed) return null
-  return JSON.parse(trimmed) as unknown
 }
 
 function makeEditDraft(asset: AssetResponse): EditAssetDraft {
@@ -121,7 +156,6 @@ export default function AdminAssetsPanel({ token }: { token: string }) {
   const [draft, setDraft] = useState<CreateAssetDraft>(emptyCreateDraft)
   const [isCreating, setIsCreating] = useState(false)
   const [createModalOpen, setCreateModalOpen] = useState(false)
-  const [selectedAsset, setSelectedAsset] = useState<AssetResponse | null>(null)
   const [catalogScope, setCatalogScope] = useState<'active_only' | 'all'>('active_only')
   const [assetSort, setAssetSort] = useState<AdminAssetSortKey>('key_asc')
   const [assetSearch, setAssetSearch] = useState('')
@@ -173,17 +207,19 @@ export default function AdminAssetsPanel({ token }: { token: string }) {
 
     setIsCreating(true)
     try {
+      const normalizedDraft = normalizeCreateDraftForType(draft)
+      const isSkin = normalizedDraft.assetKind === 'skin'
       await createAdminAsset(token, {
         key,
         display_name: displayName,
-        description: draft.description.trim() || null,
-        asset_kind: draft.isCurrency ? 'currency' : draft.assetKind,
-        ownership_model: draft.isCurrency ? 'stackable' : draft.ownershipModel,
-        is_currency: draft.isCurrency,
-        is_user_purchasable: draft.isUserPurchasable,
-        is_public: draft.isPublic,
-        rarity: draft.rarity || null,
-        weaponKey: draft.weaponKey.trim() || null,
+        description: normalizedDraft.description.trim() || null,
+        asset_kind: normalizedDraft.assetKind,
+        ownership_model: normalizedDraft.ownershipModel,
+        is_currency: normalizedDraft.isCurrency,
+        is_user_purchasable: normalizedDraft.isUserPurchasable,
+        is_public: normalizedDraft.isPublic,
+        rarity: isSkin ? normalizedDraft.rarity || null : null,
+        weaponKey: isSkin ? normalizedDraft.weaponKey.trim() || null : null,
         metadata,
       })
       setDraft(emptyCreateDraft)
@@ -195,26 +231,6 @@ export default function AdminAssetsPanel({ token }: { token: string }) {
     } finally {
       setIsCreating(false)
     }
-  }
-
-  const updateAsset = (asset: AssetResponse) => {
-    setSelectedAsset((prev) => (prev?.id === asset.id ? asset : prev))
-    setState((prev) => {
-      if (prev.status !== 'ready') return prev
-      return {
-        ...prev,
-        items: prev.items.map((item) => (item.id === asset.id ? asset : item)),
-      }
-    })
-  }
-
-  const mergeAsset = (updated: AssetResponse) => {
-    if (catalogScope === 'active_only' && !updated.isActive) {
-      setSelectedAsset(null)
-      void loadAssets()
-      return
-    }
-    updateAsset(updated)
   }
 
   const sortedItems = useMemo(() => {
@@ -233,11 +249,16 @@ export default function AdminAssetsPanel({ token }: { token: string }) {
   }
 
   const totalPages = state.status === 'ready' ? Math.max(1, state.totalPages) : 1
+  const activeAssets = state.status === 'ready' ? state.items.filter((item) => item.isActive).length : 0
+  const hiddenAssets = state.status === 'ready' ? state.items.filter((item) => !item.isPublic).length : 0
 
   return (
     <section className="card admin-card">
-      <div className="admin-assets-toolbar">
-        <h2 className="card-title">Ассеты</h2>
+      <div className="admin-section-head">
+        <div>
+          <h2 className="card-title">Ассеты</h2>
+          <p className="card-text">Каталог предметов, валют, скинов и наград для магазина и лутбоксов.</p>
+        </div>
         <div className="admin-assets-toolbar">
           <button type="button" className="btn btn-sm" onClick={() => void loadAssets()}>
             Обновить
@@ -248,9 +269,26 @@ export default function AdminAssetsPanel({ token }: { token: string }) {
         </div>
       </div>
 
-      <div className="admin-shop-list-controls">
+      {state.status === 'ready' ? (
+        <div className="admin-metric-strip">
+          <div className="admin-metric">
+            <span>Найдено</span>
+            <strong>{state.total}</strong>
+          </div>
+          <div className="admin-metric admin-metric--success">
+            <span>Активны на странице</span>
+            <strong>{activeAssets}</strong>
+          </div>
+          <div className="admin-metric admin-metric--warning">
+            <span>Скрыты</span>
+            <strong>{hiddenAssets}</strong>
+          </div>
+        </div>
+      ) : null}
+
+      <div className="admin-shop-list-controls admin-filter-bar">
         <div className="admin-shop-list-controls-row">
-          <label className="admin-shop-field" style={{ marginBottom: 0 }}>
+          <label className="admin-shop-field admin-filter-label">
             <span>Поиск</span>
             <input
               className="ui-input"
@@ -259,7 +297,7 @@ export default function AdminAssetsPanel({ token }: { token: string }) {
               placeholder="Название или key"
             />
           </label>
-          <label className="admin-shop-field" style={{ marginBottom: 0 }}>
+          <label className="admin-shop-field admin-filter-label">
             <span>Сортировка</span>
             <select className="ui-input" value={assetSort} onChange={(e) => setAssetSort(e.target.value as AdminAssetSortKey)} aria-label="Сортировка списка ассетов">
               <option value="key_asc">Ключ (A–Я)</option>
@@ -318,46 +356,69 @@ export default function AdminAssetsPanel({ token }: { token: string }) {
                       value={draft.key}
                       onChange={(event) => setDraft((prev) => ({ ...prev, key: normalizeAssetKey(event.target.value) }))}
                       placeholder="key"
+                      aria-label="Ключ ассета"
                     />
                     <input
                       className="ui-input"
                       value={draft.displayName}
                       onChange={(event) => setDraft((prev) => ({ ...prev, displayName: event.target.value }))}
                       placeholder="Название"
-                    />
-                    <input
-                      className="ui-input"
-                      value={draft.assetKind}
-                      disabled={draft.isCurrency}
-                      onChange={(event) => setDraft((prev) => ({ ...prev, assetKind: event.target.value }))}
-                      placeholder="kind"
+                      aria-label="Название ассета"
                     />
                     <select
                       className="ui-input"
-                      value={draft.ownershipModel}
+                      value={draft.assetKind}
                       disabled={draft.isCurrency}
+                      onChange={(event) =>
+                        setDraft((prev) =>
+                          normalizeCreateDraftForType({
+                            ...prev,
+                            assetKind: event.target.value as AssetKind,
+                          }),
+                        )}
+                      aria-label="Тип ассета"
+                    >
+                      {assetKindOptions.map((kind) => (
+                        <option key={kind} value={kind}>{kind}</option>
+                      ))}
+                    </select>
+                    <select
+                      className="ui-input"
+                      value={draft.ownershipModel}
+                      disabled={draft.isCurrency || draft.assetKind === 'kit'}
                       onChange={(event) => setDraft((prev) => ({ ...prev, ownershipModel: event.target.value as OwnershipModel }))}
+                      aria-label="Модель владения"
                     >
                       <option value="stackable">stackable</option>
                       <option value="entitlement">entitlement</option>
                       <option value="expirable">expirable</option>
                     </select>
-                    <select
-                      className="ui-input"
-                      value={draft.rarity}
-                      onChange={(event) => setDraft((prev) => ({ ...prev, rarity: event.target.value as SkinRarity | '' }))}
-                    >
-                      <option value="">Без редкости</option>
-                      <option value="common">common</option>
-                      <option value="rare">rare</option>
-                      <option value="legendary">legendary</option>
-                    </select>
-                    <input
-                      className="ui-input"
-                      value={draft.weaponKey}
-                      onChange={(event) => setDraft((prev) => ({ ...prev, weaponKey: event.target.value }))}
-                      placeholder="weaponKey"
-                    />
+                    {draft.assetKind === 'skin' ? (
+                      <>
+                        <select
+                          className="ui-input"
+                          value={draft.rarity}
+                          onChange={(event) => setDraft((prev) => ({ ...prev, rarity: event.target.value as SkinRarity | '' }))}
+                          aria-label="Редкость"
+                        >
+                          <option value="">Без редкости</option>
+                          <option value="common">common</option>
+                          <option value="rare">rare</option>
+                          <option value="legendary">legendary</option>
+                        </select>
+                        <input
+                          className="ui-input"
+                          value={draft.weaponKey}
+                          onChange={(event) => setDraft((prev) => ({ ...prev, weaponKey: event.target.value }))}
+                          placeholder="weaponKey"
+                          aria-label="Ключ оружия"
+                        />
+                      </>
+                    ) : (
+                      <p className="admin-field-hint admin-shop-field--full">
+                        Редкость и weaponKey доступны только для ассетов типа skin.
+                      </p>
+                    )}
                   </div>
 
                   <textarea
@@ -376,7 +437,7 @@ export default function AdminAssetsPanel({ token }: { token: string }) {
                           type="radio"
                           name="admin-create-asset-currency"
                           checked={!draft.isCurrency}
-                          onChange={() => setDraft((prev) => ({ ...prev, isCurrency: false }))}
+                          onChange={() => setDraft((prev) => normalizeCreateDraftForType({ ...prev, isCurrency: false, assetKind: 'item' }))}
                         />
                         <span className="ui-radio-mark" aria-hidden />
                         <span>Игровой ассет</span>
@@ -392,6 +453,8 @@ export default function AdminAssetsPanel({ token }: { token: string }) {
                               isCurrency: true,
                               assetKind: 'currency',
                               ownershipModel: 'stackable',
+                              rarity: '',
+                              weaponKey: '',
                             }))}
                         />
                         <span className="ui-radio-mark" aria-hidden />
@@ -481,80 +544,59 @@ export default function AdminAssetsPanel({ token }: { token: string }) {
           </div>
 
           <div className="admin-asset-table-wrap">
-            <table className="admin-asset-table">
-              <thead>
-                <tr>
-                  <th>Ассет</th>
-                  <th>Тип</th>
-                  <th>Модель</th>
-                  <th>Флаги</th>
-                  <th>Обновлен</th>
-                </tr>
-              </thead>
-              <tbody>
+            <div className="admin-asset-table admin-asset-list" aria-label="Ассеты">
+              <div className="admin-asset-list-head">
+                <span>Ассет</span>
+                <span>Тип</span>
+                <span>Модель</span>
+                <span>Флаги</span>
+                <span>Обновлен</span>
+              </div>
+              <div className="admin-asset-list-body">
                 {sortedItems.map((asset) => (
-                  <tr
+                  <AdminLink
                     key={asset.id}
-                    className="admin-asset-table-row"
-                    tabIndex={0}
-                    onClick={() => setSelectedAsset(asset)}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter' || event.key === ' ') {
-                        event.preventDefault()
-                        setSelectedAsset(asset)
-                      }
-                    }}
+                    className="admin-asset-list-row admin-asset-table-row"
+                    href={adminAssetPath(asset.id)}
+                    aria-label={`Открыть ассет ${asset.displayName}`}
                   >
-                    <td>
-                      <div className="admin-inventory-item-main">
+                    <span className="admin-asset-list-cell admin-asset-list-cell--asset">
+                      <span className="admin-inventory-item-main admin-asset-table-link">
                         <AdminAssetImage token={token} asset={asset} className="admin-asset-image-preview--thumb" />
                         <span className="admin-row-inventory-text">
                           <strong>{asset.displayName}</strong>
                           <small>{asset.key} · {asset.id}</small>
                         </span>
-                      </div>
-                    </td>
-                    <td>
+                      </span>
+                    </span>
+                    <span className="admin-asset-list-cell">
                       <span className="ui-badge ui-badge-neutral">{asset.assetKind}</span>
-                    </td>
-                    <td>
+                    </span>
+                    <span className="admin-asset-list-cell">
                       <span className="ui-badge ui-badge-neutral">{asset.ownershipModel}</span>
-                    </td>
-                    <td>
-                      <div className="admin-asset-badges">
+                    </span>
+                    <span className="admin-asset-list-cell">
+                      <span className="admin-asset-badges">
                         {asset.isCurrency ? <span className="ui-badge ui-badge-secondary">currency</span> : null}
                         {asset.isPublic ? <span className="ui-badge ui-badge-neutral">public</span> : <span className="ui-badge ui-badge-warning">hidden</span>}
                         {asset.isUserPurchasable ? <span className="ui-badge ui-badge-neutral">purchasable</span> : null}
                         <span className={`ui-badge ${asset.isActive ? 'ui-badge-success' : 'ui-badge-warning'}`}>
                           {asset.isActive ? 'active' : 'inactive'}
                         </span>
-                      </div>
-                    </td>
-                    <td>{new Date(asset.updatedAt).toLocaleString('ru-RU')}</td>
-                  </tr>
+                      </span>
+                    </span>
+                    <span className="admin-asset-list-cell">{new Date(asset.updatedAt).toLocaleString('ru-RU')}</span>
+                  </AdminLink>
                 ))}
                 {!sortedItems.length ? (
-                  <tr>
-                    <td colSpan={5} className="admin-asset-table-empty">
-                      Ассеты не найдены.
-                    </td>
-                  </tr>
+                  <p className="admin-asset-table-empty">Ассеты не найдены.</p>
                 ) : null}
-              </tbody>
-            </table>
+              </div>
+            </div>
           </div>
 
           <AdminPagination page={page} totalPages={totalPages} onPageChange={setPage} />
         </>
-      ) : null}
-
-      {selectedAsset ? (
-        <AdminAssetModal
-          token={token}
-          asset={selectedAsset}
-          onClose={() => setSelectedAsset(null)}
-          onAssetChange={mergeAsset}
-        />
       ) : null}
     </section>
   )
@@ -604,7 +646,7 @@ function AdminPagination({
   )
 }
 
-function AdminAssetModal({
+export function AdminAssetModal({
   token,
   asset,
   onClose,
@@ -691,8 +733,12 @@ function AdminAssetModal({
         is_active: draft.isActive,
         is_public: draft.isPublic,
         is_user_purchasable: draft.isUserPurchasable,
-        rarity: draft.rarity || null,
-        weaponKey: draft.weaponKey.trim() || null,
+        ...(asset.assetKind === 'skin'
+          ? {
+              rarity: draft.rarity || null,
+              weaponKey: draft.weaponKey.trim() || null,
+            }
+          : {}),
         metadata,
       })
       onAssetChange(updated)
@@ -771,22 +817,30 @@ function AdminAssetModal({
                   placeholder="Описание"
                   rows={1}
                 />
-                <select
-                  className="ui-input"
-                  value={draft.rarity}
-                  onChange={(event) => setDraft((prev) => ({ ...prev, rarity: event.target.value as SkinRarity | '' }))}
-                >
-                  <option value="">Без редкости</option>
-                  <option value="common">common</option>
-                  <option value="rare">rare</option>
-                  <option value="legendary">legendary</option>
-                </select>
-                <input
-                  className="ui-input"
-                  value={draft.weaponKey}
-                  onChange={(event) => setDraft((prev) => ({ ...prev, weaponKey: event.target.value }))}
-                  placeholder="weaponKey"
-                />
+                {asset.assetKind === 'skin' ? (
+                  <>
+                    <select
+                      className="ui-input"
+                      value={draft.rarity}
+                      onChange={(event) => setDraft((prev) => ({ ...prev, rarity: event.target.value as SkinRarity | '' }))}
+                    >
+                      <option value="">Без редкости</option>
+                      <option value="common">common</option>
+                      <option value="rare">rare</option>
+                      <option value="legendary">legendary</option>
+                    </select>
+                    <input
+                      className="ui-input"
+                      value={draft.weaponKey}
+                      onChange={(event) => setDraft((prev) => ({ ...prev, weaponKey: event.target.value }))}
+                      placeholder="weaponKey"
+                    />
+                  </>
+                ) : (
+                  <p className="admin-field-hint admin-shop-field--full">
+                    Редкость и weaponKey доступны только для ассетов типа skin.
+                  </p>
+                )}
               </div>
 
               <div className="admin-asset-flags admin-asset-flags--radios">
