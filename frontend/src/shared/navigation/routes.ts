@@ -31,6 +31,7 @@ export function pageTitleForPath(pathname: string) {
   }
   if (pathname.startsWith(`${paths.admin}/users/`)) return 'Профиль игрока | Админка | SvoCraft'
   if (pathname.startsWith(`${paths.admin}/squads/`)) return 'Профиль сквада | Админка | SvoCraft'
+  if (pathname.startsWith(`${paths.admin}/assets/`)) return 'Ассет | Админка | SvoCraft'
   if (pathname.startsWith(`${paths.admin}/tokens/`) && pathname.endsWith('/audit')) {
     return 'Аудит токена | Админка | SvoCraft'
   }

@@ -163,6 +163,7 @@ function adminRouteForPath(
   | { type: 'user'; userId: string }
   | { type: 'squad'; squadId: string }
   | { type: 'tokenAudit'; tokenId: string }
+  | { type: 'asset'; assetId: string }
   | { type: 'shopProduct'; productId: string }
   | { type: 'lootbox'; lootboxId: string }
   | { type: 'littlemice' }
@@ -205,6 +206,11 @@ function adminRouteForPath(
   const tokenAuditMatch = pathname.match(/^\/admin\/tokens\/([^/]+)\/audit$/)
   if (tokenAuditMatch) {
     return { type: 'tokenAudit', tokenId: decodeURIComponent(tokenAuditMatch[1]) }
+  }
+
+  const assetMatch = pathname.match(/^\/admin\/assets\/([^/]+)$/)
+  if (assetMatch) {
+    return { type: 'asset', assetId: decodeURIComponent(assetMatch[1]) }
   }
 
   const shopProductMatch = pathname.match(/^\/admin\/shop\/products\/([^/]+)$/)
