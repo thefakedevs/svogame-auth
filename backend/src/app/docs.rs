@@ -11,8 +11,8 @@ use crate::domains::auth::verification as auth_verification;
 use crate::domains::compat::gamervii as compat_gamervii;
 use crate::domains::discord as discord_handlers;
 use crate::domains::gunskins::handlers as gunskin_handlers;
-use crate::domains::lootboxes::handlers as lootbox_handlers;
 use crate::domains::littlemice::handlers as littlemice_handlers;
+use crate::domains::lootboxes::handlers as lootbox_handlers;
 use crate::domains::meta::handlers as meta_handlers;
 use crate::domains::ownership::handlers as ownership_handlers;
 use crate::domains::shop::handlers as shop_handlers;
@@ -167,6 +167,7 @@ use utoipa::OpenApi;
         shop_handlers::yookassa_webhook,
         shop_handlers::complete_my_mock_order,
         shop_handlers::list_admin_products,
+        shop_handlers::list_admin_orders,
         shop_handlers::get_admin_product,
         shop_handlers::create_product,
         shop_handlers::patch_product,
@@ -283,11 +284,15 @@ use utoipa::OpenApi;
             ownership_handlers::SubscriptionStatusResponse,
             ownership_handlers::OkResponse,
             shop_handlers::ShopQuery,
+            shop_handlers::AdminShopOrdersQuery,
             shop_handlers::ShopProductLocaleResponse,
             shop_handlers::ShopProductResponse,
             shop_handlers::ShopPaymentAttemptResponse,
             shop_handlers::ShopReceiptResponse,
             shop_handlers::ShopOrderResponse,
+            shop_handlers::AdminShopOrderUserResponse,
+            shop_handlers::AdminShopOrderResponse,
+            shop_handlers::AdminShopOrdersListResponse,
             shop_handlers::ShopWebhookAckResponse,
             shop_handlers::YooKassaWebhookRequest,
             shop_handlers::YooKassaWebhookObjectRequest,

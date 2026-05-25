@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
-import { createAdminShopProduct, listAdminShopProducts, type CreateShopProductInput } from '../../api/admin'
+import {
+  createAdminShopProduct,
+  listAdminShopProducts,
+  type CreateShopProductInput,
+} from '../../api/admin'
 import { toDisplayError } from '../../api/http'
 import { listAllAdminAssets, type AssetResponse, type OwnershipModel } from '../../api/inventory'
 import type { ShopProductResponse } from '../../api/shop'

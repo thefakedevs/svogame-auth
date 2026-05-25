@@ -2,6 +2,7 @@ use axum::Json;
 use axum::extract::{Path, Query, State};
 use axum::http::HeaderMap;
 use axum::response::Redirect;
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use utoipa::{IntoParams, ToSchema};
@@ -10,6 +11,7 @@ use uuid::Uuid;
 use crate::app::auth::{get_user_from_headers, require_human_superuser};
 use crate::app::http::{HttpError, HttpResult, ProblemResponse};
 use crate::app::state::AppStateExtractor;
+use crate::entities::{User, UserColumn};
 use crate::services::audit::{
     ACTION_ADMIN_SHOP_PRODUCT_CREATED, ACTION_ADMIN_SHOP_PRODUCT_UPDATED,
     ACTION_USER_SHOP_ORDER_CREATED, ACTION_USER_SHOP_ORDER_FULFILLED, write_audit_log,
@@ -22,6 +24,13 @@ use crate::services::shop::{
 #[derive(Debug, Deserialize, IntoParams, ToSchema)]
 pub struct ShopQuery {
     pub locale: Option<String>,
+}
+
+#[derive(Debug, Deserialize, IntoParams, ToSchema)]
+pub struct AdminShopOrdersQuery {
+    pub page: Option<u64>,
+    #[serde(rename = "perPage")]
+    pub per_page: Option<u64>,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
@@ -176,6 +185,31 @@ pub struct ShopOrderResponse {
 }
 
 #[derive(Debug, Serialize, ToSchema)]
+pub struct AdminShopOrderUserResponse {
+    pub id: String,
+    pub username: String,
+    #[schema(rename = "avatarUrl")]
+    pub avatar_url: Option<String>,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct AdminShopOrderResponse {
+    pub order: ShopOrderResponse,
+    pub user: AdminShopOrderUserResponse,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct AdminShopOrdersListResponse {
+    pub items: Vec<AdminShopOrderResponse>,
+    pub total: u64,
+    pub page: u64,
+    #[schema(rename = "perPage")]
+    pub per_page: u64,
+    #[schema(rename = "totalPages")]
+    pub total_pages: u64,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
 pub struct ShopWebhookAckResponse {
     pub ok: bool,
     pub provider: String,
@@ -273,10 +307,14 @@ pub async fn list_my_orders(
 ) -> HttpResult<Json<Value>> {
     let state = state.read().await;
     let user = get_user_from_headers(&headers, &state).await?;
-    let items =
-        shop::list_orders_for_user(&state.db, user.id, &state.config.shop, &state.config.receipts)
-        .await
-        .map_err(map_shop_error)?;
+    let items = shop::list_orders_for_user(
+        &state.db,
+        user.id,
+        &state.config.shop,
+        &state.config.receipts,
+    )
+    .await
+    .map_err(map_shop_error)?;
     Ok(Json(Value::Array(
         items.into_iter().map(order_json).collect(),
     )))
@@ -547,6 +585,68 @@ pub async fn list_admin_products(
     Ok(Json(Value::Array(
         items.into_iter().map(product_json).collect(),
     )))
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/admin/shop/orders",
+    params(AdminShopOrdersQuery),
+    responses(
+        (status = 200, description = "Administrative timeline of recent shop orders.", body = AdminShopOrdersListResponse)
+    ),
+    security(("bearer_auth" = [])),
+    tag = "shop-admin"
+)]
+pub async fn list_admin_orders(
+    State(state): AppStateExtractor,
+    headers: HeaderMap,
+    Query(query): Query<AdminShopOrdersQuery>,
+) -> HttpResult<Json<Value>> {
+    let state = state.read().await;
+    require_human_superuser(&headers, &state).await?;
+    let page = query.page.unwrap_or(1).max(1);
+    let per_page = query.per_page.unwrap_or(30).clamp(1, 100);
+    let (orders, total) = shop::list_admin_orders(&state.db, page, per_page, &state.config.shop)
+        .await
+        .map_err(map_shop_error)?;
+    let user_ids = orders.iter().map(|order| order.user_id).collect::<Vec<_>>();
+    let users = if user_ids.is_empty() {
+        Vec::new()
+    } else {
+        User::find()
+            .filter(UserColumn::Id.is_in(user_ids))
+            .all(&state.db)
+            .await
+            .map_err(|error| {
+                HttpError::internal_error(format!("Failed to load order users: {error}"))
+            })?
+    };
+    let total_pages = if total == 0 {
+        0
+    } else {
+        total.div_ceil(per_page)
+    };
+
+    Ok(Json(json!({
+        "items": orders
+            .into_iter()
+            .map(|order| {
+                let user = users.iter().find(|user| user.id == order.user_id);
+                json!({
+                    "order": order_json(order),
+                    "user": {
+                        "id": user.map(|item| item.id.to_string()).unwrap_or_default(),
+                        "username": user.map(|item| item.username.clone()).unwrap_or_else(|| "Unknown".to_string()),
+                        "avatarUrl": user.and_then(|item| item.avatar_url.clone())
+                    }
+                })
+            })
+            .collect::<Vec<_>>(),
+        "total": total,
+        "page": page,
+        "perPage": per_page,
+        "totalPages": total_pages
+    })))
 }
 
 #[utoipa::path(

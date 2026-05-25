@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { getAdminUser, type AdminUserResponse } from '../../api/admin'
 import {
   getAdminLittlemiceBinaryContent,
   getAdminLittlemiceCheck,
@@ -75,6 +76,12 @@ function finishTime(item: LittlemiceCheckListItemResponse) {
 
 function formatShortId(value: string) {
   return value.length > 14 ? `${value.slice(0, 8)}...${value.slice(-4)}` : value
+}
+
+function playerLabel(user: AdminUserResponse | null | undefined, playerUuid: string) {
+  if (user) return user.username
+  if (user === null) return formatShortId(playerUuid)
+  return 'Загрузка...'
 }
 
 function getPaginationPages(page: number, totalPages: number) {
@@ -547,6 +554,7 @@ function ScreenshotPanel({
 
 function AdminUserLittlemiceDetailView({ token, userId, checkId }: { token: string; userId: string; checkId: string }) {
   const [check, setCheck] = useState<LittlemiceCheckDetailResponse | null>(null)
+  const [player, setPlayer] = useState<AdminUserResponse | null | undefined>(undefined)
   const [logText, setLogText] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [logError, setLogError] = useState('')
@@ -557,6 +565,7 @@ function AdminUserLittlemiceDetailView({ token, userId, checkId }: { token: stri
     let cancelled = false
     const run = async () => {
       setCheck(null)
+      setPlayer(undefined)
       setLogText(null)
       setError('')
       setLogError('')
@@ -564,6 +573,14 @@ function AdminUserLittlemiceDetailView({ token, userId, checkId }: { token: stri
         const loaded = await getAdminLittlemiceCheck(token, checkId)
         if (cancelled) return
         setCheck(loaded)
+
+        void getAdminUser(token, loaded.playerUuid)
+          .then((loadedPlayer) => {
+            if (!cancelled) setPlayer(loadedPlayer)
+          })
+          .catch(() => {
+            if (!cancelled) setPlayer(null)
+          })
 
         if (loaded.logUrl) {
           try {
@@ -601,14 +618,11 @@ function AdminUserLittlemiceDetailView({ token, userId, checkId }: { token: stri
         {error ? <ErrorState title="Проверка недоступна" message={error} /> : null}
         {check ? (
           <div className="admin-littlemice-detail">
-            <div className={`admin-littlemice-head admin-littlemice-detail-hero admin-littlemice-detail-hero--${statusTone(check.status)}`}>
-              <div>
+              <div className="admin-littlemice-detail-hero">
                 <h2 className="card-title">Проверка littlemice</h2>
-                <p className="card-text">Сводка проверки, доказательства и диагностические файлы в одном месте.</p>
                 <p className="admin-inline-muted">Check ID: <code>{check.id}</code></p>
+                <span>Ник игрока: <strong>{playerLabel(player, check.playerUuid)}</strong></span>
               </div>
-              <span className={statusClassName(check.status)}>{statusLabel(check.status)}</span>
-            </div>
 
             {playerMismatch ? (
               <p className="admin-inline-warning">Эта проверка относится к игроку <code>{check.playerUuid}</code>, а открыта из профиля <code>{userId}</code>.</p>

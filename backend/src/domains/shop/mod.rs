@@ -42,4 +42,5 @@ pub fn router() -> Router<crate::app::state::SharedAppState> {
             "/api/admin/shop/products/{product_id}",
             get(handlers::get_admin_product).patch(handlers::patch_product),
         )
+        .route("/api/admin/shop/orders", get(handlers::list_admin_orders))
 }

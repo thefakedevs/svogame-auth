@@ -862,6 +862,42 @@
   background: rgba(0, 0, 0, 0.18);
 }
 
+.admin-littlemice-detail-hero-aside,
+.admin-littlemice-player-chip {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.admin-littlemice-detail-hero-aside {
+  justify-content: flex-end;
+}
+
+.admin-littlemice-player-chip {
+  flex-direction: column;
+  align-items: flex-start;
+  max-width: min(280px, 100%);
+  padding: 8px 10px;
+  border: 1px solid var(--ui-border);
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.admin-littlemice-player-chip span {
+  color: var(--ui-text-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.admin-littlemice-player-chip strong {
+  max-width: 100%;
+  color: var(--ui-text);
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+
 .admin-littlemice-detail-hero--failed {
   border-color: rgba(237, 66, 69, 0.32);
   background: rgba(237, 66, 69, 0.08);
@@ -1653,6 +1689,103 @@
   gap: 16px;
 }
 
+.admin-shop-orders {
+  display: grid;
+  gap: 14px;
+}
+
+.admin-purchase-timeline {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-purchase-card {
+  border: 1px solid var(--ui-border);
+  border-radius: 8px;
+  background: var(--ui-surface);
+  overflow: hidden;
+}
+
+.admin-purchase-card-main {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(138px, 0.3fr) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  border: 0;
+  padding: 14px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.admin-purchase-card-main:hover,
+.admin-purchase-card-main:focus-visible {
+  background: var(--ui-surface-muted);
+}
+
+.admin-purchase-time {
+  color: var(--ui-text-muted);
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+.admin-purchase-summary {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.admin-purchase-summary strong,
+.admin-purchase-summary span {
+  overflow-wrap: anywhere;
+}
+
+.admin-purchase-details {
+  display: grid;
+  gap: 14px;
+  border-top: 1px solid var(--ui-border);
+  padding: 14px;
+}
+
+.admin-purchase-kv {
+  margin: 0;
+}
+
+.admin-purchase-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.admin-purchase-detail-grid h3 {
+  margin: 0 0 8px;
+  font-size: 0.95rem;
+}
+
+.admin-purchase-raw {
+  color: var(--ui-text-muted);
+}
+
+.admin-purchase-raw summary {
+  cursor: pointer;
+}
+
+.admin-purchase-raw pre {
+  max-height: 220px;
+  overflow: auto;
+  margin: 8px 0 0;
+  padding: 10px;
+  border-radius: 8px;
+  background: var(--ui-surface-muted);
+  color: var(--ui-text);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .admin-shop-create .card-text {
   margin-bottom: 12px;
 }
@@ -2136,6 +2269,15 @@
 
   .admin-shop-locale-row {
     grid-template-columns: 1fr;
+  }
+
+  .admin-purchase-card-main,
+  .admin-purchase-detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-purchase-card-main {
+    align-items: flex-start;
   }
 
   .admin-token-create {

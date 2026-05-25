@@ -50,7 +50,9 @@ export interface LootboxOpenHistoryResponse {
   id: number
   userId: string
   lootboxAssetKey: string
+  selectedReward: LootboxRewardResponse
   reward: LootboxRewardResponse
+  wasCompensated: boolean
   actorKind: string
   actorUserId: string | null
   actorServiceName: string | null
@@ -225,6 +227,14 @@ export function getAdminUserLootboxOpenHistory(
       }),
     },
   )
+}
+
+export function getAdminLootboxOpenHistory(token: string): Promise<LootboxOpenHistoryResponse[]> {
+  return request<LootboxOpenHistoryResponse[]>('/api/admin/lootboxes/open-history', {
+    headers: authHeaders(token, {
+      'Content-Type': 'application/json',
+    }),
+  })
 }
 
 export function getMyLootboxOpenHistory(token: string): Promise<LootboxOpenHistoryResponse[]> {

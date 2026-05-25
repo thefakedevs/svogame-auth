@@ -3,7 +3,7 @@ mod yookassa;
 use anyhow::{Result, anyhow};
 use sea_orm::{
     ActiveModelTrait, ActiveValue::Set, ColumnTrait, Condition, ConnectionTrait,
-    DatabaseConnection, EntityTrait, QueryFilter, QueryOrder, TransactionTrait,
+    DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, TransactionTrait,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -487,6 +487,23 @@ pub async fn list_orders_for_user(
         .all(db)
         .await?;
     map_orders_with_attempts(db, orders, shop_config).await
+}
+
+pub async fn list_admin_orders(
+    db: &DatabaseConnection,
+    page: u64,
+    per_page: u64,
+    shop_config: &ShopConfig,
+) -> Result<(Vec<ShopOrderView>, u64)> {
+    let paginator = ShopOrder::find()
+        .order_by_desc(ShopOrderColumn::CreatedAt)
+        .paginate(db, per_page);
+    let total = paginator.num_items().await?;
+    let orders = paginator.fetch_page(page.saturating_sub(1)).await?;
+    Ok((
+        map_orders_with_attempts(db, orders, shop_config).await?,
+        total,
+    ))
 }
 
 pub async fn get_order_for_user(
