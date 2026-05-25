@@ -1,5 +1,6 @@
 import { authHeaders, request, requestNullable } from './http'
 import type { ShopProductResponse } from './shop'
+import type { ShopOrderResponse } from './shop'
 import type { SquadMemberResponse } from './squads'
 import type { SkinModel } from './skins'
 
@@ -119,6 +120,25 @@ export interface DeactivateAdminUserRequest {
 
 export interface ActionResponse {
   status: string
+}
+
+export interface AdminShopOrderUserResponse {
+  id: string
+  username: string
+  avatarUrl: string | null
+}
+
+export interface AdminShopOrderResponse {
+  order: ShopOrderResponse
+  user: AdminShopOrderUserResponse
+}
+
+export interface AdminShopOrdersListResponse {
+  items: AdminShopOrderResponse[]
+  total: number
+  page: number
+  perPage: number
+  totalPages: number
 }
 
 export interface ProductLocaleInput {
@@ -526,6 +546,24 @@ export function listAdminShopProducts(token: string, locale?: string | null): Pr
   if (locale) params.set('locale', locale)
   const suffix = params.toString()
   return request<ShopProductResponse[]>(`/api/admin/shop/products${suffix ? `?${suffix}` : ''}`, {
+    headers: authHeaders(token, {
+      'Content-Type': 'application/json',
+    }),
+  })
+}
+
+export function listAdminShopOrders(
+  token: string,
+  query?: {
+    page?: number
+    perPage?: number
+  },
+): Promise<AdminShopOrdersListResponse> {
+  const params = new URLSearchParams()
+  if (query?.page) params.set('page', String(query.page))
+  if (query?.perPage) params.set('perPage', String(query.perPage))
+  const suffix = params.toString()
+  return request<AdminShopOrdersListResponse>(`/api/admin/shop/orders${suffix ? `?${suffix}` : ''}`, {
     headers: authHeaders(token, {
       'Content-Type': 'application/json',
     }),
