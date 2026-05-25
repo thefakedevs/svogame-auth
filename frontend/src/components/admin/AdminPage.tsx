@@ -45,6 +45,7 @@ import AdminLittlemiceTimelineView from './AdminLittlemiceTimelineView'
 import AdminShopPanel from './AdminShopPanel'
 import AdminShopProductView from './AdminShopProductView'
 import AdminSquadProfile from './AdminSquadProfile'
+import AdminTimelinePanel from './AdminTimelinePanel'
 import AdminUserLittlemiceChecksView from './AdminUserLittlemiceChecksView'
 import AdminUserLootboxHistoryView from './AdminUserLootboxHistoryView'
 import AdminUserProfile from './AdminUserProfile'
@@ -65,7 +66,7 @@ type AdminRoute =
   | { type: 'userLootboxHistory'; userId: string }
   | { type: 'userLittlemice'; userId: string; checkId?: string }
 type AccessState = 'loading' | 'allowed' | 'denied' | 'error'
-type HomeTab = 'overview' | 'users' | 'squads' | 'tokens' | 'assets' | 'shop' | 'skinShop' | 'lootboxes'
+type HomeTab = 'overview' | 'users' | 'squads' | 'tokens' | 'assets' | 'timeline' | 'shop' | 'skinShop' | 'lootboxes'
 const PAGE_SIZE = 30
 
 const dateTimeFormatter = new Intl.DateTimeFormat('ru-RU', {
@@ -144,6 +145,7 @@ function tabFromQuery(tab: string | null): HomeTab {
   if (tab === 'squads') return 'squads'
   if (tab === 'tokens') return 'tokens'
   if (tab === 'assets') return 'assets'
+  if (tab === 'timeline') return 'timeline'
   if (tab === 'shop') return 'shop'
   if (tab === 'skinShop') return 'skinShop'
   if (tab === 'lootboxes') return 'lootboxes'
@@ -563,6 +565,7 @@ function AdminHome({
           <AdminLink href={adminHomeTabPath('users')} replace className={`admin-tab ${tab === 'users' ? 'is-active' : ''}`}>Пользователи</AdminLink>
           <AdminLink href={adminHomeTabPath('squads')} replace className={`admin-tab ${tab === 'squads' ? 'is-active' : ''}`}>Сквады</AdminLink>
           <AdminLink href={adminHomeTabPath('assets')} replace className={`admin-tab ${tab === 'assets' ? 'is-active' : ''}`}>Ассеты</AdminLink>
+          <AdminLink href={adminHomeTabPath('timeline')} replace className={`admin-tab ${tab === 'timeline' ? 'is-active' : ''}`}>История покупок</AdminLink>
           <AdminLink href={adminHomeTabPath('shop')} replace className={`admin-tab ${tab === 'shop' ? 'is-active' : ''}`}>Магазин</AdminLink>
           <AdminLink href={adminHomeTabPath('skinShop')} replace className={`admin-tab ${tab === 'skinShop' ? 'is-active' : ''}`}>Скины → магазин</AdminLink>
           <AdminLink href={adminHomeTabPath('lootboxes')} replace className={`admin-tab ${tab === 'lootboxes' ? 'is-active' : ''}`}>Лутбоксы</AdminLink>
@@ -821,6 +824,7 @@ function AdminHome({
       ) : null}
 
       {tab === 'assets' ? <AdminAssetsPanel token={token} /> : null}
+      {tab === 'timeline' ? <AdminTimelinePanel token={token} /> : null}
 
       {tab === 'shop' ? <AdminShopPanel token={token} /> : null}
       {tab === 'skinShop' ? <AdminGunskinShopWizard token={token} /> : null}
