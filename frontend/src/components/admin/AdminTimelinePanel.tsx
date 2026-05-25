@@ -32,15 +32,6 @@ function formatRub(value: number) {
   return `${value.toLocaleString('ru-RU')} ₽`
 }
 
-function formatMetadata(value: unknown) {
-  if (value == null) return '—'
-  try {
-    return JSON.stringify(value, null, 2)
-  } catch {
-    return String(value)
-  }
-}
-
 function formatLootboxReward(item: LootboxOpenHistoryResponse) {
   const reward = item.reward
   if (reward.amount != null) return `${reward.displayName} x${reward.amount}`
