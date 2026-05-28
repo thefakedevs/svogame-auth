@@ -22,6 +22,7 @@ import './ShopPage.css'
 import { skinRarityRank, uniqueSortedWeaponKeys } from './skinInventoryControls'
 
 const SHOP_LOCALE = 'ru-RU'
+const DEFAULT_STACKABLE_MAX_PURCHASE_QUANTITY = 99
 
 type ShopSortKey = 'default' | 'price_asc' | 'price_desc' | 'rarity' | 'weapon'
 type ShopRarityFilter = 'all' | 'none' | SkinRarity
@@ -47,6 +48,18 @@ const priceFormatter = new Intl.NumberFormat('ru-RU', {
 
 function formatPrice(value: number) {
   return priceFormatter.format(value)
+}
+
+function maxPurchaseQuantity(item: ShopProductView | null) {
+  if (!item) return 1
+  if (normalizedOwnershipModel(item.product, item.asset) !== 'stackable') return 1
+  return item.product.maxPerPurchase ?? DEFAULT_STACKABLE_MAX_PURCHASE_QUANTITY
+}
+
+function clampPurchaseQuantity(item: ShopProductView | null, value: number) {
+  const max = maxPurchaseQuantity(item)
+  if (!Number.isFinite(value)) return 1
+  return Math.max(1, Math.min(max, Math.trunc(value)))
 }
 
 function formatDuration(seconds: number | null | undefined) {
@@ -364,6 +377,7 @@ export default function ShopPage() {
   const [state, setState] = useState<ShopState>({ status: 'loading' })
   const [detailsProduct, setDetailsProduct] = useState<ShopProductView | null>(null)
   const [confirmProduct, setConfirmProduct] = useState<ShopProductView | null>(null)
+  const [confirmQuantity, setConfirmQuantity] = useState(1)
   const [buyingProductKey, setBuyingProductKey] = useState<string | null>(null)
   const [isCreatingOrder, setIsCreatingOrder] = useState(false)
   const [shopSort, setShopSort] = useState<ShopSortKey>('default')
@@ -489,6 +503,7 @@ export default function ShopPage() {
     try {
       await getCurrentUser(token)
       setDetailsProduct(null)
+      setConfirmQuantity(1)
       setConfirmProduct(item)
     } catch (cause) {
       toast.error(toDisplayError(cause, 'Нужно войти в аккаунт.'))
@@ -500,6 +515,7 @@ export default function ShopPage() {
 
   const createOrder = async () => {
     if (!confirmProduct || isCreatingOrder) return
+    const quantity = clampPurchaseQuantity(confirmProduct, confirmQuantity)
 
     const token = getAuthToken()
     if (!token) {
@@ -511,6 +527,7 @@ export default function ShopPage() {
     try {
       const order = await createMyShopOrder(token, {
         product_key: confirmProduct.product.key,
+        quantity,
         locale: SHOP_LOCALE,
       })
       const checkoutUrl = order.payment?.checkoutUrl
@@ -525,6 +542,12 @@ export default function ShopPage() {
       setIsCreatingOrder(false)
     }
   }
+
+  const confirmMaxQuantity = maxPurchaseQuantity(confirmProduct)
+  const normalizedConfirmQuantity = clampPurchaseQuantity(confirmProduct, confirmQuantity)
+  const isConfirmQuantityEditable = confirmMaxQuantity > 1
+  const confirmTotalPrice = confirmProduct ? confirmProduct.product.priceRub * normalizedConfirmQuantity : 0
+  const confirmQuantityPresets = [1, 3, 5, 10]
 
   if (state.status === 'loading') {
     return <LoadingState title="Загружаем магазин" />
@@ -800,9 +823,73 @@ export default function ShopPage() {
             </>
           )}
         >
-          <p>
-            Точно купить «{confirmProduct.title}» за {formatPrice(confirmProduct.product.priceRub)}?
-          </p>
+          <div className="shop-confirm">
+            <p className="shop-confirm__title">
+              Купить «{confirmProduct.title}»
+            </p>
+            {isConfirmQuantityEditable ? (
+              <div className="shop-confirm__quantity">
+                <span id="shop-confirm-quantity-label">Количество</span>
+                <div className="shop-confirm__quantity-row">
+                  <div className="shop-confirm__quantity-control">
+                    <button
+                      className="btn btn-sm"
+                      type="button"
+                      disabled={isCreatingOrder || normalizedConfirmQuantity <= 1}
+                      onClick={() => setConfirmQuantity((value) => clampPurchaseQuantity(confirmProduct, value - 1))}
+                    >
+                      -
+                    </button>
+                    <input
+                      className="ui-input"
+                      type="number"
+                      min={1}
+                      max={confirmMaxQuantity}
+                      value={normalizedConfirmQuantity}
+                      disabled={isCreatingOrder}
+                      aria-labelledby="shop-confirm-quantity-label"
+                      onChange={(event) => setConfirmQuantity(clampPurchaseQuantity(confirmProduct, Number(event.target.value)))}
+                    />
+                    <button
+                      className="btn btn-sm"
+                      type="button"
+                      disabled={isCreatingOrder || normalizedConfirmQuantity >= confirmMaxQuantity}
+                      onClick={() => setConfirmQuantity((value) => clampPurchaseQuantity(confirmProduct, value + 1))}
+                    >
+                      +
+                    </button>
+                  </div>
+                  <div className="shop-confirm__presets" aria-label="Быстрый выбор количества">
+                    {confirmQuantityPresets.map((preset) => (
+                      <button
+                        key={preset}
+                        className={`shop-confirm__preset${normalizedConfirmQuantity === preset ? ' is-active' : ''}`}
+                        type="button"
+                        disabled={isCreatingOrder || preset > confirmMaxQuantity}
+                        onClick={() => setConfirmQuantity(clampPurchaseQuantity(confirmProduct, preset))}
+                      >
+                        x{preset}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ) : null}
+            <dl className="shop-confirm__summary">
+              <div>
+                <dt>Цена за штуку</dt>
+                <dd>{formatPrice(confirmProduct.product.priceRub)}</dd>
+              </div>
+              <div>
+                <dt>Количество</dt>
+                <dd>{normalizedConfirmQuantity}</dd>
+              </div>
+              <div>
+                <dt>Итого</dt>
+                <dd>{formatPrice(confirmTotalPrice)}</dd>
+              </div>
+            </dl>
+          </div>
         </ShopModal>
       ) : null}
     </main>
