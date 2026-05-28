@@ -535,11 +535,6 @@ function LootboxCard({ item, onOpenDetails }: { item: LootboxCardItem; onOpenDet
           <span>Кейс</span>
           <span>{item.amount} шт</span>
         </div>
-        <div className="inventory-skin-card__selection">
-          <span className={`inventory-skin-card__action ${item.isOpenable ? 'is-selected' : ''}`}>
-            {item.isOpenable ? 'Можно открыть' : 'Недоступен'}
-          </span>
-        </div>
         <div className="inventory-card-meta">
           <span>Выдано: {formatDateTime(item.updatedAt).replace(', ', ' ')}</span>
         </div>
@@ -579,9 +574,6 @@ function RegularInventoryCard({ item, onOpenDetails }: { item: RegularInventoryI
         <div className="inventory-skin-card__rarity inventory-lootbox-card__badges">
           <span>{kindLabel}</span>
           <span>{statusLabel}</span>
-        </div>
-        <div className="inventory-skin-card__selection">
-          <span className="inventory-skin-card__action is-selected">Открыть</span>
         </div>
         {metaText ? (
           <div className="inventory-card-meta">
