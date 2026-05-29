@@ -397,7 +397,8 @@
   border-radius: 0;
 }
 
-.inventory-lootbox-card {
+.inventory-lootbox-card,
+.inventory-regular-card {
   border-color: color-mix(in srgb, var(--inventory-accent) 62%, var(--ui-border));
 }
 

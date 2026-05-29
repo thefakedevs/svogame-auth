@@ -9,6 +9,13 @@ import {
   type EntitlementResponse,
   type SkinRarity,
 } from '../api/inventory'
+import {
+  getPublicLootbox,
+  listPublicLootboxes,
+  type LootboxDefinitionResponse,
+  type LootboxDetailResponse,
+  type LootboxDropResponse,
+} from '../api/lootboxes'
 import { createMyShopOrder, listPublicShopProducts, type ShopProductResponse } from '../api/shop'
 import { getCurrentUser } from '../api/users'
 import ErrorState from '../components/ErrorState'
@@ -32,7 +39,7 @@ type ShopAssetKindFilter = 'all' | string
 type ShopState =
   | { status: 'loading' }
   | { status: 'error'; error: string }
-  | { status: 'ready'; products: ShopProductResponse[]; assets: AssetResponse[]; entitlements: EntitlementResponse[] }
+  | { status: 'ready'; products: ShopProductResponse[]; assets: AssetResponse[]; entitlements: EntitlementResponse[]; lootboxes: LootboxDefinitionResponse[] }
 
 const skinRarityConfig: Record<SkinRarity, { label: string; color: string }> = {
   common: { label: 'Обычный', color: '#9aa8b5' },
@@ -192,6 +199,27 @@ function buildAssetMap(assets: AssetResponse[]) {
   return map
 }
 
+function buildLootboxMap(lootboxes: LootboxDefinitionResponse[]) {
+  const map = new Map<string, LootboxDefinitionResponse>()
+  for (const lootbox of lootboxes) {
+    map.set(lootbox.assetKey, lootbox)
+    map.set(lootbox.assetDefinitionId, lootbox)
+    map.set(lootbox.id, lootbox)
+  }
+  return map
+}
+
+function productRewardView(assetMap: Map<string, AssetResponse>, assetKey: string, assetDefinitionId: string) {
+  const asset = assetMap.get(assetKey) ?? assetMap.get(assetDefinitionId) ?? null
+  return {
+    title: asset?.displayName ?? assetKey,
+    imageUrl: assetImageUrl(asset),
+    accent: asset?.rarity
+      ? skinRarityConfig[asset.rarity].color
+      : metadataString(asset, ['accentColor', 'color', 'rarityColor']) ?? fallbackAccent(assetKey),
+  }
+}
+
 function buildOwnedSet(entitlements: EntitlementResponse[]) {
   const set = new Set<string>()
   for (const item of entitlements) {
@@ -248,6 +276,7 @@ function buildProductMetaItems(product: ShopProductResponse, asset: AssetRespons
 type ShopProductView = {
   product: ShopProductResponse
   asset: AssetResponse | null
+  lootbox: LootboxDefinitionResponse | null
   title: string
   description: string
   imageUrl: string | null
@@ -258,6 +287,11 @@ type ShopProductView = {
   accent: string
   owned: boolean
 }
+
+type ShopLootboxDetailsState =
+  | { status: 'loading'; item: ShopProductView }
+  | { status: 'ready'; item: ShopProductView; detail: LootboxDetailResponse }
+  | { status: 'error'; item: ShopProductView; error: string }
 
 function resolveModelPreviewUrl(value: string | null) {
   if (!value) return null
@@ -282,16 +316,145 @@ function productModelPreview(product: ShopProductResponse, asset: AssetResponse 
   return modelUrl && textureUrl ? { modelUrl, textureUrl } : null
 }
 
-function InventoryVisual({ item }: { item: { title: string; imageUrl: string | null; accent: string } }) {
+function InventoryVisual({
+  item,
+  compact = false,
+  fallbackLabel,
+}: {
+  item: { title: string; imageUrl: string | null; accent: string }
+  compact?: boolean
+  fallbackLabel?: string
+}) {
   const [failedImageUrl, setFailedImageUrl] = useState<string | null>(null)
-  const fallback = item.title.trim().slice(0, 1).toUpperCase() || 'S'
+  const fallback = fallbackLabel ?? (item.title.trim().slice(0, 1).toUpperCase() || 'S')
   const showImage = Boolean(item.imageUrl) && failedImageUrl !== item.imageUrl
 
   return (
-    <div className="inventory-visual" style={cardStyle(item.accent)}>
+    <div className={`inventory-visual ${compact ? 'inventory-visual--compact' : ''}`} style={cardStyle(item.accent)}>
       {showImage ? <img src={item.imageUrl ?? ''} alt="" loading="lazy" onError={() => setFailedImageUrl(item.imageUrl)} /> : <span>{fallback}</span>}
       <div className="inventory-visual-splash" />
     </div>
+  )
+}
+
+function formatDropAmount(drop: LootboxDropResponse) {
+  if (drop.amount !== null && drop.amount !== undefined) return `${drop.amount} шт`
+  if (drop.durationSeconds !== null && drop.durationSeconds !== undefined) {
+    const days = Math.floor(drop.durationSeconds / 86_400)
+    if (days > 0) return `${days} д.`
+
+    const hours = Math.max(1, Math.floor(drop.durationSeconds / 3_600))
+    return `${hours} ч.`
+  }
+  return '1 шт'
+}
+
+function formatDropDetails(drop: LootboxDropResponse) {
+  const rows = [formatDropAmount(drop)]
+  if (drop.duplicateCompensationAmount !== null && drop.duplicateCompensationAmount !== undefined) {
+    rows.push(`компенсация дубля: ${drop.duplicateCompensationAmount}`)
+  }
+  return rows.join(' · ')
+}
+
+function formatDropChance(drop: LootboxDropResponse) {
+  if (drop.totalWeight <= 0) return null
+  const chance = drop.weight / drop.totalWeight * 100
+  return `${chance >= 10 ? chance.toFixed(0) : chance.toFixed(1)}%`
+}
+
+function ShopLootboxDetailsModal({
+  state,
+  assetMap,
+  isBuying,
+  onBuy,
+  onClose,
+}: {
+  state: ShopLootboxDetailsState
+  assetMap: Map<string, AssetResponse>
+  isBuying: boolean
+  onBuy: (item: ShopProductView) => void
+  onClose: () => void
+}) {
+  const { item } = state
+  const drops = state.status === 'ready'
+    ? state.detail.drops.filter((drop) => drop.isActive).sort((left, right) => left.sortOrder - right.sortOrder)
+    : []
+
+  return (
+    <AppPortal>
+      <div className="ui-modal-backdrop" role="presentation" onClick={onClose}>
+        <div className="ui-modal skin-details-modal lootbox-details-modal" role="dialog" aria-modal="true" aria-labelledby="shop-lootbox-details-title" onClick={(event) => event.stopPropagation()}>
+          <div className="ui-modal-header">
+            <h2 id="shop-lootbox-details-title" className="ui-modal-title">{item.title}</h2>
+            <button className="ui-modal-close" type="button" aria-label="Закрыть" onClick={onClose}>
+              ×
+            </button>
+          </div>
+          <div className="ui-modal-body">
+            <div className="skin-details-modal__body">
+              <InventoryVisual item={item} fallbackLabel="Кейс" />
+              <div className="skin-details-modal__content">
+                <p>{item.description || 'Описание кейса пока не заполнено.'}</p>
+                <dl className="skin-details-modal__meta">
+                  {buildProductMetaItems(item.product, item.asset).map((metaItem) => (
+                    <div key={`${metaItem.label}:${metaItem.value}`}>
+                      <dt>{metaItem.label}</dt>
+                      <dd>{metaItem.value}</dd>
+                    </div>
+                  ))}
+                </dl>
+
+                <section className="lootbox-details-modal__drops" aria-label="Содержимое кейса">
+                  <h3>Может выпасть</h3>
+                  {state.status === 'loading' ? (
+                    <p className="ownership-muted">Загружаем содержимое...</p>
+                  ) : null}
+                  {state.status === 'error' ? (
+                    <p className="ownership-muted">{state.error}</p>
+                  ) : null}
+                  {state.status === 'ready' && drops.length === 0 ? (
+                    <p className="ownership-muted">Активные награды не указаны.</p>
+                  ) : null}
+                  {drops.length ? (
+                    <div className="lootbox-details-modal__drop-list">
+                      {drops.map((drop) => {
+                        const reward = productRewardView(assetMap, drop.rewardAssetKey, drop.rewardAssetDefinitionId)
+                        const chance = formatDropChance(drop)
+
+                        return (
+                          <article key={drop.id} className="lootbox-details-modal__drop" style={cardStyle(reward.accent)}>
+                            <InventoryVisual item={reward} compact />
+                            <div className="lootbox-details-modal__drop-main">
+                              <strong>{drop.rewardAssetDisplayName || reward.title}</strong>
+                              <span>{formatDropDetails(drop)}</span>
+                            </div>
+                            {chance ? <span className="lootbox-details-modal__drop-chance">{chance}</span> : null}
+                          </article>
+                        )
+                      })}
+                    </div>
+                  ) : null}
+                </section>
+              </div>
+            </div>
+          </div>
+          <div className="ui-modal-footer">
+            <button className="btn" type="button" onClick={onClose}>Закрыть</button>
+            {item.owned ? null : (
+              <button
+                className="btn primary"
+                type="button"
+                disabled={isBuying}
+                onClick={() => onBuy(item)}
+              >
+                Купить за {formatPrice(item.product.priceRub)}
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </AppPortal>
   )
 }
 
@@ -306,10 +469,13 @@ function ProductCard({
   onOpenDetails: (item: ShopProductView) => void
   onBuy: (item: ShopProductView) => void
 }) {
+  const assetKind = normalizedAssetKind(item.product, item.asset)
+
   return (
     <article
       className={`inventory-skin-card shop-product-card ${item.owned ? 'is-owned' : ''}`}
       data-rarity={item.asset?.rarity ?? 'none'}
+      data-asset-kind={assetKind}
       style={cardStyle(item.accent)}
     >
       <button className="shop-product-card__preview" type="button" onClick={() => onOpenDetails(item)}>
@@ -376,6 +542,7 @@ function ShopModal({
 export default function ShopPage() {
   const [state, setState] = useState<ShopState>({ status: 'loading' })
   const [detailsProduct, setDetailsProduct] = useState<ShopProductView | null>(null)
+  const [detailsLootbox, setDetailsLootbox] = useState<ShopLootboxDetailsState | null>(null)
   const [confirmProduct, setConfirmProduct] = useState<ShopProductView | null>(null)
   const [confirmQuantity, setConfirmQuantity] = useState(1)
   const [buyingProductKey, setBuyingProductKey] = useState<string | null>(null)
@@ -390,13 +557,14 @@ export default function ShopPage() {
     setState({ status: 'loading' })
     try {
       const token = getAuthToken()
-      const [products, assets, entitlements] = await Promise.all([
+      const [products, assets, entitlements, lootboxes] = await Promise.all([
         listPublicShopProducts(SHOP_LOCALE),
         listAllPublicAssets(),
         token ? listMyEntitlements(token).catch(() => [] as EntitlementResponse[]) : Promise.resolve([] as EntitlementResponse[]),
+        listPublicLootboxes().catch(() => [] as LootboxDefinitionResponse[]),
       ])
 
-      setState({ status: 'ready', products, assets, entitlements })
+      setState({ status: 'ready', products, assets, entitlements, lootboxes })
     } catch (cause) {
       setState({ status: 'error', error: toDisplayError(cause, 'Не удалось загрузить магазин.') })
     }
@@ -410,17 +578,20 @@ export default function ShopPage() {
     if (state.status !== 'ready') return []
 
     const assetMap = buildAssetMap(state.assets)
+    const lootboxMap = buildLootboxMap(state.lootboxes)
     const ownedSet = buildOwnedSet(state.entitlements)
 
     return state.products
       .map((product) => {
         const asset = assetMap.get(product.assetKey) ?? assetMap.get(product.assetDefinitionId) ?? null
+        const lootbox = lootboxMap.get(product.assetKey) ?? lootboxMap.get(product.assetDefinitionId) ?? null
         const title = product.localizedName || asset?.displayName || product.assetDisplayName || product.key
         const description = productDescription(product, asset)
 
         return {
           product,
           asset,
+          lootbox,
           title,
           description,
           imageUrl: assetImageUrl(asset),
@@ -430,6 +601,11 @@ export default function ShopPage() {
         }
       })
   }, [state])
+
+  const assetMap = useMemo(
+    () => state.status === 'ready' ? buildAssetMap(state.assets) : new Map<string, AssetResponse>(),
+    [state],
+  )
 
   const shopWeaponOptions = useMemo(
     () => uniqueSortedWeaponKeys(baseProductViews.map((item) => item.asset?.weaponKey)),
@@ -503,6 +679,7 @@ export default function ShopPage() {
     try {
       await getCurrentUser(token)
       setDetailsProduct(null)
+      setDetailsLootbox(null)
       setConfirmQuantity(1)
       setConfirmProduct(item)
     } catch (cause) {
@@ -510,6 +687,26 @@ export default function ShopPage() {
       redirectToAuth(currentAppPath())
     } finally {
       setBuyingProductKey(null)
+    }
+  }
+
+  const openProductDetails = async (item: ShopProductView) => {
+    if (normalizedAssetKind(item.product, item.asset) !== 'lootbox' || !item.lootbox) {
+      setDetailsProduct(item)
+      return
+    }
+
+    setDetailsProduct(null)
+    setDetailsLootbox({ status: 'loading', item })
+    try {
+      const detail = await getPublicLootbox(item.lootbox.id)
+      setDetailsLootbox({ status: 'ready', item, detail })
+    } catch (cause) {
+      setDetailsLootbox({
+        status: 'error',
+        item,
+        error: toDisplayError(cause, 'Не удалось загрузить содержимое кейса.'),
+      })
     }
   }
 
@@ -593,7 +790,7 @@ export default function ShopPage() {
                 key={item.product.id}
                 item={item}
                 isBuying={buyingProductKey === item.product.key}
-                onOpenDetails={setDetailsProduct}
+                onOpenDetails={(selected) => void openProductDetails(selected)}
                 onBuy={openBuyConfirmation}
               />
             ))}
@@ -805,6 +1002,16 @@ export default function ShopPage() {
               )}
             </>
           )}
+        />
+      ) : null}
+
+      {detailsLootbox ? (
+        <ShopLootboxDetailsModal
+          state={detailsLootbox}
+          assetMap={assetMap}
+          isBuying={buyingProductKey === detailsLootbox.item.product.key}
+          onBuy={(selected) => void openBuyConfirmation(selected)}
+          onClose={() => setDetailsLootbox(null)}
         />
       ) : null}
 

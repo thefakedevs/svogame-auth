@@ -19,6 +19,10 @@
   min-height: 276px;
 }
 
+.shop-product-card[data-asset-kind="lootbox"] {
+  border-color: color-mix(in srgb, var(--inventory-accent) 62%, var(--ui-border));
+}
+
 .shop-product-card.is-owned {
   opacity: 0.82;
 }
