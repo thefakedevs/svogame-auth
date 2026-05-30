@@ -75,10 +75,13 @@ export default function AppHeader({ pageTitle }: Props) {
     if (!isMenuOpen || !isMobileMenu) return
 
     const previousOverflow = document.body.style.overflow
+    const previousRootOverflow = document.documentElement.style.overflow
     document.body.style.overflow = 'hidden'
+    document.documentElement.style.overflow = 'hidden'
 
     return () => {
       document.body.style.overflow = previousOverflow
+      document.documentElement.style.overflow = previousRootOverflow
     }
   }, [isMenuOpen, isMobileMenu])
 

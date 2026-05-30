@@ -277,12 +277,14 @@
     grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
     align-items: center;
     gap: 0.75rem;
-    width: calc(100% + 40px);
-    margin: -20px -20px 1rem;
+    width: 100%;
+    max-width: 100%;
+    margin: 0 0 1rem;
     padding: 12px 16px;
     border-top: 0;
     border-right: 0;
     border-left: 0;
+    overflow: hidden;
   }
 
   .app-header__left {
@@ -357,10 +359,10 @@
     position: fixed;
     inset: 0;
     z-index: 120;
-    width: 100vw;
+    width: auto;
     max-width: none;
     height: 100dvh;
-    max-height: none;
+    max-height: 100dvh;
     padding: 20px 16px 16px;
     border: 0;
     background:
@@ -379,9 +381,13 @@
   }
 
   .app-header__menu-body {
-    min-height: 100%;
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
     padding: 1rem 0 1.25rem;
-    overflow: auto;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
     gap: 1.25rem;
   }
 
@@ -411,6 +417,7 @@
   .app-header__menu-section button {
     justify-content: flex-start;
     width: 100%;
+    max-width: 100%;
     min-height: 48px;
     padding: 0.8rem 0.9rem;
   }
@@ -437,7 +444,7 @@
   }
 
   .app-header__menu {
-    width: 100vw;
+    width: auto;
   }
 }
 
