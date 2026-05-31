@@ -42,10 +42,6 @@ function defaultMetaItems(item: SkinDetailsModalItem) {
 
   rows.push({ label: 'Редкость', value: rarityLabel(item.rarity) })
 
-  if (item.weaponKey) {
-    rows.push({ label: 'Оружие', value: item.weaponKey })
-  }
-
   return rows
 }
 
