@@ -70,12 +70,17 @@
 }
 
 .inventory-filters-modal {
+  display: flex;
+  flex-direction: column;
   max-width: 520px;
   width: min(520px, calc(100vw - 32px));
+  overflow: hidden;
 }
 
 .inventory-filters-modal .ui-modal-body {
-  max-height: min(72vh, 560px);
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
   overflow-y: auto;
 }
 

@@ -241,6 +241,12 @@ function productDescription(product: ShopProductResponse, asset: AssetResponse |
     ?? 'Товар для твоего инвентаря.'
 }
 
+function displaySkinTitle(title: string, asset: AssetResponse | null) {
+  if (!asset?.weaponKey || !title.includes('|')) return title
+
+  return title.split('|').slice(1).join('|').trim() || title
+}
+
 function addMetaItem(rows: Array<{ label: string; value: string }>, label: string, value: string | null | undefined) {
   if (!value) return
   rows.push({ label, value })
@@ -258,7 +264,6 @@ function buildProductMetaItems(product: ShopProductResponse, asset: AssetRespons
 
   if (isSkin) {
     if (asset?.rarity) addMetaItem(rows, 'Редкость', rarityLabel(asset.rarity))
-    addMetaItem(rows, 'Оружие', asset?.weaponKey ?? '—')
   }
 
   if (!isSkin && (isSubscription || ownershipModel === 'expirable')) {
@@ -585,7 +590,7 @@ export default function ShopPage() {
       .map((product) => {
         const asset = assetMap.get(product.assetKey) ?? assetMap.get(product.assetDefinitionId) ?? null
         const lootbox = lootboxMap.get(product.assetKey) ?? lootboxMap.get(product.assetDefinitionId) ?? null
-        const title = product.localizedName || asset?.displayName || product.assetDisplayName || product.key
+        const title = displaySkinTitle(product.localizedName || asset?.displayName || product.assetDisplayName || product.key, asset)
         const description = productDescription(product, asset)
 
         return {
