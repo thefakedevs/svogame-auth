@@ -128,18 +128,12 @@ function assetAccent(asset: AssetResponse | null, assetKey: string) {
     : metadataString(asset, ['accentColor', 'color', 'rarityColor']) ?? fallbackAccent(asset?.key ?? assetKey)
 }
 
-function displaySkinTitle(title: string, asset: AssetResponse | null) {
-  if (!asset?.weaponKey || !title.includes('|')) return title
-
-  return title.split('|').slice(1).join('|').trim() || title
-}
-
 function assetView(assetMap: Map<string, AssetResponse>, assetKey: string, assetDefinitionId: string) {
   const asset = getAsset(assetMap, assetKey, assetDefinitionId)
   return {
     asset,
     key: assetKey,
-    title: displaySkinTitle(asset?.displayName ?? assetKey, asset),
+    title: asset?.displayName ?? assetKey,
     description: asset?.description ?? asset?.assetKind ?? assetKey,
     imageUrl: assetImageUrl(asset),
     modelPreview: assetModelPreview(asset),
