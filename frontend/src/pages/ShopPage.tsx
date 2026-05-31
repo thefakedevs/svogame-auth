@@ -241,12 +241,6 @@ function productDescription(product: ShopProductResponse, asset: AssetResponse |
     ?? 'Товар для твоего инвентаря.'
 }
 
-function displaySkinTitle(title: string, asset: AssetResponse | null) {
-  if (!asset?.weaponKey || !title.includes('|')) return title
-
-  return title.split('|').slice(1).join('|').trim() || title
-}
-
 function addMetaItem(rows: Array<{ label: string; value: string }>, label: string, value: string | null | undefined) {
   if (!value) return
   rows.push({ label, value })
@@ -590,7 +584,7 @@ export default function ShopPage() {
       .map((product) => {
         const asset = assetMap.get(product.assetKey) ?? assetMap.get(product.assetDefinitionId) ?? null
         const lootbox = lootboxMap.get(product.assetKey) ?? lootboxMap.get(product.assetDefinitionId) ?? null
-        const title = displaySkinTitle(product.localizedName || asset?.displayName || product.assetDisplayName || product.key, asset)
+        const title = product.localizedName || asset?.displayName || product.assetDisplayName || product.key
         const description = productDescription(product, asset)
 
         return {
