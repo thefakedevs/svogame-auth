@@ -1,4 +1,4 @@
-import type { ProfileTab } from './types'
+import type { ProfileTab } from "./types";
 
 function OverviewSkeleton() {
   return (
@@ -45,7 +45,7 @@ function OverviewSkeleton() {
         </div>
       </div>
     </div>
-  )
+  );
 }
 
 function SquadsSkeleton() {
@@ -82,7 +82,7 @@ function SquadsSkeleton() {
         ))}
       </div>
     </div>
-  )
+  );
 }
 
 function SettingsSkeleton() {
@@ -117,15 +117,15 @@ function SettingsSkeleton() {
         </div>
       </div>
     </div>
-  )
+  );
 }
 
-export default function ProfileSkeleton({ activeTab = 'overview' }: { activeTab?: ProfileTab }) {
+export default function ProfileSkeleton({ activeTab = "overview" }: { activeTab?: ProfileTab }) {
   return (
     <>
-      {activeTab === 'squads' ? <SquadsSkeleton /> : null}
-      {activeTab === 'settings' ? <SettingsSkeleton /> : null}
-      {activeTab === 'overview' ? <OverviewSkeleton /> : null}
+      {activeTab === "squads" ? <SquadsSkeleton /> : null}
+      {activeTab === "settings" ? <SettingsSkeleton /> : null}
+      {activeTab === "overview" ? <OverviewSkeleton /> : null}
     </>
-  )
+  );
 }

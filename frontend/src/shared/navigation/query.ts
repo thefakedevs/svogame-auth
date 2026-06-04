@@ -1,8 +1,8 @@
-import { useMemo } from 'react'
-import { useSearch } from './history'
+import { useMemo } from "react";
+import { useSearch } from "./history";
 
 export function useQueryParams() {
-  const search = useSearch()
+  const search = useSearch();
 
-  return useMemo(() => new URLSearchParams(search), [search])
+  return useMemo(() => new URLSearchParams(search), [search]);
 }

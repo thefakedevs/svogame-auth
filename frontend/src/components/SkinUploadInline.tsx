@@ -1,97 +1,99 @@
-import { Suspense, lazy, useRef, useState } from 'react'
-import toast from 'react-hot-toast'
-import { ApiError, uploadMySkin, type SkinModel } from '../api/skins'
-import { getAuthToken } from '../shared/session/auth-session'
-import './SkinUploadInline.css'
+import { Suspense, lazy, useRef, useState } from "react";
+import toast from "react-hot-toast";
+import { ApiError, uploadMySkin, type SkinModel } from "../api/skins";
+import { getAuthToken } from "../shared/session/auth-session";
+import "./SkinUploadInline.css";
 
-const SkinViewer3D = lazy(() => import('./SkinViewer3D'))
+const SkinViewer3D = lazy(() => import("./SkinViewer3D"));
 
 function skinUploadErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
     if (error.isNetworkError()) {
-      return 'Нет доступа к серверу. Проверьте подключение и попробуйте снова.'
+      return "Нет доступа к серверу. Проверьте подключение и попробуйте снова.";
     }
-    return error.message
+    return error.message;
   }
 
   if (error instanceof Error && error.message) {
-    return error.message
+    return error.message;
   }
 
-  return 'Не удалось загрузить скин.'
+  return "Не удалось загрузить скин.";
 }
 
 export default function SkinUploadInline({ onUploaded }: { onUploaded?: () => void }) {
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState(false)
-  const [model, setModel] = useState<SkinModel>('default')
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [model, setModel] = useState<SkinModel>("default");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (file: File) => {
-    if (file.type.startsWith('image/')) {
-      const reader = new FileReader()
+    if (file.type.startsWith("image/")) {
+      const reader = new FileReader();
       reader.onload = (event) => {
-        setPreviewUrl(event.target?.result as string)
-      }
-      reader.readAsDataURL(file)
+        setPreviewUrl(event.target?.result as string);
+      };
+      reader.readAsDataURL(file);
     }
-  }
+  };
 
   const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (file) handleFileChange(file)
-  }
+    const file = event.target.files?.[0];
+    if (file) handleFileChange(file);
+  };
 
   const handleUpload = async () => {
-    const file = fileInputRef.current?.files?.[0]
-    if (!file) return
+    const file = fileInputRef.current?.files?.[0];
+    if (!file) return;
 
-    const token = getAuthToken()
+    const token = getAuthToken();
     if (!token) {
-      toast.error('Сессия не найдена. Войдите снова.')
-      return
+      toast.error("Сессия не найдена. Войдите снова.");
+      return;
     }
 
-    setIsLoading(true)
+    setIsLoading(true);
 
-    const uploadPromise = uploadMySkin(token, file, model)
+    const uploadPromise = uploadMySkin(token, file, model);
 
     toast.promise(uploadPromise, {
-      loading: 'Загрузка скина...',
-      success: 'Скин успешно загружен.',
+      loading: "Загрузка скина...",
+      success: "Скин успешно загружен.",
       error: (error) => skinUploadErrorMessage(error),
-    })
+    });
 
     try {
-      await uploadPromise
-      setPreviewUrl(null)
-      if (fileInputRef.current) fileInputRef.current.value = ''
-      onUploaded?.()
+      await uploadPromise;
+      setPreviewUrl(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      onUploaded?.();
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   return (
     <div className="skin-upload-inline">
       <div className="upload-preview-3d">
         {previewUrl ? (
           <>
-            <Suspense fallback={<div className="upload-placeholder">Загружаем предпросмотр...</div>}>
+            <Suspense
+              fallback={<div className="upload-placeholder">Загружаем предпросмотр...</div>}
+            >
               <SkinViewer3D skinUrl={previewUrl} model={model} width={300} height={400} />
             </Suspense>
             <div className="model-toggle">
               <button
                 type="button"
-                className={`btn btn-sm model-btn ${model === 'default' ? 'active' : ''}`}
-                onClick={() => setModel('default')}
+                className={`btn btn-sm model-btn ${model === "default" ? "active" : ""}`}
+                onClick={() => setModel("default")}
               >
                 Обычная
               </button>
               <button
                 type="button"
-                className={`btn btn-sm model-btn ${model === 'slim' ? 'active' : ''}`}
-                onClick={() => setModel('slim')}
+                className={`btn btn-sm model-btn ${model === "slim" ? "active" : ""}`}
+                onClick={() => setModel("slim")}
               >
                 Тонкая
               </button>
@@ -109,19 +111,30 @@ export default function SkinUploadInline({ onUploaded }: { onUploaded?: () => vo
         )}
       </div>
 
-      <input ref={fileInputRef} type="file" accept="image/*" onChange={handleInputChange} style={{ display: 'none' }} />
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleInputChange}
+        style={{ display: "none" }}
+      />
 
       {previewUrl ? (
         <div className="upload-buttons">
-          <button type="button" className="btn btn-success" onClick={() => void handleUpload()} disabled={isLoading}>
-            {isLoading ? 'Загрузка...' : 'Загрузить'}
+          <button
+            type="button"
+            className="btn btn-success"
+            onClick={() => void handleUpload()}
+            disabled={isLoading}
+          >
+            {isLoading ? "Загрузка..." : "Загрузить"}
           </button>
           <button
             type="button"
             className="btn"
             onClick={() => {
-              setPreviewUrl(null)
-              if (fileInputRef.current) fileInputRef.current.value = ''
+              setPreviewUrl(null);
+              if (fileInputRef.current) fileInputRef.current.value = "";
             }}
             disabled={isLoading}
           >
@@ -130,5 +143,5 @@ export default function SkinUploadInline({ onUploaded }: { onUploaded?: () => vo
         </div>
       ) : null}
     </div>
-  )
+  );
 }

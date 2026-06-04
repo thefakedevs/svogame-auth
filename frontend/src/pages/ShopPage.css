@@ -156,7 +156,10 @@
   font-size: 0.78rem;
   font-weight: 900;
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s;
 }
 
 .shop-confirm__preset:hover:not(:disabled),

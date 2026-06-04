@@ -131,19 +131,19 @@
 }
 
 .profile-squad-avatar-tile.is-readonly,
-.profile-squad-avatar-tile[aria-disabled='true'] {
+.profile-squad-avatar-tile[aria-disabled="true"] {
   cursor: not-allowed;
 }
 
 .profile-squad-avatar-tile.is-readonly .profile-squad-avatar-image,
 .profile-squad-avatar-tile.is-readonly .profile-squad-avatar-placeholder,
-.profile-squad-avatar-tile[aria-disabled='true'] .profile-squad-avatar-image,
-.profile-squad-avatar-tile[aria-disabled='true'] .profile-squad-avatar-placeholder {
+.profile-squad-avatar-tile[aria-disabled="true"] .profile-squad-avatar-image,
+.profile-squad-avatar-tile[aria-disabled="true"] .profile-squad-avatar-placeholder {
   filter: grayscale(0.2) brightness(0.72);
 }
 
 .profile-squad-avatar-tile.is-readonly .profile-squad-avatar-tooltip,
-.profile-squad-avatar-tile[aria-disabled='true'] .profile-squad-avatar-tooltip,
+.profile-squad-avatar-tile[aria-disabled="true"] .profile-squad-avatar-tooltip,
 .profile-squad-avatar-tile.is-readonly .profile-squad-avatar-placeholder-copy {
   color: rgba(247, 164, 29, 0.7);
 }

@@ -29,7 +29,7 @@
 }
 
 .ui-kit-page .ui-section-title::before {
-  content: '';
+  content: "";
   width: 6px;
   height: 6px;
   background: #f7a41d;

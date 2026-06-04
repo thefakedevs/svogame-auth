@@ -1,4 +1,4 @@
-import './ContactsPage.css'
+import "./ContactsPage.css";
 
 export default function ContactsPage() {
   return (
@@ -6,20 +6,24 @@ export default function ContactsPage() {
       <section className="contacts-hero card">
         <h1 className="card-title contacts-hero__title">Связь с SvoCraft</h1>
         <p className="card-text">
-          Следите за новостями в социальных каналах и пишите в поддержку, если нужна помощь с аккаунтом, лаунчером или
-          входом в игру.
+          Следите за новостями в социальных каналах и пишите в поддержку, если нужна помощь с
+          аккаунтом, лаунчером или входом в игру.
         </p>
       </section>
 
       <section className="contacts-section" aria-labelledby="contacts-community-title">
-        <h2 id="contacts-community-title" className="ui-section-title">Каналы проекта</h2>
+        <h2 id="contacts-community-title" className="ui-section-title">
+          Каналы проекта
+        </h2>
         <div className="contacts-grid">
           <article className="card contacts-card">
             <div className="contacts-card__head">
               <h3 className="card-title">Discord-сервер</h3>
               <span className="ui-badge ui-badge-accent">Сообщество</span>
             </div>
-            <p className="card-text">Сервер с основной коммуникацией игроков и самой актуальной информацией.</p>
+            <p className="card-text">
+              Сервер с основной коммуникацией игроков и самой актуальной информацией.
+            </p>
             <div className="ui-card-footer">
               <a
                 className="btn btn-sm btn-secondary-accent"
@@ -38,7 +42,9 @@ export default function ContactsPage() {
               <h3 className="card-title">Telegram-канал</h3>
               <span className="ui-badge ui-badge-accent">Новости</span>
             </div>
-            <p className="card-text">Новости проекта, расписание ивентов, быстрые объявления по лаунчеру и серверам.</p>
+            <p className="card-text">
+              Новости проекта, расписание ивентов, быстрые объявления по лаунчеру и серверам.
+            </p>
             <div className="ui-card-footer">
               <a
                 className="btn btn-sm btn-secondary-accent"
@@ -74,14 +80,18 @@ export default function ContactsPage() {
       </section>
 
       <section className="contacts-section" aria-labelledby="contacts-support-title">
-        <h2 id="contacts-support-title" className="ui-section-title">Поддержка</h2>
+        <h2 id="contacts-support-title" className="ui-section-title">
+          Поддержка
+        </h2>
         <div className="contacts-grid">
           <article className="card contacts-card">
             <div className="contacts-card__head">
               <h3 className="card-title">Почта поддержки</h3>
               <span className="ui-badge ui-badge-accent">Email</span>
             </div>
-            <p className="card-text">Для вопросов по аккаунту, лаунчеру, оплатам и доступу к игре.</p>
+            <p className="card-text">
+              Для вопросов по аккаунту, лаунчеру, оплатам и доступу к игре.
+            </p>
             <div className="ui-card-footer">
               <a
                 className="btn btn-sm btn-secondary-accent"
@@ -98,7 +108,9 @@ export default function ContactsPage() {
               <h3 className="card-title">Поддержка в Telegram</h3>
               <span className="ui-badge ui-badge-accent">Support</span>
             </div>
-            <p className="card-text">Быстрая помощь с любыми проблемами, входом и техническими ошибками.</p>
+            <p className="card-text">
+              Быстрая помощь с любыми проблемами, входом и техническими ошибками.
+            </p>
             <div className="ui-card-footer">
               <a
                 className="btn btn-sm btn-secondary-accent"
@@ -114,5 +126,5 @@ export default function ContactsPage() {
         </div>
       </section>
     </main>
-  )
+  );
 }

@@ -1,33 +1,36 @@
-import ErrorState from '../ErrorState'
-import { useQuery } from '../../util/query'
-import { buildAuthUrl } from '../../routes/auth'
-import { navigateTo } from '../../shared/navigation/history'
+import ErrorState from "../ErrorState";
+import { useQuery } from "../../util/query";
+import { buildAuthUrl } from "../../routes/auth";
+import { navigateTo } from "../../shared/navigation/history";
 
 const authErrorTitles: Record<string, string> = {
-  access_denied: 'Доступ не был предоставлен',
-}
+  access_denied: "Доступ не был предоставлен",
+};
 
 const authErrorDescriptions: Record<string, string> = {
-  access_denied: 'Вход через Discord был отменен или отклонен. Попробуйте начать авторизацию заново.',
-}
+  access_denied:
+    "Вход через Discord был отменен или отклонен. Попробуйте начать авторизацию заново.",
+};
 
 function resolveMessage(errorCode: string | null, errorDescription: string | null): string {
   if (errorDescription?.trim()) {
-    return errorDescription
+    return errorDescription;
   }
 
   if (errorCode && authErrorDescriptions[errorCode]) {
-    return authErrorDescriptions[errorCode]
+    return authErrorDescriptions[errorCode];
   }
 
-  return 'Не удалось завершить авторизацию через Discord. Попробуйте еще раз.'
+  return "Не удалось завершить авторизацию через Discord. Попробуйте еще раз.";
 }
 
 export default function AuthErrorPage() {
-  const query = useQuery()
-  const errorCode = query.get('error')
-  const errorDescription = query.get('error_description')
-  const title = errorCode ? authErrorTitles[errorCode] ?? 'Авторизация не завершена' : 'Авторизация не завершена'
+  const query = useQuery();
+  const errorCode = query.get("error");
+  const errorDescription = query.get("error_description");
+  const title = errorCode
+    ? (authErrorTitles[errorCode] ?? "Авторизация не завершена")
+    : "Авторизация не завершена";
 
   return (
     <div className="page auth-error-page auth-pow-fullbleed">
@@ -41,5 +44,5 @@ export default function AuthErrorPage() {
         />
       </div>
     </div>
-  )
+  );
 }

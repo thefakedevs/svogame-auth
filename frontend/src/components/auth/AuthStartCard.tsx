@@ -3,9 +3,9 @@ export default function AuthStartCard({
   errorMessage,
   isLoading,
 }: {
-  onStart: () => void
-  errorMessage?: string
-  isLoading?: boolean
+  onStart: () => void;
+  errorMessage?: string;
+  isLoading?: boolean;
 }) {
   return (
     <div className="page auth-start-page auth-pow-fullbleed">
@@ -20,11 +20,11 @@ export default function AuthStartCard({
           {errorMessage ? <p className="card-text">{errorMessage}</p> : null}
           <div className="auth-start-card__actions mt-6 flex justify-end">
             <button className="btn primary" type="button" onClick={onStart} disabled={isLoading}>
-              {isLoading ? 'Подготовка...' : 'Продолжить'}
+              {isLoading ? "Подготовка..." : "Продолжить"}
             </button>
           </div>
         </section>
       </div>
     </div>
-  )
+  );
 }

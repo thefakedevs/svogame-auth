@@ -14,7 +14,9 @@
   justify-content: center;
   border: 1px dashed rgba(255, 255, 255, 0.22);
   background: rgba(0, 0, 0, 0.25);
-  transition: border-color 0.15s, background 0.15s;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
 }
 
 .upload-preview-3d:has(.upload-placeholder) {

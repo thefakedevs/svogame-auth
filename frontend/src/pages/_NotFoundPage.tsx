@@ -1,5 +1,5 @@
-import { paths } from '../routes/paths'
-import './NotFoundPage.css'
+import { paths } from "../routes/paths";
+import "./NotFoundPage.css";
 
 export default function NotFoundPage() {
   return (
@@ -11,10 +11,14 @@ export default function NotFoundPage() {
           Проверьте адрес или перейдите в один из основных разделов.
         </p>
         <div className="not-found-actions">
-          <a href={paths.home} className="btn primary">На главную</a>
-          <a href={paths.profile} className="btn">Профиль</a>
+          <a href={paths.home} className="btn primary">
+            На главную
+          </a>
+          <a href={paths.profile} className="btn">
+            Профиль
+          </a>
         </div>
       </section>
     </div>
-  )
+  );
 }

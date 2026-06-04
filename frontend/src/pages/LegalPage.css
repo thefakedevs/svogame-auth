@@ -70,7 +70,10 @@
   text-decoration: none;
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(255, 255, 255, 0.03);
-  transition: border-color 0.18s ease, background 0.18s ease, transform 0.18s ease;
+  transition:
+    border-color 0.18s ease,
+    background 0.18s ease,
+    transform 0.18s ease;
 }
 
 .legal-page__list-link:hover {
@@ -126,12 +129,12 @@
 }
 
 .legal-page__subnav a:hover,
-.legal-page__subnav a[aria-current='page'] {
+.legal-page__subnav a[aria-current="page"] {
   color: #fff;
   border-bottom-color: rgba(143, 211, 255, 0.5);
 }
 
-.legal-page__subnav a[aria-current='page'] {
+.legal-page__subnav a[aria-current="page"] {
   cursor: default;
 }
 

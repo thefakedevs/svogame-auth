@@ -1,6 +1,6 @@
 .ui-kit-page.ui-pow-check {
-  --ui-pow-font-sans: 'IBM Plex Sans', 'Inter', system-ui, sans-serif;
-  --ui-pow-font-mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Code', monospace;
+  --ui-pow-font-sans: "IBM Plex Sans", "Inter", system-ui, sans-serif;
+  --ui-pow-font-mono: "IBM Plex Mono", ui-monospace, "Cascadia Code", monospace;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -36,10 +36,8 @@
   z-index: 1;
   width: clamp(52px, 12vw, 64px);
   height: clamp(52px, 12vw, 64px);
-  filter:
-    drop-shadow(0 0 8px rgba(247, 164, 29, 0.85))
-    drop-shadow(0 0 22px rgba(247, 164, 29, 0.4))
-    drop-shadow(0 0 40px rgba(247, 164, 29, 0.2));
+  filter: drop-shadow(0 0 8px rgba(247, 164, 29, 0.85))
+    drop-shadow(0 0 22px rgba(247, 164, 29, 0.4)) drop-shadow(0 0 40px rgba(247, 164, 29, 0.2));
 }
 
 .ui-kit-page.ui-pow-check .ui-pow-check-title {
@@ -116,8 +114,8 @@
 }
 
 .ui-kit-page.ui-auth-flow {
-  --ui-pow-font-sans: 'IBM Plex Sans', 'Inter', system-ui, sans-serif;
-  --ui-pow-font-mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Code', monospace;
+  --ui-pow-font-sans: "IBM Plex Sans", "Inter", system-ui, sans-serif;
+  --ui-pow-font-mono: "IBM Plex Mono", ui-monospace, "Cascadia Code", monospace;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -209,10 +207,8 @@
   z-index: 1;
   width: clamp(52px, 12vw, 64px);
   height: clamp(52px, 12vw, 64px);
-  filter:
-    drop-shadow(0 0 8px rgba(247, 164, 29, 0.4))
-    drop-shadow(0 0 22px rgba(247, 164, 29, 0.28))
-    drop-shadow(0 0 40px rgba(247, 164, 29, 0.2));
+  filter: drop-shadow(0 0 8px rgba(247, 164, 29, 0.4))
+    drop-shadow(0 0 22px rgba(247, 164, 29, 0.28)) drop-shadow(0 0 40px rgba(247, 164, 29, 0.2));
 }
 
 .ui-kit-page.ui-auth-flow .ui-auth-flow-icon--error {
@@ -220,7 +216,7 @@
 }
 
 .ui-kit-page.ui-auth-flow .ui-auth-flow-icon--error::before {
-  content: '';
+  content: "";
   position: absolute;
   width: clamp(76px, 20vw, 104px);
   height: clamp(76px, 20vw, 104px);
@@ -237,9 +233,7 @@
 }
 
 .ui-kit-page.ui-auth-flow .ui-auth-flow-icon--error svg {
-  filter:
-    drop-shadow(0 0 8px rgba(237, 66, 69, 0.55))
-    drop-shadow(0 0 22px rgba(237, 66, 69, 0.28));
+  filter: drop-shadow(0 0 8px rgba(237, 66, 69, 0.55)) drop-shadow(0 0 22px rgba(237, 66, 69, 0.28));
 }
 
 .ui-kit-page.ui-auth-flow.ui-pow-check .vt-slot-main {

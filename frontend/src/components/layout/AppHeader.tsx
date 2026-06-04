@@ -1,142 +1,142 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
-import { toDisplayError } from '../../api/http'
-import { getMyDefaultWalletBalance, type WalletBalanceResponse } from '../../api/inventory'
-import { buildAuthUrl } from '../../routes/auth'
-import { paths } from '../../routes/paths'
-import { navigateTo } from '../../shared/navigation/history'
-import { clearAuthSession, getAuthToken } from '../../shared/session/auth-session'
-import { validateTokenFormat } from '../../shared/session/token'
-import { useAuthStore } from '../../store/authStore'
-import './AppHeader.css'
+import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { toDisplayError } from "../../api/http";
+import { getMyDefaultWalletBalance, type WalletBalanceResponse } from "../../api/inventory";
+import { buildAuthUrl } from "../../routes/auth";
+import { paths } from "../../routes/paths";
+import { navigateTo } from "../../shared/navigation/history";
+import { clearAuthSession, getAuthToken } from "../../shared/session/auth-session";
+import { validateTokenFormat } from "../../shared/session/token";
+import { useAuthStore } from "../../store/authStore";
+import "./AppHeader.css";
 
-type Props = { pageTitle?: string }
+type Props = { pageTitle?: string };
 
-const balanceFormatter = new Intl.NumberFormat('ru-RU')
+const balanceFormatter = new Intl.NumberFormat("ru-RU");
 
 function formatBalance(balance?: WalletBalanceResponse | null) {
-  if (!balance) return '0'
-  return balanceFormatter.format(balance.balance)
+  if (!balance) return "0";
+  return balanceFormatter.format(balance.balance);
 }
 
 export default function AppHeader({ pageTitle }: Props) {
-  const authHydrated = useAuthStore((store) => store.hydrated)
-  const authUser = useAuthStore((store) => store.user)
-  const [isMenuOpen, setIsMenuOpen] = useState(false)
-  const [isMobileMenu, setIsMobileMenu] = useState(false)
-  const [defaultBalance, setDefaultBalance] = useState<WalletBalanceResponse | null>(null)
-  const [isBalanceLoading, setIsBalanceLoading] = useState(false)
-  const triggerRef = useRef<HTMLDivElement | null>(null)
-  const menuPanelRef = useRef<HTMLDivElement | null>(null)
+  const authHydrated = useAuthStore((store) => store.hydrated);
+  const authUser = useAuthStore((store) => store.user);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isMobileMenu, setIsMobileMenu] = useState(false);
+  const [defaultBalance, setDefaultBalance] = useState<WalletBalanceResponse | null>(null);
+  const [isBalanceLoading, setIsBalanceLoading] = useState(false);
+  const triggerRef = useRef<HTMLDivElement | null>(null);
+  const menuPanelRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const onPointerDown = (event: PointerEvent) => {
-      const target = event.target as Node
+      const target = event.target as Node;
       if (!triggerRef.current?.contains(target) && !menuPanelRef.current?.contains(target)) {
-        setIsMenuOpen(false)
+        setIsMenuOpen(false);
       }
-    }
+    };
 
-    window.addEventListener('pointerdown', onPointerDown)
-    return () => window.removeEventListener('pointerdown', onPointerDown)
-  }, [])
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-
-    const mediaQuery = window.matchMedia('(max-width: 720px)')
-    const syncViewport = () => setIsMobileMenu(mediaQuery.matches)
-
-    syncViewport()
-
-    if (typeof mediaQuery.addEventListener === 'function') {
-      mediaQuery.addEventListener('change', syncViewport)
-      return () => mediaQuery.removeEventListener('change', syncViewport)
-    }
-
-    mediaQuery.addListener(syncViewport)
-    return () => mediaQuery.removeListener(syncViewport)
-  }, [])
+    window.addEventListener("pointerdown", onPointerDown);
+    return () => window.removeEventListener("pointerdown", onPointerDown);
+  }, []);
 
   useEffect(() => {
-    if (!isMenuOpen) return
+    if (typeof window === "undefined") return;
+
+    const mediaQuery = window.matchMedia("(max-width: 720px)");
+    const syncViewport = () => setIsMobileMenu(mediaQuery.matches);
+
+    syncViewport();
+
+    if (typeof mediaQuery.addEventListener === "function") {
+      mediaQuery.addEventListener("change", syncViewport);
+      return () => mediaQuery.removeEventListener("change", syncViewport);
+    }
+
+    mediaQuery.addListener(syncViewport);
+    return () => mediaQuery.removeListener(syncViewport);
+  }, []);
+
+  useEffect(() => {
+    if (!isMenuOpen) return;
 
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setIsMenuOpen(false)
+      if (event.key === "Escape") {
+        setIsMenuOpen(false);
       }
-    }
+    };
 
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [isMenuOpen])
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isMenuOpen]);
 
   useEffect(() => {
-    if (!isMenuOpen || !isMobileMenu) return
+    if (!isMenuOpen || !isMobileMenu) return;
 
-    const previousOverflow = document.body.style.overflow
-    const previousRootOverflow = document.documentElement.style.overflow
-    document.body.style.overflow = 'hidden'
-    document.documentElement.style.overflow = 'hidden'
+    const previousOverflow = document.body.style.overflow;
+    const previousRootOverflow = document.documentElement.style.overflow;
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
 
     return () => {
-      document.body.style.overflow = previousOverflow
-      document.documentElement.style.overflow = previousRootOverflow
-    }
-  }, [isMenuOpen, isMobileMenu])
+      document.body.style.overflow = previousOverflow;
+      document.documentElement.style.overflow = previousRootOverflow;
+    };
+  }, [isMenuOpen, isMobileMenu]);
 
   const sessionWarning = useMemo(() => {
-    const token = getAuthToken()
-    if (!authHydrated || !token) return null
+    const token = getAuthToken();
+    if (!authHydrated || !token) return null;
 
     return validateTokenFormat(token)
       ? null
-      : 'Сохраненная сессия выглядит поврежденной. Лучше войти заново.'
-  }, [authHydrated])
+      : "Сохраненная сессия выглядит поврежденной. Лучше войти заново.";
+  }, [authHydrated]);
 
-  const avatarFallback = authUser?.username ? authUser.username.slice(0, 2).toUpperCase() : 'SV'
-  const hasSession = authHydrated && Boolean(authUser)
+  const avatarFallback = authUser?.username ? authUser.username.slice(0, 2).toUpperCase() : "SV";
+  const hasSession = authHydrated && Boolean(authUser);
 
   useEffect(() => {
-    let cancelled = false
+    let cancelled = false;
     const run = async () => {
-      const token = getAuthToken()
-      await Promise.resolve()
+      const token = getAuthToken();
+      await Promise.resolve();
 
-      if (cancelled) return
+      if (cancelled) return;
 
       if (!authHydrated || !authUser || !token) {
-        setDefaultBalance(null)
-        setIsBalanceLoading(false)
-        return
+        setDefaultBalance(null);
+        setIsBalanceLoading(false);
+        return;
       }
 
-      setIsBalanceLoading(true)
+      setIsBalanceLoading(true);
       try {
-        const balance = await getMyDefaultWalletBalance(token)
-        if (!cancelled) setDefaultBalance(balance)
+        const balance = await getMyDefaultWalletBalance(token);
+        if (!cancelled) setDefaultBalance(balance);
       } catch {
-        if (!cancelled) setDefaultBalance(null)
+        if (!cancelled) setDefaultBalance(null);
       } finally {
-        if (!cancelled) setIsBalanceLoading(false)
+        if (!cancelled) setIsBalanceLoading(false);
       }
-    }
+    };
 
-    void run()
+    void run();
 
     return () => {
-      cancelled = true
-    }
-  }, [authHydrated, authUser])
+      cancelled = true;
+    };
+  }, [authHydrated, authUser]);
 
   const onLogout = () => {
     try {
-      clearAuthSession()
-      navigateTo(paths.home, { replace: true })
+      clearAuthSession();
+      navigateTo(paths.home, { replace: true });
     } catch (error) {
-      console.error(toDisplayError(error, 'Не удалось завершить сессию на этом устройстве.'))
+      console.error(toDisplayError(error, "Не удалось завершить сессию на этом устройстве."));
     }
-  }
+  };
 
   const menu = isMenuOpen ? (
     <div
@@ -144,7 +144,7 @@ export default function AppHeader({ pageTitle }: Props) {
       ref={menuPanelRef}
       className="app-header__menu"
       role="dialog"
-      aria-modal={isMobileMenu ? 'true' : undefined}
+      aria-modal={isMobileMenu ? "true" : undefined}
       aria-label="Навигация"
     >
       <div className="app-header__menu-topbar">
@@ -160,25 +160,33 @@ export default function AppHeader({ pageTitle }: Props) {
       <div className="app-header__menu-body">
         <div className="app-header__menu-head">
           {authUser?.avatarUrl ? (
-            <img src={authUser.avatarUrl} alt={authUser.username} className="app-header__menu-avatar" />
+            <img
+              src={authUser.avatarUrl}
+              alt={authUser.username}
+              className="app-header__menu-avatar"
+            />
           ) : (
-            <span className="app-header__menu-avatar app-header__avatar--fallback">{avatarFallback}</span>
+            <span className="app-header__menu-avatar app-header__avatar--fallback">
+              {avatarFallback}
+            </span>
           )}
           <div>
-            <strong>{authUser?.username ?? 'Игрок'}</strong>
+            <strong>{authUser?.username ?? "Игрок"}</strong>
             <div className="app-header__menu-meta">Discord подключен</div>
           </div>
         </div>
         {sessionWarning ? (
           <div className="ui-alert ui-alert-warning">
-            <span className="ui-alert-icon" aria-hidden>!</span>
+            <span className="ui-alert-icon" aria-hidden>
+              !
+            </span>
             <span>{sessionWarning}</span>
           </div>
         ) : null}
         <a className="app-header__balance" href={paths.wallet}>
           <span>
             <small>Баланс</small>
-            <strong>{isBalanceLoading ? '...' : formatBalance(defaultBalance)} защекоинов</strong>
+            <strong>{isBalanceLoading ? "..." : formatBalance(defaultBalance)} защекоинов</strong>
           </span>
         </a>
         <div className="app-header__menu-section">
@@ -198,12 +206,14 @@ export default function AppHeader({ pageTitle }: Props) {
         </div>
       </div>
     </div>
-  ) : null
+  ) : null;
 
   return (
     <header className="app-header">
       <div className="app-header__left">
-        <a href={paths.home} className="app-header__brand">SvoCraft</a>
+        <a href={paths.home} className="app-header__brand">
+          SvoCraft
+        </a>
       </div>
       <div className="app-header__center" aria-live="polite">
         {pageTitle ? <span className="app-header__title">{pageTitle}</span> : null}
@@ -221,22 +231,34 @@ export default function AppHeader({ pageTitle }: Props) {
               aria-controls="app-header-menu"
             >
               {authUser?.avatarUrl ? (
-                <img src={authUser.avatarUrl} alt={authUser.username} className="app-header__avatar" />
+                <img
+                  src={authUser.avatarUrl}
+                  alt={authUser.username}
+                  className="app-header__avatar"
+                />
               ) : (
-                <span className="app-header__avatar app-header__avatar--fallback">{avatarFallback}</span>
+                <span className="app-header__avatar app-header__avatar--fallback">
+                  {avatarFallback}
+                </span>
               )}
-              <span className="app-header__account-name">{authUser?.username ?? 'Игрок'}</span>
-              <span className="app-header__account-caret" aria-hidden>▾</span>
+              <span className="app-header__account-name">{authUser?.username ?? "Игрок"}</span>
+              <span className="app-header__account-caret" aria-hidden>
+                ▾
+              </span>
             </button>
 
             {isMobileMenu
-              ? (typeof document !== 'undefined' ? createPortal(menu, document.body) : null)
+              ? typeof document !== "undefined"
+                ? createPortal(menu, document.body)
+                : null
               : menu}
           </>
         ) : (
-          <a href={buildAuthUrl()} className="btn primary app-header__login">Войти</a>
+          <a href={buildAuthUrl()} className="btn primary app-header__login">
+            Войти
+          </a>
         )}
       </div>
     </header>
-  )
+  );
 }

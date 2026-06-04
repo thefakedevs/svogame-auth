@@ -23,8 +23,7 @@
   align-content: center;
   border: 1px solid var(--ui-border);
   background:
-    linear-gradient(135deg, rgba(247, 164, 29, 0.12), transparent 48%),
-    rgba(0, 0, 0, 0.24);
+    linear-gradient(135deg, rgba(247, 164, 29, 0.12), transparent 48%), rgba(0, 0, 0, 0.24);
 }
 
 .ownership-summary-card span,
@@ -186,9 +185,16 @@
 .inventory-subscription-card {
   border: 1px solid var(--ui-border);
   background:
-    linear-gradient(135deg, color-mix(in srgb, var(--inventory-accent) 16%, transparent), transparent 42%),
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--inventory-accent) 16%, transparent),
+      transparent 42%
+    ),
     rgba(0, 0, 0, 0.24);
-  transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease,
+    transform 160ms ease;
 }
 
 .inventory-skin-card:hover,
@@ -197,7 +203,11 @@
 .inventory-subscription-card:hover {
   border-color: color-mix(in srgb, var(--inventory-accent) 58%, rgba(255, 255, 255, 0.2));
   background:
-    linear-gradient(135deg, color-mix(in srgb, var(--inventory-accent) 22%, transparent), transparent 48%),
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--inventory-accent) 22%, transparent),
+      transparent 48%
+    ),
     rgba(0, 0, 0, 0.3);
 }
 
@@ -220,8 +230,16 @@
 
 .inventory-skin-card.is-selected .inventory-visual {
   background:
-    linear-gradient(135deg, color-mix(in srgb, var(--inventory-accent) 36%, transparent), transparent),
-    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.07) 0 8px, rgba(255, 255, 255, 0.03) 8px 16px);
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--inventory-accent) 36%, transparent),
+      transparent
+    ),
+    repeating-linear-gradient(
+      45deg,
+      rgba(255, 255, 255, 0.07) 0 8px,
+      rgba(255, 255, 255, 0.03) 8px 16px
+    );
 }
 
 .inventory-skin-card.is-selecting {
@@ -256,7 +274,11 @@
 .inventory-skin-card[data-rarity="legendary"] {
   border-color: color-mix(in srgb, var(--inventory-accent) 62%, var(--ui-border));
   background:
-    linear-gradient(135deg, color-mix(in srgb, var(--inventory-accent) 24%, transparent), transparent 48%),
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--inventory-accent) 24%, transparent),
+      transparent 48%
+    ),
     rgba(0, 0, 0, 0.26);
 }
 
@@ -448,8 +470,16 @@
   aspect-ratio: 1 / 1;
   overflow: hidden;
   background:
-    linear-gradient(135deg, color-mix(in srgb, var(--inventory-accent) 22%, transparent), transparent),
-    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.05) 0 8px, rgba(255, 255, 255, 0.02) 8px 16px);
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--inventory-accent) 22%, transparent),
+      transparent
+    ),
+    repeating-linear-gradient(
+      45deg,
+      rgba(255, 255, 255, 0.05) 0 8px,
+      rgba(255, 255, 255, 0.02) 8px 16px
+    );
 }
 
 .inventory-visual--compact {
@@ -564,7 +594,11 @@
   padding: 8px;
   border: 1px solid color-mix(in srgb, var(--inventory-accent) 34%, rgba(255, 255, 255, 0.1));
   background:
-    linear-gradient(135deg, color-mix(in srgb, var(--inventory-accent) 12%, transparent), transparent 44%),
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--inventory-accent) 12%, transparent),
+      transparent 44%
+    ),
     rgba(0, 0, 0, 0.18);
 }
 
@@ -640,7 +674,9 @@
   padding: 12px;
   border: 1px solid var(--ui-border);
   background: rgba(0, 0, 0, 0.22);
-  transition: border-color 160ms ease, background 160ms ease;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease;
 }
 
 .ownership-item:hover {

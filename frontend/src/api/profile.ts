@@ -1,5 +1,10 @@
-export { getRestrictionMeta, getSquadConfig, type RestrictionMetaResponse, type SquadConfigResponse } from './meta'
-export { getMyRestrictions, type UserRestrictionResponse } from './restrictions'
+export {
+  getRestrictionMeta,
+  getSquadConfig,
+  type RestrictionMetaResponse,
+  type SquadConfigResponse,
+} from "./meta";
+export { getMyRestrictions, type UserRestrictionResponse } from "./restrictions";
 export {
   acceptSquadInvite,
   createSquad,
@@ -20,4 +25,4 @@ export {
   type SquadMemberResponse,
   type SquadResponse,
   type UserSearchItemResponse,
-} from './squads'
+} from "./squads";

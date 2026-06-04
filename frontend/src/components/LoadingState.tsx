@@ -1,10 +1,10 @@
-import type { ReactNode } from 'react'
-import './LoadingState.css'
+import type { ReactNode } from "react";
+import "./LoadingState.css";
 
 interface LoadingStateProps {
-  title?: string
-  message?: string
-  children?: ReactNode
+  title?: string;
+  message?: string;
+  children?: ReactNode;
 }
 
 export default function LoadingState({ title, message, children }: LoadingStateProps) {
@@ -26,5 +26,5 @@ export default function LoadingState({ title, message, children }: LoadingStateP
       </div>
       {children && <div className="loading-children">{children}</div>}
     </div>
-  )
+  );
 }

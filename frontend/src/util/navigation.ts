@@ -5,4 +5,4 @@ export {
   replaceUrl,
   usePathname,
   useSearch,
-} from '../shared/navigation/history'
+} from "../shared/navigation/history";

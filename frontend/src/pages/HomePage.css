@@ -71,13 +71,18 @@ body:has(.landing-shell) .ui-kit-page.landing-shell {
 }
 
 .landing-hero::before {
-  content: '';
+  content: "";
   position: absolute;
   inset: 0;
   z-index: 2;
   pointer-events: none;
   background:
-    linear-gradient(90deg, rgba(18, 18, 18, 0.94), rgba(18, 18, 18, 0.62) 50%, rgba(18, 18, 18, 0.18)),
+    linear-gradient(
+      90deg,
+      rgba(18, 18, 18, 0.94),
+      rgba(18, 18, 18, 0.62) 50%,
+      rgba(18, 18, 18, 0.18)
+    ),
     repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.035) 0 1px, transparent 1px 5px);
 }
 
@@ -161,7 +166,7 @@ body:has(.landing-shell) .ui-kit-page.landing-shell {
 }
 
 .landing-trust li::before {
-  content: '';
+  content: "";
   width: 6px;
   height: 6px;
   margin-right: 0.5rem;
@@ -235,7 +240,7 @@ body:has(.landing-shell) .ui-kit-page.landing-shell {
 /* Left + right fade masks */
 .landing-shop-ticker::before,
 .landing-shop-ticker::after {
-  content: '';
+  content: "";
   position: absolute;
   top: 0;
   bottom: 0;
@@ -288,13 +293,18 @@ body:has(.landing-shell) .ui-kit-page.landing-shell {
   border-top: 2px solid var(--inventory-accent, rgba(255, 255, 255, 0.18));
   background: rgba(0, 0, 0, 0.38);
   overflow: hidden;
-  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
 }
 
 .landing-shop-ticker-card:hover {
   transform: translateY(-3px);
   border-color: var(--inventory-accent, rgba(255, 255, 255, 0.28));
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45), 0 0 0 1px var(--inventory-accent, transparent);
+  box-shadow:
+    0 6px 24px rgba(0, 0, 0, 0.45),
+    0 0 0 1px var(--inventory-accent, transparent);
 }
 
 /* ── Card image area ─────────────────────────────────────── */
@@ -304,7 +314,11 @@ body:has(.landing-shell) .ui-kit-page.landing-shell {
   display: flex;
   justify-content: stretch;
   align-items: stretch;
-  background: radial-gradient(ellipse at 50% 80%, color-mix(in srgb, var(--inventory-accent, #555) 18%, transparent), transparent 70%);
+  background: radial-gradient(
+    ellipse at 50% 80%,
+    color-mix(in srgb, var(--inventory-accent, #555) 18%, transparent),
+    transparent 70%
+  );
 }
 
 .landing-shop-ticker-card__visual .inventory-visual {
@@ -392,8 +406,12 @@ body:has(.landing-shell) .ui-kit-page.landing-shell {
 }
 
 @keyframes landing-shop-ticker-scroll {
-  0%   { transform: translateX(0); }
-  100% { transform: translateX(-50%); }
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
 }
 
 .landing-mode-grid {
@@ -727,8 +745,7 @@ body:has(.landing-shell) .ui-kit-page.landing-shell {
   padding: 1.5rem;
   border: 1px solid rgba(247, 164, 29, 0.35);
   background:
-    linear-gradient(90deg, rgba(247, 164, 29, 0.12), transparent 58%),
-    rgba(0, 0, 0, 0.38);
+    linear-gradient(90deg, rgba(247, 164, 29, 0.12), transparent 58%), rgba(0, 0, 0, 0.38);
 }
 
 .landing-final-cta__content {
@@ -784,7 +801,7 @@ body:has(.landing-shell) .ui-kit-page.landing-shell {
 }
 
 .landing-footer__logo::before {
-  content: '';
+  content: "";
   width: 4px;
   height: 22px;
   background: #f7a41d;
@@ -964,5 +981,4 @@ body:has(.landing-shell) .ui-kit-page.landing-shell {
   .landing-gallery-card img {
     opacity: 100%;
   }
-
 }

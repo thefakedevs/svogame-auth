@@ -1,23 +1,23 @@
-import { buildSkinUrl } from '../../api/skins'
-import SkinPreview2D from '../SkinPreview2D'
-import type { ProfileDashboardData } from './types'
+import { buildSkinUrl } from "../../api/skins";
+import SkinPreview2D from "../SkinPreview2D";
+import type { ProfileDashboardData } from "./types";
 
-const dateTimeFormatter = new Intl.DateTimeFormat('ru-RU', {
-  day: '2-digit',
-  month: 'short',
-  year: 'numeric',
-  hour: '2-digit',
-  minute: '2-digit',
-})
+const dateTimeFormatter = new Intl.DateTimeFormat("ru-RU", {
+  day: "2-digit",
+  month: "short",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+});
 
 function initials(value: string) {
-  return value.slice(0, 2).toUpperCase()
+  return value.slice(0, 2).toUpperCase();
 }
 
 function formatDateTime(value?: string | null) {
-  if (!value) return 'Нет данных'
-  const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? value : dateTimeFormatter.format(date).replace(', ', ' ')
+  if (!value) return "Нет данных";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : dateTimeFormatter.format(date).replace(", ", " ");
 }
 
 export default function ProfileOverviewTab({
@@ -27,11 +27,11 @@ export default function ProfileOverviewTab({
   setActiveTab,
   skinVersion,
 }: {
-  data: ProfileDashboardData
-  skinFailed: boolean
-  setSkinFailed: (value: boolean) => void
-  setActiveTab: (tab: 'overview' | 'squads' | 'settings') => void
-  skinVersion: number
+  data: ProfileDashboardData;
+  skinFailed: boolean;
+  setSkinFailed: (value: boolean) => void;
+  setActiveTab: (tab: "overview" | "squads" | "settings") => void;
+  skinVersion: number;
 }) {
   return (
     <div className="profile-layout">
@@ -45,8 +45,12 @@ export default function ProfileOverviewTab({
           <div>
             <h1 className="profile-name">{data.user.username}</h1>
             <div className="profile-chip-row">
-              {data.user.isSuperuser ? <span className="ui-badge ui-badge-secondary">Админ</span> : null}
-              <span className="ui-badge ui-badge-neutral">{data.user.isActive ? 'Активен' : 'Отключен'}</span>
+              {data.user.isSuperuser ? (
+                <span className="ui-badge ui-badge-secondary">Админ</span>
+              ) : null}
+              <span className="ui-badge ui-badge-neutral">
+                {data.user.isActive ? "Активен" : "Отключен"}
+              </span>
             </div>
           </div>
         </div>
@@ -54,7 +58,7 @@ export default function ProfileOverviewTab({
         <div className="profile-skin-card">
           <div className="profile-section-head">
             <span className="ui-section-title">Текущий скин</span>
-            <button className="btn btn-sm" type="button" onClick={() => setActiveTab('settings')}>
+            <button className="btn btn-sm" type="button" onClick={() => setActiveTab("settings")}>
               Изменить
             </button>
           </div>
@@ -84,7 +88,7 @@ export default function ProfileOverviewTab({
           ) : null}
           <div>
             <dt>Последний вход</dt>
-            <dd>{formatDateTime(data.user.lastLoginAt).replace(', ', ' ')}</dd>
+            <dd>{formatDateTime(data.user.lastLoginAt).replace(", ", " ")}</dd>
           </div>
         </dl>
       </aside>
@@ -99,8 +103,8 @@ export default function ProfileOverviewTab({
               <strong>Статус профиля</strong>
               <span className="profile-subtle">
                 {data.user.isActive
-                  ? 'Аккаунт активен и готов к использованию'
-                  : 'Аккаунт временно недоступен'}
+                  ? "Аккаунт активен и готов к использованию"
+                  : "Аккаунт временно недоступен"}
               </span>
             </div>
             <div className="profile-inline-card">
@@ -110,7 +114,7 @@ export default function ProfileOverviewTab({
             <div className="profile-inline-card">
               <strong>Скин</strong>
               <span className="profile-subtle">
-                {skinFailed ? 'Скин не загружен' : 'Скин загружен и отображается'}
+                {skinFailed ? "Скин не загружен" : "Скин загружен и отображается"}
               </span>
             </div>
           </div>
@@ -119,8 +123,8 @@ export default function ProfileOverviewTab({
         <section className="card profile-panel">
           <div className="ui-card-header">
             <h2 className="card-title">Сквад</h2>
-            <button className="btn btn-sm" type="button" onClick={() => setActiveTab('squads')}>
-              {data.squad ? 'Открыть страницу сквада' : 'Перейти к сквадам'}
+            <button className="btn btn-sm" type="button" onClick={() => setActiveTab("squads")}>
+              {data.squad ? "Открыть страницу сквада" : "Перейти к сквадам"}
             </button>
           </div>
           {data.squad ? (
@@ -144,14 +148,19 @@ export default function ProfileOverviewTab({
               <div className="profile-chip-row">
                 <span className="ui-badge ui-badge-neutral">Нет сквада</span>
                 {data.squadInvites.length > 0 ? (
-                  <span className="ui-badge ui-badge-success">Инвайты: {data.squadInvites.length}</span>
+                  <span className="ui-badge ui-badge-success">
+                    Инвайты: {data.squadInvites.length}
+                  </span>
                 ) : null}
               </div>
-              <p>Во вкладке сквадов можно создать команду, принять приглашение или посмотреть доступные действия.</p>
+              <p>
+                Во вкладке сквадов можно создать команду, принять приглашение или посмотреть
+                доступные действия.
+              </p>
             </div>
           )}
         </section>
       </div>
     </div>
-  )
+  );
 }

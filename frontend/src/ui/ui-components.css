@@ -88,7 +88,9 @@
   font-size: 1.1rem;
   line-height: 1;
   cursor: pointer;
-  transition: border-color 0.15s, color 0.15s;
+  transition:
+    border-color 0.15s,
+    color 0.15s;
 }
 
 .ui-kit-page .ui-alert-close:hover {
@@ -126,7 +128,9 @@
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--ui-text);
-  transition: background 0.15s, color 0.15s;
+  transition:
+    background 0.15s,
+    color 0.15s;
 }
 
 .ui-kit-page .ui-accordion summary::-webkit-details-marker {
@@ -134,7 +138,7 @@
 }
 
 .ui-kit-page .ui-accordion summary::after {
-  content: '';
+  content: "";
   width: 0;
   height: 0;
   border-left: 5px solid transparent;
@@ -196,7 +200,9 @@
   font-size: 0.95rem;
   line-height: 1;
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  transition:
+    background 0.15s,
+    color 0.15s;
 }
 
 .ui-kit-page .ui-chip-remove:hover {
@@ -240,7 +246,7 @@
 }
 
 .ui-kit-page .ui-navbar-brand::before {
-  content: '';
+  content: "";
   width: 4px;
   height: 20px;
   background: #f7a41d;
@@ -266,7 +272,9 @@
   color: rgba(255, 255, 255, 0.65);
   text-decoration: none;
   border: 1px solid transparent;
-  transition: color 0.15s, border-color 0.15s;
+  transition:
+    color 0.15s,
+    border-color 0.15s;
 }
 
 .ui-kit-page .ui-navbar-links a:hover {
@@ -382,7 +390,9 @@
   color: rgba(255, 255, 255, 0.55);
   text-decoration: none;
   border-bottom: 1px solid transparent;
-  transition: color 0.15s, border-color 0.15s;
+  transition:
+    color 0.15s,
+    border-color 0.15s;
 }
 
 .ui-kit-page .ui-breadcrumb a:hover {
@@ -396,8 +406,8 @@
   user-select: none;
 }
 
-.ui-kit-page .ui-breadcrumb li[aria-current='page'],
-.ui-kit-page .ui-breadcrumb li[aria-current='page'] span {
+.ui-kit-page .ui-breadcrumb li[aria-current="page"],
+.ui-kit-page .ui-breadcrumb li[aria-current="page"] span {
   color: #f7a41d;
   font-weight: 700;
 }
@@ -425,7 +435,9 @@
   pointer-events: none;
   opacity: 0;
   visibility: hidden;
-  transition: opacity 0.15s ease, visibility 0.15s ease;
+  transition:
+    opacity 0.15s ease,
+    visibility 0.15s ease;
 }
 
 .ui-kit-page .ui-tooltip--top .ui-tooltip-popup {
@@ -470,7 +482,10 @@
   font-weight: 700;
   font-family: inherit;
   cursor: pointer;
-  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  transition:
+    border-color 0.15s,
+    color 0.15s,
+    background 0.15s;
 }
 
 .ui-kit-page .ui-pagination-btn:hover:not(:disabled) {
@@ -484,7 +499,7 @@
   cursor: not-allowed;
 }
 
-.ui-kit-page .ui-pagination-btn[aria-current='page'] {
+.ui-kit-page .ui-pagination-btn[aria-current="page"] {
   border-color: #f7a41d;
   background: rgba(247, 164, 29, 0.15);
   color: #f7a41d;
@@ -567,7 +582,9 @@
   font-size: 1.2rem;
   line-height: 1;
   cursor: pointer;
-  transition: border-color 0.15s, color 0.15s;
+  transition:
+    border-color 0.15s,
+    color 0.15s;
 }
 
 .ui-kit-page .ui-modal-close:hover {
@@ -647,7 +664,9 @@
   border: 1px dashed rgba(255, 255, 255, 0.22);
   background: rgba(0, 0, 0, 0.25);
   cursor: pointer;
-  transition: border-color 0.15s, background 0.15s;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
 }
 
 .ui-kit-page .ui-upload:hover .ui-upload-label,
@@ -742,11 +761,13 @@
   border: 1px solid var(--ui-border);
   background: rgba(0, 0, 0, 0.45);
   position: relative;
-  transition: border-color 0.15s, background 0.15s;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
 }
 
 .ui-kit-page .ui-radio-mark::after {
-  content: '';
+  content: "";
   position: absolute;
   left: 50%;
   top: 50%;
@@ -756,7 +777,9 @@
   background: var(--ui-secondary);
   opacity: 0;
   transform: scale(0.6);
-  transition: opacity 0.15s, transform 0.15s;
+  transition:
+    opacity 0.15s,
+    transform 0.15s;
 }
 
 .ui-kit-page .ui-radio input:checked + .ui-radio-mark {
@@ -802,11 +825,13 @@
   border: 1px solid var(--ui-border);
   background: rgba(0, 0, 0, 0.45);
   position: relative;
-  transition: border-color 0.15s, background 0.15s;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
 }
 
 .ui-kit-page .ui-checkbox-mark::after {
-  content: '';
+  content: "";
   position: absolute;
   left: 50%;
   top: 50%;
@@ -816,7 +841,9 @@
   background: var(--ui-secondary);
   opacity: 0;
   transform: scale(0.6);
-  transition: opacity 0.15s, transform 0.15s;
+  transition:
+    opacity 0.15s,
+    transform 0.15s;
 }
 
 .ui-kit-page .ui-checkbox input:checked + .ui-checkbox-mark {
@@ -847,7 +874,8 @@
   border-radius: 0;
   max-width: none;
   padding: 24px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, transparent 40%), var(--ui-card);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, transparent 40%), var(--ui-card);
   border: 1px solid var(--ui-border);
   box-shadow:
     0 0 0 1px rgba(0, 0, 0, 0.4),
@@ -857,7 +885,7 @@
 }
 
 .ui-kit-page .card::before {
-  content: '';
+  content: "";
   position: absolute;
   left: 0;
   top: 0;
@@ -957,12 +985,14 @@
   background: rgba(0, 0, 0, 0.5);
   border: 1px solid var(--ui-border);
   position: relative;
-  transition: background 0.15s, border-color 0.15s;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
   flex-shrink: 0;
 }
 
 .ui-kit-page .ui-switch-track::after {
-  content: '';
+  content: "";
   position: absolute;
   top: 2px;
   left: 2px;

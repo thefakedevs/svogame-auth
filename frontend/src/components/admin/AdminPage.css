@@ -690,7 +690,7 @@
 }
 
 .admin-littlemice-timeline::before {
-  content: '';
+  content: "";
   position: absolute;
   top: 8px;
   bottom: 8px;
@@ -1399,7 +1399,9 @@
 .admin-asset-list-head,
 .admin-asset-list-row {
   display: grid;
-  grid-template-columns: minmax(260px, 2fr) minmax(90px, 0.7fr) minmax(120px, 0.8fr) minmax(220px, 1.4fr) minmax(150px, 0.9fr);
+  grid-template-columns:
+    minmax(260px, 2fr) minmax(90px, 0.7fr) minmax(120px, 0.8fr) minmax(220px, 1.4fr)
+    minmax(150px, 0.9fr);
   align-items: stretch;
 }
 
@@ -1432,7 +1434,9 @@
 
 .admin-asset-table-row {
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
 }
 
 .admin-asset-table-row:hover,
@@ -1492,7 +1496,10 @@
   font-weight: 700;
   font-family: inherit;
   cursor: pointer;
-  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  transition:
+    border-color 0.15s,
+    color 0.15s,
+    background 0.15s;
 }
 
 .admin-page .ui-pagination-btn:hover:not(:disabled) {
@@ -1506,7 +1513,7 @@
   cursor: not-allowed;
 }
 
-.admin-page .ui-pagination-btn[aria-current='page'] {
+.admin-page .ui-pagination-btn[aria-current="page"] {
   border-color: #f7a41d;
   background: rgba(247, 164, 29, 0.15);
   color: #f7a41d;
@@ -1973,7 +1980,9 @@
 .admin-lootbox-table-head,
 .admin-lootbox-cell {
   display: grid;
-  grid-template-columns: 64px minmax(220px, 1.35fr) minmax(128px, .52fr) minmax(132px, .52fr) minmax(96px, .4fr) minmax(180px, .9fr) 96px;
+  grid-template-columns:
+    64px minmax(220px, 1.35fr) minmax(128px, 0.52fr) minmax(132px, 0.52fr)
+    minmax(96px, 0.4fr) minmax(180px, 0.9fr) 96px;
   gap: 10px;
   align-items: start;
 }
@@ -1981,10 +1990,10 @@
 .admin-lootbox-table-head {
   padding: 0 12px;
   color: var(--ui-text-muted);
-  font-size: .76rem;
+  font-size: 0.76rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: .06em;
+  letter-spacing: 0.06em;
 }
 
 .admin-lootbox-cell,
@@ -1992,7 +2001,7 @@
   position: relative;
   padding: 12px;
   border: 1px solid var(--ui-border);
-  background: rgba(0, 0, 0, .24);
+  background: rgba(0, 0, 0, 0.24);
 }
 
 .admin-lootbox-drop-card {
@@ -2002,7 +2011,7 @@
 
 .admin-lootbox-cell--empty {
   border-style: dashed;
-  background: rgba(247, 164, 29, .06);
+  background: rgba(247, 164, 29, 0.06);
 }
 
 .admin-lootbox-plus {
@@ -2012,11 +2021,11 @@
   width: 38px;
   height: 38px;
   line-height: 1;
-  border: 1px solid rgba(247, 164, 29, .45);
+  border: 1px solid rgba(247, 164, 29, 0.45);
   color: #f7a41d;
   font-size: 1.6rem;
   font-weight: 800;
-  background: rgba(247, 164, 29, .1);
+  background: rgba(247, 164, 29, 0.1);
 }
 
 .admin-lootbox-cell-add {
@@ -2032,8 +2041,8 @@
   height: 34px;
   border: 1px solid var(--ui-border);
   color: var(--ui-text-muted);
-  background: rgba(0, 0, 0, .2);
-  font-size: .82rem;
+  background: rgba(0, 0, 0, 0.2);
+  font-size: 0.82rem;
   font-weight: 700;
 }
 
@@ -2059,7 +2068,7 @@
 .admin-lootbox-field small,
 .admin-lootbox-field-caption {
   color: var(--ui-text-muted);
-  font-size: .72rem;
+  font-size: 0.72rem;
   line-height: 1.15;
 }
 
@@ -2091,7 +2100,7 @@
   min-height: 50px;
   padding: 8px;
   border: 1px solid var(--ui-border);
-  background: rgba(0, 0, 0, .34);
+  background: rgba(0, 0, 0, 0.34);
   color: var(--ui-text);
   text-align: left;
 }
@@ -2100,7 +2109,7 @@
 .admin-asset-picker-trigger:focus-visible,
 .admin-asset-picker-option:hover,
 .admin-asset-picker-option:focus-visible {
-  border-color: rgba(247, 164, 29, .45);
+  border-color: rgba(247, 164, 29, 0.45);
 }
 
 .admin-asset-picker-trigger:disabled {
@@ -2143,9 +2152,9 @@
   gap: 8px;
   max-height: 360px;
   padding: 10px;
-  border: 1px solid rgba(247, 164, 29, .35);
-  background: rgba(18, 18, 18, .98);
-  box-shadow: 0 18px 38px rgba(0, 0, 0, .35);
+  border: 1px solid rgba(247, 164, 29, 0.35);
+  background: rgba(18, 18, 18, 0.98);
+  box-shadow: 0 18px 38px rgba(0, 0, 0, 0.35);
 }
 
 .admin-asset-picker-options {
@@ -2170,7 +2179,7 @@
 }
 
 .admin-lootbox-drop-card--new {
-  border-color: rgba(247, 164, 29, .28);
+  border-color: rgba(247, 164, 29, 0.28);
 }
 
 @media (max-width: 1100px) {

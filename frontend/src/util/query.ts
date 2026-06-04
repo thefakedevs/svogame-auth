@@ -1,1 +1,1 @@
-export { useQueryParams as useQuery } from '../shared/navigation/query'
+export { useQueryParams as useQuery } from "../shared/navigation/query";

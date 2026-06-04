@@ -70,7 +70,7 @@
   border: 1px solid var(--ui-border);
   background: rgba(0, 0, 0, 0.35);
   color: var(--ui-text-muted);
-  font-family: 'IBM Plex Mono', ui-monospace, 'Cascadia Code', monospace;
+  font-family: "IBM Plex Mono", ui-monospace, "Cascadia Code", monospace;
   font-size: 0.75rem;
   user-select: all;
   overflow-wrap: anywhere;

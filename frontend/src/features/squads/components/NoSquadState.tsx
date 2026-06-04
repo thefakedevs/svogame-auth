@@ -1,94 +1,94 @@
-import { useState } from 'react'
-import toast from 'react-hot-toast'
-import { acceptSquadInvite, createSquad, declineSquadInvite } from '../../../api/squads'
-import { toDisplayError } from '../../../api/http'
-import { formatDateTime } from '../lib/format'
+import { useState } from "react";
+import toast from "react-hot-toast";
+import { acceptSquadInvite, createSquad, declineSquadInvite } from "../../../api/squads";
+import { toDisplayError } from "../../../api/http";
+import { formatDateTime } from "../lib/format";
 import {
   hasInvalidSquadNameBoundary,
   hasInvalidSquadNameByConfig,
   isInvalidSquadNameLength,
   sanitizeSquadName,
-} from '../lib/validation'
-import type { SquadSectionProps } from '../types'
+} from "../lib/validation";
+import type { SquadSectionProps } from "../types";
 
 export default function NoSquadState({ authToken, data, onChanged }: SquadSectionProps) {
-  const [nameDraft, setNameDraft] = useState('')
-  const [hasInvalidNameInput, setHasInvalidNameInput] = useState(false)
-  const [isCreating, setIsCreating] = useState(false)
-  const [processingInviteId, setProcessingInviteId] = useState<string | null>(null)
+  const [nameDraft, setNameDraft] = useState("");
+  const [hasInvalidNameInput, setHasInvalidNameInput] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+  const [processingInviteId, setProcessingInviteId] = useState<string | null>(null);
 
   const onNameDraftChange = (value: string) => {
-    const sanitized = sanitizeSquadName(value)
-    const trimmed = sanitized.trim()
+    const sanitized = sanitizeSquadName(value);
+    const trimmed = sanitized.trim();
 
-    setNameDraft(sanitized)
+    setNameDraft(sanitized);
     setHasInvalidNameInput(
       sanitized !== value ||
         hasInvalidSquadNameBoundary(trimmed) ||
         isInvalidSquadNameLength(trimmed) ||
         hasInvalidSquadNameByConfig(trimmed, data.squadConfig),
-    )
-  }
+    );
+  };
 
   const onCreate = async () => {
-    const trimmed = nameDraft.trim()
+    const trimmed = nameDraft.trim();
     if (hasInvalidSquadNameByConfig(trimmed, data.squadConfig)) {
-      setHasInvalidNameInput(true)
-      return
+      setHasInvalidNameInput(true);
+      return;
     }
-    if (!trimmed) return
+    if (!trimmed) return;
 
-    setIsCreating(true)
-    const request = createSquad(authToken, trimmed)
+    setIsCreating(true);
+    const request = createSquad(authToken, trimmed);
     toast.promise(request, {
-      loading: 'Создаем сквад...',
-      success: 'Сквад создан.',
-      error: (cause) => toDisplayError(cause, 'Не удалось создать сквад.'),
-    })
+      loading: "Создаем сквад...",
+      success: "Сквад создан.",
+      error: (cause) => toDisplayError(cause, "Не удалось создать сквад."),
+    });
 
     try {
-      await request
-      setNameDraft('')
-      setHasInvalidNameInput(false)
-      await onChanged()
+      await request;
+      setNameDraft("");
+      setHasInvalidNameInput(false);
+      await onChanged();
     } finally {
-      setIsCreating(false)
+      setIsCreating(false);
     }
-  }
+  };
 
   const onAcceptInvite = async (inviteId: string) => {
-    setProcessingInviteId(inviteId)
-    const request = acceptSquadInvite(authToken, inviteId)
+    setProcessingInviteId(inviteId);
+    const request = acceptSquadInvite(authToken, inviteId);
     toast.promise(request, {
-      loading: 'Принимаем инвайт...',
-      success: 'Вы вступили в сквад.',
-      error: (cause) => toDisplayError(cause, 'Не удалось принять инвайт.'),
-    })
+      loading: "Принимаем инвайт...",
+      success: "Вы вступили в сквад.",
+      error: (cause) => toDisplayError(cause, "Не удалось принять инвайт."),
+    });
 
     try {
-      await request
-      await onChanged()
+      await request;
+      await onChanged();
     } finally {
-      setProcessingInviteId(null)
+      setProcessingInviteId(null);
     }
-  }
+  };
 
   const onDeclineInvite = async (inviteId: string) => {
-    setProcessingInviteId(inviteId)
-    const request = declineSquadInvite(authToken, inviteId)
+    setProcessingInviteId(inviteId);
+    const request = declineSquadInvite(authToken, inviteId);
     toast.promise(request, {
-      loading: 'Отклоняем инвайт...',
-      success: 'Инвайт отклонен.',
-      error: (cause) => toDisplayError(cause, 'Не удалось отклонить инвайт.'),
-    })
+      loading: "Отклоняем инвайт...",
+      success: "Инвайт отклонен.",
+      error: (cause) => toDisplayError(cause, "Не удалось отклонить инвайт."),
+    });
 
     try {
-      await request
-      await onChanged()
+      await request;
+      await onChanged();
     } finally {
-      setProcessingInviteId(null)
+      setProcessingInviteId(null);
     }
-  }
+  };
 
   return (
     <div className="profile-split">
@@ -97,8 +97,10 @@ export default function NoSquadState({ authToken, data, onChanged }: SquadSectio
           <h2 className="card-title">Создать сквад</h2>
         </div>
         <div className="profile-form">
-          <div className={`ui-field ${hasInvalidNameInput ? 'ui-field-error' : ''}`}>
-            <label className="ui-label" htmlFor="create-squad-name">Название</label>
+          <div className={`ui-field ${hasInvalidNameInput ? "ui-field-error" : ""}`}>
+            <label className="ui-label" htmlFor="create-squad-name">
+              Название
+            </label>
             <input
               id="create-squad-name"
               className="ui-input"
@@ -110,13 +112,20 @@ export default function NoSquadState({ authToken, data, onChanged }: SquadSectio
               inputMode="text"
               autoComplete="off"
             />
-            <div className={`ui-hint ${hasInvalidNameInput ? 'ui-hint-error' : ''}`}>
-              Лимиты: {data.squadConfig.nameMinChars}-{data.squadConfig.nameMaxChars} символов. Разрешены: латиница, кириллица и `-`. Имя не может начинаться или заканчиваться на `-`. Инвайт действует {data.squadConfig.inviteTtlHours} часа.
+            <div className={`ui-hint ${hasInvalidNameInput ? "ui-hint-error" : ""}`}>
+              Лимиты: {data.squadConfig.nameMinChars}-{data.squadConfig.nameMaxChars} символов.
+              Разрешены: латиница, кириллица и `-`. Имя не может начинаться или заканчиваться на
+              `-`. Инвайт действует {data.squadConfig.inviteTtlHours} часа.
             </div>
           </div>
           <div className="profile-actions">
-            <button className="btn primary" type="button" disabled={isCreating} onClick={() => void onCreate()}>
-              {isCreating ? 'Создание...' : 'Создать сквад'}
+            <button
+              className="btn primary"
+              type="button"
+              disabled={isCreating}
+              onClick={() => void onCreate()}
+            >
+              {isCreating ? "Создание..." : "Создать сквад"}
             </button>
           </div>
         </div>
@@ -135,14 +144,26 @@ export default function NoSquadState({ authToken, data, onChanged }: SquadSectio
               <div key={invite.id} className="profile-invite-card">
                 <div className="profile-stack profile-invite-card__content">
                   <strong>{invite.squadName}</strong>
-                  <span className="profile-subtle">Истекает {formatDateTime(invite.expiresAt).replace(', ', ' ')}</span>
+                  <span className="profile-subtle">
+                    Истекает {formatDateTime(invite.expiresAt).replace(", ", " ")}
+                  </span>
                   <span className="profile-subtle">Пригласил: {invite.inviterUsername}</span>
                 </div>
                 <div className="profile-actions">
-                  <button className="btn primary profile-invite-action-btn" type="button" disabled={processingInviteId === invite.id} onClick={() => void onAcceptInvite(invite.id)}>
-                    {processingInviteId === invite.id ? 'Обработка...' : 'Принять'}
+                  <button
+                    className="btn primary profile-invite-action-btn"
+                    type="button"
+                    disabled={processingInviteId === invite.id}
+                    onClick={() => void onAcceptInvite(invite.id)}
+                  >
+                    {processingInviteId === invite.id ? "Обработка..." : "Принять"}
                   </button>
-                  <button className="btn profile-invite-action-btn" type="button" disabled={processingInviteId === invite.id} onClick={() => void onDeclineInvite(invite.id)}>
+                  <button
+                    className="btn profile-invite-action-btn"
+                    type="button"
+                    disabled={processingInviteId === invite.id}
+                    onClick={() => void onDeclineInvite(invite.id)}
+                  >
                     Отклонить
                   </button>
                 </div>
@@ -157,5 +178,5 @@ export default function NoSquadState({ authToken, data, onChanged }: SquadSectio
         )}
       </section>
     </div>
-  )
+  );
 }

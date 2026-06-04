@@ -1,15 +1,16 @@
 {
   "name": "app",
-  "private": true,
   "version": "0.0.0",
+  "private": true,
   "type": "module",
   "scripts": {
     "dev": "concurrently --kill-others-on-fail \"npm run dev:app\" \"npm run docs:dev\"",
-    "dev:app": "vite",
+    "dev:app": "vp dev",
     "build": "npm run build:app && npm run docs:build",
-    "build:app": "npm run typecheck && vite build",
-    "lint": "eslint .",
-    "preview": "vite preview",
+    "build:app": "npm run typecheck && vp build",
+    "lint": "vp lint",
+    "check": "vp check",
+    "preview": "vp preview",
     "typecheck": "tsc -p tsconfig.app.json --noEmit",
     "docs:dev": "vitepress dev docs --port 5174 --strictPort",
     "docs:build": "vitepress build docs",
@@ -41,7 +42,7 @@
     "globals": "^16.5.0",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.46.4",
-    "vite": "^7.3.2",
+    "vite-plus": "^0.1.24",
     "vitepress": "^1.6.4"
   }
 }

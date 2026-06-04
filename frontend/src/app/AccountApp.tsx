@@ -1,25 +1,25 @@
-import { useEffect } from 'react'
-import { Toaster } from 'react-hot-toast'
-import AdminPage from '../components/admin/AdminPage'
-import AppHeader from '../components/layout/AppHeader'
-import ProfilePage from '../components/profile/ProfilePage'
-import ContactsPage from '../pages/_ContactsPage'
-import DownloadsPage from '../pages/_DownloadsPage'
-import HomePage from '../pages/_HomePage'
-import LegalPage, { isLegalPath, legalPageHeading } from '../pages/LegalPage'
-import OwnershipPage from '../pages/OwnershipPage'
-import ShopCheckoutReturnPage from '../pages/ShopCheckoutReturnPage'
-import ShopPage from '../pages/ShopPage'
-import UiKitPage from '../pages/_UiKitPage'
-import WalletPage from '../pages/WalletPage'
-import { paths } from '../routes/paths'
-import { buildAnalyticsPath, trackPageView } from '../services/analytics'
-import { usePathname, useSearch } from '../shared/navigation/history'
-import { normalizePathname, pageTitleForPath } from '../shared/navigation/routes'
-import AuthRoute from './AuthRoute'
-import TokenRoute from './TokenRoute'
+import { useEffect } from "react";
+import { Toaster } from "react-hot-toast";
+import AdminPage from "../components/admin/AdminPage";
+import AppHeader from "../components/layout/AppHeader";
+import ProfilePage from "../components/profile/ProfilePage";
+import ContactsPage from "../pages/_ContactsPage";
+import DownloadsPage from "../pages/_DownloadsPage";
+import HomePage from "../pages/_HomePage";
+import LegalPage, { isLegalPath, legalPageHeading } from "../pages/LegalPage";
+import OwnershipPage from "../pages/OwnershipPage";
+import ShopCheckoutReturnPage from "../pages/ShopCheckoutReturnPage";
+import ShopPage from "../pages/ShopPage";
+import UiKitPage from "../pages/_UiKitPage";
+import WalletPage from "../pages/WalletPage";
+import { paths } from "../routes/paths";
+import { buildAnalyticsPath, trackPageView } from "../services/analytics";
+import { usePathname, useSearch } from "../shared/navigation/history";
+import { normalizePathname, pageTitleForPath } from "../shared/navigation/routes";
+import AuthRoute from "./AuthRoute";
+import TokenRoute from "./TokenRoute";
 
-function ProfileShell({ pageTitle, defaultTab }: { pageTitle: string; defaultTab?: 'settings' }) {
+function ProfileShell({ pageTitle, defaultTab }: { pageTitle: string; defaultTab?: "settings" }) {
   return (
     <>
       <div className="ui-kit-vhs" aria-hidden />
@@ -28,7 +28,7 @@ function ProfileShell({ pageTitle, defaultTab }: { pageTitle: string; defaultTab
         <ProfilePage defaultTab={defaultTab} />
       </div>
     </>
-  )
+  );
 }
 
 function OwnershipShell() {
@@ -40,7 +40,7 @@ function OwnershipShell() {
         <OwnershipPage />
       </div>
     </>
-  )
+  );
 }
 
 function ShopShell() {
@@ -52,7 +52,7 @@ function ShopShell() {
         <ShopPage />
       </div>
     </>
-  )
+  );
 }
 
 function ShopCheckoutReturnShell() {
@@ -64,7 +64,7 @@ function ShopCheckoutReturnShell() {
         <ShopCheckoutReturnPage />
       </div>
     </>
-  )
+  );
 }
 
 function WalletShell() {
@@ -76,7 +76,7 @@ function WalletShell() {
         <WalletPage />
       </div>
     </>
-  )
+  );
 }
 
 function HomeShell() {
@@ -88,7 +88,7 @@ function HomeShell() {
         <HomePage />
       </div>
     </>
-  )
+  );
 }
 
 function AdminShell() {
@@ -100,7 +100,7 @@ function AdminShell() {
         <AdminPage />
       </div>
     </>
-  )
+  );
 }
 
 function LegalShell({ pathname }: { pathname: string }) {
@@ -112,7 +112,7 @@ function LegalShell({ pathname }: { pathname: string }) {
         <LegalPage pathname={pathname} />
       </div>
     </>
-  )
+  );
 }
 
 function ContactsShell() {
@@ -124,7 +124,7 @@ function ContactsShell() {
         <ContactsPage />
       </div>
     </>
-  )
+  );
 }
 
 function DownloadsShell() {
@@ -136,7 +136,7 @@ function DownloadsShell() {
         <DownloadsPage />
       </div>
     </>
-  )
+  );
 }
 
 function NotFoundShell() {
@@ -153,147 +153,150 @@ function NotFoundShell() {
         </div>
       </div>
     </>
-  )
+  );
 }
 
 function adminRouteForPath(
   pathname: string,
 ):
-  | { type: 'home' }
-  | { type: 'user'; userId: string }
-  | { type: 'squad'; squadId: string }
-  | { type: 'tokenAudit'; tokenId: string }
-  | { type: 'asset'; assetId: string }
-  | { type: 'shopProduct'; productId: string }
-  | { type: 'lootbox'; lootboxId: string }
-  | { type: 'littlemice' }
-  | { type: 'userLootboxHistory'; userId: string }
-  | { type: 'userLittlemice'; userId: string; checkId?: string }
+  | { type: "home" }
+  | { type: "user"; userId: string }
+  | { type: "squad"; squadId: string }
+  | { type: "tokenAudit"; tokenId: string }
+  | { type: "asset"; assetId: string }
+  | { type: "shopProduct"; productId: string }
+  | { type: "lootbox"; lootboxId: string }
+  | { type: "littlemice" }
+  | { type: "userLootboxHistory"; userId: string }
+  | { type: "userLittlemice"; userId: string; checkId?: string }
   | null {
   if (pathname === paths.admin) {
-    return { type: 'home' }
+    return { type: "home" };
   }
 
-  const userMatch = pathname.match(/^\/admin\/users\/([^/]+)$/)
+  const userMatch = pathname.match(/^\/admin\/users\/([^/]+)$/);
   if (userMatch) {
-    return { type: 'user', userId: decodeURIComponent(userMatch[1]) }
+    return { type: "user", userId: decodeURIComponent(userMatch[1]) };
   }
 
-  const userLootboxHistoryMatch = pathname.match(/^\/admin\/users\/([^/]+)\/lootboxes\/open-history$/)
+  const userLootboxHistoryMatch = pathname.match(
+    /^\/admin\/users\/([^/]+)\/lootboxes\/open-history$/,
+  );
   if (userLootboxHistoryMatch) {
-    return { type: 'userLootboxHistory', userId: decodeURIComponent(userLootboxHistoryMatch[1]) }
+    return { type: "userLootboxHistory", userId: decodeURIComponent(userLootboxHistoryMatch[1]) };
   }
 
-  const userLittlemiceCheckMatch = pathname.match(/^\/admin\/users\/([^/]+)\/littlemice\/([^/]+)$/)
+  const userLittlemiceCheckMatch = pathname.match(/^\/admin\/users\/([^/]+)\/littlemice\/([^/]+)$/);
   if (userLittlemiceCheckMatch) {
     return {
-      type: 'userLittlemice',
+      type: "userLittlemice",
       userId: decodeURIComponent(userLittlemiceCheckMatch[1]),
       checkId: decodeURIComponent(userLittlemiceCheckMatch[2]),
-    }
+    };
   }
 
-  const userLittlemiceMatch = pathname.match(/^\/admin\/users\/([^/]+)\/littlemice$/)
+  const userLittlemiceMatch = pathname.match(/^\/admin\/users\/([^/]+)\/littlemice$/);
   if (userLittlemiceMatch) {
-    return { type: 'userLittlemice', userId: decodeURIComponent(userLittlemiceMatch[1]) }
+    return { type: "userLittlemice", userId: decodeURIComponent(userLittlemiceMatch[1]) };
   }
 
-  const squadMatch = pathname.match(/^\/admin\/squads\/([^/]+)$/)
+  const squadMatch = pathname.match(/^\/admin\/squads\/([^/]+)$/);
   if (squadMatch) {
-    return { type: 'squad', squadId: decodeURIComponent(squadMatch[1]) }
+    return { type: "squad", squadId: decodeURIComponent(squadMatch[1]) };
   }
 
-  const tokenAuditMatch = pathname.match(/^\/admin\/tokens\/([^/]+)\/audit$/)
+  const tokenAuditMatch = pathname.match(/^\/admin\/tokens\/([^/]+)\/audit$/);
   if (tokenAuditMatch) {
-    return { type: 'tokenAudit', tokenId: decodeURIComponent(tokenAuditMatch[1]) }
+    return { type: "tokenAudit", tokenId: decodeURIComponent(tokenAuditMatch[1]) };
   }
 
-  const assetMatch = pathname.match(/^\/admin\/assets\/([^/]+)$/)
+  const assetMatch = pathname.match(/^\/admin\/assets\/([^/]+)$/);
   if (assetMatch) {
-    return { type: 'asset', assetId: decodeURIComponent(assetMatch[1]) }
+    return { type: "asset", assetId: decodeURIComponent(assetMatch[1]) };
   }
 
-  const shopProductMatch = pathname.match(/^\/admin\/shop\/products\/([^/]+)$/)
+  const shopProductMatch = pathname.match(/^\/admin\/shop\/products\/([^/]+)$/);
   if (shopProductMatch) {
-    return { type: 'shopProduct', productId: decodeURIComponent(shopProductMatch[1]) }
+    return { type: "shopProduct", productId: decodeURIComponent(shopProductMatch[1]) };
   }
 
-  const lootboxMatch = pathname.match(/^\/admin\/lootboxes\/([^/]+)$/)
+  const lootboxMatch = pathname.match(/^\/admin\/lootboxes\/([^/]+)$/);
   if (lootboxMatch) {
-    return { type: 'lootbox', lootboxId: decodeURIComponent(lootboxMatch[1]) }
+    return { type: "lootbox", lootboxId: decodeURIComponent(lootboxMatch[1]) };
   }
 
   if (pathname === `${paths.admin}/littlemice`) {
-    return { type: 'littlemice' }
+    return { type: "littlemice" };
   }
 
-  return null
+  return null;
 }
 
 export default function AccountApp() {
-  const pathname = normalizePathname(usePathname() || paths.home)
-  const search = useSearch()
-  const adminRoute = adminRouteForPath(pathname)
+  const pathname = normalizePathname(usePathname() || paths.home);
+  const search = useSearch();
+  const adminRoute = adminRouteForPath(pathname);
 
   useEffect(() => {
-    if (typeof document === 'undefined') {
-      return
+    if (typeof document === "undefined") {
+      return;
     }
 
-    document.title = pageTitleForPath(pathname)
-  }, [pathname])
+    document.title = pageTitleForPath(pathname);
+  }, [pathname]);
 
   useEffect(() => {
-    trackPageView(buildAnalyticsPath(pathname, search), pageTitleForPath(pathname))
-  }, [pathname, search])
+    trackPageView(buildAnalyticsPath(pathname, search), pageTitleForPath(pathname));
+  }, [pathname, search]);
 
-  let page = <NotFoundShell />
+  let page = <NotFoundShell />;
 
   if (adminRoute) {
-    page = <AdminShell />
+    page = <AdminShell />;
   } else if (isLegalPath(pathname)) {
-    page = <LegalShell pathname={pathname} />
-  } else switch (pathname) {
-    case paths.auth:
-      page = <AuthRoute />
-      break
-    case paths.profile:
-      page = <ProfileShell pageTitle="Профиль" />
-      break
-    case paths.profileEdit:
-      page = <ProfileShell pageTitle="Настройки профиля" defaultTab="settings" />
-      break
-    case paths.inventory:
-      page = <OwnershipShell />
-      break
-    case paths.shop:
-      page = <ShopShell />
-      break
-    case paths.shopCheckoutReturn:
-      page = <ShopCheckoutReturnShell />
-      break
-    case paths.wallet:
-      page = <WalletShell />
-      break
-    case paths.contacts:
-      page = <ContactsShell />
-      break
-    case paths.downloads:
-      page = <DownloadsShell />
-      break
-    case paths.token:
-      page = <TokenRoute />
-      break
-    case paths.uiKit:
-      page = <UiKitPage />
-      break
-    case paths.home:
-      page = <HomeShell />
-      break
-    default:
-      page = <NotFoundShell />
-      break
-  }
+    page = <LegalShell pathname={pathname} />;
+  } else
+    switch (pathname) {
+      case paths.auth:
+        page = <AuthRoute />;
+        break;
+      case paths.profile:
+        page = <ProfileShell pageTitle="Профиль" />;
+        break;
+      case paths.profileEdit:
+        page = <ProfileShell pageTitle="Настройки профиля" defaultTab="settings" />;
+        break;
+      case paths.inventory:
+        page = <OwnershipShell />;
+        break;
+      case paths.shop:
+        page = <ShopShell />;
+        break;
+      case paths.shopCheckoutReturn:
+        page = <ShopCheckoutReturnShell />;
+        break;
+      case paths.wallet:
+        page = <WalletShell />;
+        break;
+      case paths.contacts:
+        page = <ContactsShell />;
+        break;
+      case paths.downloads:
+        page = <DownloadsShell />;
+        break;
+      case paths.token:
+        page = <TokenRoute />;
+        break;
+      case paths.uiKit:
+        page = <UiKitPage />;
+        break;
+      case paths.home:
+        page = <HomeShell />;
+        break;
+      default:
+        page = <NotFoundShell />;
+        break;
+    }
 
   return (
     <>
@@ -305,14 +308,14 @@ export default function AccountApp() {
         toastOptions={{
           duration: 3000,
           style: {
-            background: '#19191c',
-            color: '#fff',
-            border: '1px solid rgba(255,255,255,.08)',
-            borderRadius: '0',
+            background: "#19191c",
+            color: "#fff",
+            border: "1px solid rgba(255,255,255,.08)",
+            borderRadius: "0",
           },
         }}
       />
       {page}
     </>
-  )
+  );
 }

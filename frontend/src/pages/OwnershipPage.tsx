@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState, type CSSProperties } from 'react'
-import toast from 'react-hot-toast'
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import toast from "react-hot-toast";
 import {
   buildPublicAssetImageUrl,
   getMyInventory,
@@ -14,122 +14,157 @@ import {
   type SelectedGunskinResponse,
   type SkinRarity,
   type StackableResponse,
-} from '../api/inventory'
-import { toDisplayError } from '../api/http'
+} from "../api/inventory";
+import { toDisplayError } from "../api/http";
 import {
   getMyLootboxes,
   getPublicLootbox,
   type LootboxDetailResponse,
   type LootboxDropResponse,
   type OwnedLootboxResponse,
-} from '../api/lootboxes'
-import ErrorState from '../components/ErrorState'
-import LoadingState from '../components/LoadingState'
-import SkinDetailsModal from '../components/SkinDetailsModal'
-import { currentAppPath, redirectToAuth } from '../routes/auth'
-import { getAuthToken } from '../shared/session/auth-session'
-import AppPortal from '../shared/ui/portal/AppPortal'
-import './OwnershipPage.css'
-import { skinRarityRank, uniqueSortedWeaponKeys } from './skinInventoryControls'
+} from "../api/lootboxes";
+import ErrorState from "../components/ErrorState";
+import LoadingState from "../components/LoadingState";
+import SkinDetailsModal from "../components/SkinDetailsModal";
+import { currentAppPath, redirectToAuth } from "../routes/auth";
+import { getAuthToken } from "../shared/session/auth-session";
+import AppPortal from "../shared/ui/portal/AppPortal";
+import "./OwnershipPage.css";
+import { skinRarityRank, uniqueSortedWeaponKeys } from "./skinInventoryControls";
 
 type OwnershipState =
-  | { status: 'loading' }
-  | { status: 'unauthorized' }
-  | { status: 'error'; error: string }
-  | { status: 'ready'; inventory: InventoryResponse; assets: AssetResponse[]; selectedGunskins: SelectedGunskinResponse[]; lootboxes: OwnedLootboxResponse[] }
+  | { status: "loading" }
+  | { status: "unauthorized" }
+  | { status: "error"; error: string }
+  | {
+      status: "ready";
+      inventory: InventoryResponse;
+      assets: AssetResponse[];
+      selectedGunskins: SelectedGunskinResponse[];
+      lootboxes: OwnedLootboxResponse[];
+    };
 
 const skinRarityConfig: Record<SkinRarity, { label: string; color: string }> = {
-  common: { label: 'Обычный', color: '#9aa8b5' },
-  rare: { label: 'Редкий', color: '#2f8cff' },
-  legendary: { label: 'Легендарный', color: '#ffb02e' },
-}
+  common: { label: "Обычный", color: "#9aa8b5" },
+  rare: { label: "Редкий", color: "#2f8cff" },
+  legendary: { label: "Легендарный", color: "#ffb02e" },
+};
 
-const dateTimeFormatter = new Intl.DateTimeFormat('ru-RU', {
-  day: '2-digit',
-  month: 'short',
-  year: 'numeric',
-  hour: '2-digit',
-  minute: '2-digit',
-})
+const dateTimeFormatter = new Intl.DateTimeFormat("ru-RU", {
+  day: "2-digit",
+  month: "short",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+});
 
 function formatDateTime(value?: string | null) {
-  if (!value) return 'Нет данных'
-  const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? value : dateTimeFormatter.format(date).replace(",", " ")
+  if (!value) return "Нет данных";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : dateTimeFormatter.format(date).replace(",", " ");
 }
 
 function makeAssetMap(assets: AssetResponse[]) {
-  const map = new Map<string, AssetResponse>()
+  const map = new Map<string, AssetResponse>();
   for (const asset of assets) {
-    map.set(asset.key, asset)
-    map.set(asset.id, asset)
+    map.set(asset.key, asset);
+    map.set(asset.id, asset);
   }
-  return map
+  return map;
 }
 
-function getAsset(assetMap: Map<string, AssetResponse>, assetKey: string, assetDefinitionId: string) {
-  return assetMap.get(assetKey) ?? assetMap.get(assetDefinitionId) ?? null
+function getAsset(
+  assetMap: Map<string, AssetResponse>,
+  assetKey: string,
+  assetDefinitionId: string,
+) {
+  return assetMap.get(assetKey) ?? assetMap.get(assetDefinitionId) ?? null;
 }
 
 function metadataRecord(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : null
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
 }
 
 function metadataString(asset: AssetResponse | null, keys: string[]) {
-  const metadata = metadataRecord(asset?.metadata)
-  if (!metadata) return null
+  const metadata = metadataRecord(asset?.metadata);
+  if (!metadata) return null;
 
   for (const key of keys) {
-    const value = metadata[key]
-    if (typeof value === 'string' && value.trim()) return value.trim()
+    const value = metadata[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
   }
 
-  return null
+  return null;
 }
 
 function assetImageUrl(asset: AssetResponse | null) {
-  if (!asset) return null
-  return asset.imageUrl
-    ?? metadataString(asset, ['imageUrl', 'image', 'iconUrl', 'icon', 'thumbnailUrl', 'thumbnail', 'previewUrl', 'skinUrl'])
-    ?? buildPublicAssetImageUrl(asset.id, asset.updatedAt)
+  if (!asset) return null;
+  return (
+    asset.imageUrl ??
+    metadataString(asset, [
+      "imageUrl",
+      "image",
+      "iconUrl",
+      "icon",
+      "thumbnailUrl",
+      "thumbnail",
+      "previewUrl",
+      "skinUrl",
+    ]) ??
+    buildPublicAssetImageUrl(asset.id, asset.updatedAt)
+  );
 }
 
 function resolveModelPreviewUrl(value: string | null) {
-  if (!value) return null
-  if (value.startsWith('/') || value.startsWith('http://') || value.startsWith('https://')) return value
-  return null
+  if (!value) return null;
+  if (value.startsWith("/") || value.startsWith("http://") || value.startsWith("https://"))
+    return value;
+  return null;
 }
 
 function assetModelPreview(asset: AssetResponse | null) {
   const rawModel =
-    asset?.modelUrl
-    ?? metadataString(asset, ['modelUrl', 'model_url', 'geckoModelUrl', 'gecko_model_url', 'model'])
-    ?? null
+    asset?.modelUrl ??
+    metadataString(asset, ["modelUrl", "model_url", "geckoModelUrl", "gecko_model_url", "model"]) ??
+    null;
   const rawTexture =
-    asset?.textureUrl
-    ?? metadataString(asset, ['textureUrl', 'texture_url', 'geckoTextureUrl', 'gecko_texture_url', 'texture'])
-    ?? null
+    asset?.textureUrl ??
+    metadataString(asset, [
+      "textureUrl",
+      "texture_url",
+      "geckoTextureUrl",
+      "gecko_texture_url",
+      "texture",
+    ]) ??
+    null;
 
-  const modelUrl = resolveModelPreviewUrl(rawModel)
-  const textureUrl = resolveModelPreviewUrl(rawTexture)
-  return modelUrl && textureUrl ? { modelUrl, textureUrl } : null
+  const modelUrl = resolveModelPreviewUrl(rawModel);
+  const textureUrl = resolveModelPreviewUrl(rawTexture);
+  return modelUrl && textureUrl ? { modelUrl, textureUrl } : null;
 }
 
 function fallbackAccent(key: string) {
-  const palette = ['#2db7a3', '#f7a41d', '#67d391', '#ff8b8b', '#6fb6ff', '#d6a4ff']
-  let hash = 0
-  for (const char of key) hash = (hash + char.charCodeAt(0)) % palette.length
-  return palette[hash]
+  const palette = ["#2db7a3", "#f7a41d", "#67d391", "#ff8b8b", "#6fb6ff", "#d6a4ff"];
+  let hash = 0;
+  for (const char of key) hash = (hash + char.charCodeAt(0)) % palette.length;
+  return palette[hash];
 }
 
 function assetAccent(asset: AssetResponse | null, assetKey: string) {
   return asset?.rarity
     ? skinRarityConfig[asset.rarity].color
-    : metadataString(asset, ['accentColor', 'color', 'rarityColor']) ?? fallbackAccent(asset?.key ?? assetKey)
+    : (metadataString(asset, ["accentColor", "color", "rarityColor"]) ??
+        fallbackAccent(asset?.key ?? assetKey));
 }
 
-function assetView(assetMap: Map<string, AssetResponse>, assetKey: string, assetDefinitionId: string) {
-  const asset = getAsset(assetMap, assetKey, assetDefinitionId)
+function assetView(
+  assetMap: Map<string, AssetResponse>,
+  assetKey: string,
+  assetDefinitionId: string,
+) {
+  const asset = getAsset(assetMap, assetKey, assetDefinitionId);
   return {
     asset,
     key: assetKey,
@@ -140,7 +175,7 @@ function assetView(assetMap: Map<string, AssetResponse>, assetKey: string, asset
     accent: assetAccent(asset, assetKey),
     rarity: asset?.rarity ?? null,
     weaponKey: asset?.weaponKey ?? null,
-  }
+  };
 }
 
 function isSkinAsset(asset: AssetResponse | null, assetKey: string) {
@@ -150,184 +185,220 @@ function isSkinAsset(asset: AssetResponse | null, assetKey: string) {
     asset?.displayName,
     asset?.assetKind,
     asset?.weaponKey,
-    metadataString(asset, ['type', 'category', 'kind', 'itemType']),
-  ].filter(Boolean).join(' ').toLowerCase()
+    metadataString(asset, ["type", "category", "kind", "itemType"]),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
 
-  return haystack.includes('skin') || haystack.includes('скин')
+  return haystack.includes("skin") || haystack.includes("скин");
 }
 
 function rarityLabel(rarity: SkinRarity | null) {
-  return rarity ? skinRarityConfig[rarity].label : 'Без редкости'
+  return rarity ? skinRarityConfig[rarity].label : "Без редкости";
 }
 
 function assetKindLabel(assetKind: string | null | undefined) {
-  switch ((assetKind ?? '').trim().toLowerCase()) {
-    case 'skin':
-      return 'Скин'
-    case 'subscription':
-      return 'Подписка'
-    case 'kit':
-      return 'Кит'
-    case 'lootbox':
-      return 'Лутбокс'
-    case 'currency':
-      return 'Валюта'
-    case 'cosmetic':
-      return 'Косметика'
-    case 'ticket':
-      return 'Билет'
-    case 'token':
-      return 'Токен'
-    case 'item':
-      return 'Предмет'
+  switch ((assetKind ?? "").trim().toLowerCase()) {
+    case "skin":
+      return "Скин";
+    case "subscription":
+      return "Подписка";
+    case "kit":
+      return "Кит";
+    case "lootbox":
+      return "Лутбокс";
+    case "currency":
+      return "Валюта";
+    case "cosmetic":
+      return "Косметика";
+    case "ticket":
+      return "Билет";
+    case "token":
+      return "Токен";
+    case "item":
+      return "Предмет";
     default:
-      return assetKind?.trim() || 'Товар'
+      return assetKind?.trim() || "Товар";
   }
 }
 
 function normalizedAssetKind(asset: AssetResponse | null) {
-  return (
-    metadataString(asset, ['assetKind', 'kind', 'type'])
-    ?? asset?.assetKind
-    ?? 'item'
-  ).trim().toLowerCase()
+  return (metadataString(asset, ["assetKind", "kind", "type"]) ?? asset?.assetKind ?? "item")
+    .trim()
+    .toLowerCase();
 }
 
 function normalizedOwnershipModel(asset: AssetResponse | null) {
-  return (asset?.ownershipModel ?? 'entitlement').trim().toLowerCase()
+  return (asset?.ownershipModel ?? "entitlement").trim().toLowerCase();
 }
 
-function addMetaItem(rows: Array<{ label: string; value: string }>, label: string, value: string | null | undefined) {
-  if (!value) return
-  rows.push({ label, value })
+function addMetaItem(
+  rows: Array<{ label: string; value: string }>,
+  label: string,
+  value: string | null | undefined,
+) {
+  if (!value) return;
+  rows.push({ label, value });
 }
 
 function buildInventoryMetaItems(
   asset: AssetResponse | null,
   options: {
-    amount?: number | null
-    expiresAt?: string | null
-    updatedAt?: string | null
+    amount?: number | null;
+    expiresAt?: string | null;
+    updatedAt?: string | null;
   } = {},
 ) {
-  const rows: Array<{ label: string; value: string }> = []
-  const assetKind = normalizedAssetKind(asset)
-  const ownershipModel = normalizedOwnershipModel(asset)
-  const isSkin = assetKind === 'skin' || Boolean(asset?.weaponKey || asset?.rarity)
+  const rows: Array<{ label: string; value: string }> = [];
+  const assetKind = normalizedAssetKind(asset);
+  const ownershipModel = normalizedOwnershipModel(asset);
+  const isSkin = assetKind === "skin" || Boolean(asset?.weaponKey || asset?.rarity);
 
-  addMetaItem(rows, 'Тип', assetKindLabel(assetKind))
+  addMetaItem(rows, "Тип", assetKindLabel(assetKind));
 
   if (isSkin) {
-    if (asset?.rarity) addMetaItem(rows, 'Редкость', rarityLabel(asset.rarity))
-    return rows
+    if (asset?.rarity) addMetaItem(rows, "Редкость", rarityLabel(asset.rarity));
+    return rows;
   }
 
-  if (ownershipModel === 'stackable') {
-    addMetaItem(rows, 'В инвентаре', options.amount !== undefined && options.amount !== null ? `${options.amount} шт` : null)
+  if (ownershipModel === "stackable") {
+    addMetaItem(
+      rows,
+      "В инвентаре",
+      options.amount !== undefined && options.amount !== null ? `${options.amount} шт` : null,
+    );
   }
 
-  if (ownershipModel === 'expirable') {
-    addMetaItem(rows, 'Активна до', options.expiresAt ? formatDateTime(options.expiresAt).replace(', ', ' ') : null)
+  if (ownershipModel === "expirable") {
+    addMetaItem(
+      rows,
+      "Активна до",
+      options.expiresAt ? formatDateTime(options.expiresAt).replace(", ", " ") : null,
+    );
   }
 
-  addMetaItem(rows, 'Обновлено', options.updatedAt ? formatDateTime(options.updatedAt).replace(', ', ' ') : null)
+  addMetaItem(
+    rows,
+    "Обновлено",
+    options.updatedAt ? formatDateTime(options.updatedAt).replace(", ", " ") : null,
+  );
 
-  return rows
+  return rows;
 }
 
 function skinRarityAccent(rarity: SkinRarity | null) {
-  return rarity ? skinRarityConfig[rarity].color : '#8fa3ad'
+  return rarity ? skinRarityConfig[rarity].color : "#8fa3ad";
 }
 
 function isSelectedSkin(item: SkinCardItem, selected: SelectedGunskinResponse | null | undefined) {
-  return Boolean(selected && (
-    selected.assetKey === item.assetKey
-    || selected.assetDefinitionId === item.assetDefinitionId
-  ))
+  return Boolean(
+    selected &&
+    (selected.assetKey === item.assetKey || selected.assetDefinitionId === item.assetDefinitionId),
+  );
 }
 
 function subscriptionTier(asset: AssetResponse | null, assetKey: string, title: string) {
-  const source = `${asset?.key ?? assetKey} ${title}`.toLowerCase()
-  if (source.includes('pro')) return 'PRO'
-  if (source.includes('plus')) return 'PLUS'
-  return 'Подписка'
+  const source = `${asset?.key ?? assetKey} ${title}`.toLowerCase();
+  if (source.includes("pro")) return "PRO";
+  if (source.includes("plus")) return "PLUS";
+  return "Подписка";
 }
 
 function remainingText(value: string | null | undefined, isActive: boolean) {
-  if (!isActive) return 'Не активна'
-  if (!value) return 'Активна'
+  if (!isActive) return "Не активна";
+  if (!value) return "Активна";
 
-  const expiresAt = new Date(value).getTime()
-  if (Number.isNaN(expiresAt)) return 'Активна'
+  const expiresAt = new Date(value).getTime();
+  if (Number.isNaN(expiresAt)) return "Активна";
 
-  const diff = expiresAt - Date.now()
-  if (diff <= 0) return 'Истекает'
+  const diff = expiresAt - Date.now();
+  if (diff <= 0) return "Истекает";
 
-  const days = Math.floor(diff / 86_400_000)
-  if (days > 0) return `Осталось ${days} д.`
+  const days = Math.floor(diff / 86_400_000);
+  if (days > 0) return `Осталось ${days} д.`;
 
-  const hours = Math.max(1, Math.floor(diff / 3_600_000))
-  return `Осталось ${hours} ч.`
+  const hours = Math.max(1, Math.floor(diff / 3_600_000));
+  return `Осталось ${hours} ч.`;
 }
 
 function cardStyle(accent: string): CSSProperties {
-  return { '--inventory-accent': accent } as CSSProperties
+  return { "--inventory-accent": accent } as CSSProperties;
 }
 
 type InventoryVisualItem = {
-  title: string
-  imageUrl: string | null
-  accent: string
-  fallbackLabel?: string
-}
+  title: string;
+  imageUrl: string | null;
+  accent: string;
+  fallbackLabel?: string;
+};
 
-function InventoryVisual({ item, compact = false }: { item: InventoryVisualItem; compact?: boolean }) {
-  const [failedImageUrl, setFailedImageUrl] = useState<string | null>(null)
-  const fallback = item.fallbackLabel ?? (item.title.trim().slice(0, 1).toUpperCase() || 'I')
-  const showImage = Boolean(item.imageUrl) && failedImageUrl !== item.imageUrl
+function InventoryVisual({
+  item,
+  compact = false,
+}: {
+  item: InventoryVisualItem;
+  compact?: boolean;
+}) {
+  const [failedImageUrl, setFailedImageUrl] = useState<string | null>(null);
+  const fallback = item.fallbackLabel ?? (item.title.trim().slice(0, 1).toUpperCase() || "I");
+  const showImage = Boolean(item.imageUrl) && failedImageUrl !== item.imageUrl;
 
   return (
-    <div className={`inventory-visual ${compact ? 'inventory-visual--compact' : ''}`} style={cardStyle(item.accent)}>
-      {showImage ? <img src={item.imageUrl ?? ''} alt="" loading="lazy" onError={() => setFailedImageUrl(item.imageUrl)} /> : <span>{fallback}</span>}
+    <div
+      className={`inventory-visual ${compact ? "inventory-visual--compact" : ""}`}
+      style={cardStyle(item.accent)}
+    >
+      {showImage ? (
+        <img
+          src={item.imageUrl ?? ""}
+          alt=""
+          loading="lazy"
+          onError={() => setFailedImageUrl(item.imageUrl)}
+        />
+      ) : (
+        <span>{fallback}</span>
+      )}
       {/* splash for better image visibility */}
       <div className="inventory-visual-splash" />
     </div>
-  )
+  );
 }
 
 function EmptySection({ text }: { text: string }) {
-  return <p className="ownership-muted inventory-empty">{text}</p>
+  return <p className="ownership-muted inventory-empty">{text}</p>;
 }
 
-type InventoryAssetView = ReturnType<typeof assetView>
+type InventoryAssetView = ReturnType<typeof assetView>;
 
 type SkinCardItem = InventoryAssetView & {
-  assetKey: string
-  assetDefinitionId: string
-  amount?: number
-  grantedAt?: string
-  updatedAt?: string
-}
+  assetKey: string;
+  assetDefinitionId: string;
+  amount?: number;
+  grantedAt?: string;
+  updatedAt?: string;
+};
 
-type LootboxCardItem = InventoryAssetView & OwnedLootboxResponse
-  & Pick<StackableResponse, 'assetDefinitionId' | 'updatedAt'>
+type LootboxCardItem = InventoryAssetView &
+  OwnedLootboxResponse &
+  Pick<StackableResponse, "assetDefinitionId" | "updatedAt">;
 
 type RegularInventoryItem = InventoryAssetView & {
-  assetKey: string
-  assetDefinitionId: string
-  amount?: number
-  expiresAt?: string | null
-  grantedAt?: string | null
-  updatedAt?: string | null
-  isActive?: boolean
-  lastExtendedAt?: string | null
-  source: 'stackable' | 'entitlement' | 'expirable'
-}
+  assetKey: string;
+  assetDefinitionId: string;
+  amount?: number;
+  expiresAt?: string | null;
+  grantedAt?: string | null;
+  updatedAt?: string | null;
+  isActive?: boolean;
+  lastExtendedAt?: string | null;
+  source: "stackable" | "entitlement" | "expirable";
+};
 
 type LootboxDetailsState =
-  | { status: 'loading'; item: LootboxCardItem }
-  | { status: 'ready'; item: LootboxCardItem; detail: LootboxDetailResponse }
-  | { status: 'error'; item: LootboxCardItem; error: string }
+  | { status: "loading"; item: LootboxCardItem }
+  | { status: "ready"; item: LootboxCardItem; detail: LootboxDetailResponse }
+  | { status: "error"; item: LootboxCardItem; error: string };
 
 function SkinCard({
   item,
@@ -338,33 +409,41 @@ function SkinCard({
   onSelect,
   onReset,
 }: {
-  item: SkinCardItem
-  isSelected: boolean
-  isSelecting: boolean
-  isResetting: boolean
-  onOpenDetails: (item: SkinCardItem) => void
-  onSelect: (item: SkinCardItem) => void
-  onReset: (item: SkinCardItem) => void
+  item: SkinCardItem;
+  isSelected: boolean;
+  isSelecting: boolean;
+  isResetting: boolean;
+  onOpenDetails: (item: SkinCardItem) => void;
+  onSelect: (item: SkinCardItem) => void;
+  onReset: (item: SkinCardItem) => void;
 }) {
-  const accent = skinRarityAccent(item.rarity)
-  const canSelect = Boolean(item.weaponKey)
-  const isBusy = isSelecting || isResetting
-  const [isActionHovered, setIsActionHovered] = useState(false)
+  const accent = skinRarityAccent(item.rarity);
+  const canSelect = Boolean(item.weaponKey);
+  const isBusy = isSelecting || isResetting;
+  const [isActionHovered, setIsActionHovered] = useState(false);
   const actionLabel = isResetting
-    ? 'Убираем...'
+    ? "Убираем..."
     : isSelecting
-      ? 'Выбираем...'
+      ? "Выбираем..."
       : isSelected
-        ? isActionHovered ? 'Убрать выбор' : 'Выбрано'
-        : canSelect ? 'Выбрать' : 'Нет оружия'
+        ? isActionHovered
+          ? "Убрать выбор"
+          : "Выбрано"
+        : canSelect
+          ? "Выбрать"
+          : "Нет оружия";
 
   return (
     <article
-      className={`inventory-skin-card ${isSelected ? 'is-selected' : ''} ${isBusy ? 'is-selecting' : ''}`}
-      data-rarity={item.rarity ?? 'none'}
+      className={`inventory-skin-card ${isSelected ? "is-selected" : ""} ${isBusy ? "is-selecting" : ""}`}
+      data-rarity={item.rarity ?? "none"}
       style={cardStyle(accent)}
     >
-      <button className="inventory-skin-card__preview" type="button" onClick={() => onOpenDetails(item)}>
+      <button
+        className="inventory-skin-card__preview"
+        type="button"
+        onClick={() => onOpenDetails(item)}
+      >
         <InventoryVisual item={{ ...item, accent }} />
       </button>
       <div className="inventory-skin-card__body">
@@ -376,7 +455,7 @@ function SkinCard({
         </div>
         <div className="inventory-skin-card__selection">
           <button
-            className={`inventory-skin-card__action ${isSelected ? 'is-selected' : ''} ${isSelected && isActionHovered ? 'is-remove-intent' : ''}`}
+            className={`inventory-skin-card__action ${isSelected ? "is-selected" : ""} ${isSelected && isActionHovered ? "is-remove-intent" : ""}`}
             type="button"
             disabled={!canSelect || isBusy}
             onMouseEnter={() => setIsActionHovered(true)}
@@ -385,10 +464,10 @@ function SkinCard({
             onBlur={() => setIsActionHovered(false)}
             onClick={() => {
               if (isSelected) {
-                onReset(item)
-                return
+                onReset(item);
+                return;
               }
-              onSelect(item)
+              onSelect(item);
             }}
           >
             {actionLabel}
@@ -397,39 +476,39 @@ function SkinCard({
         <div className="inventory-card-meta">
           <span>
             {item.amount !== undefined
-              ? `Обновлено: ${formatDateTime(item.updatedAt).replace(', ', ' ')}`
-              : `Выдано: ${formatDateTime(item.grantedAt).replace(', ', ' ')}`}
+              ? `Обновлено: ${formatDateTime(item.updatedAt).replace(", ", " ")}`
+              : `Выдано: ${formatDateTime(item.grantedAt).replace(", ", " ")}`}
           </span>
         </div>
       </div>
     </article>
-  )
+  );
 }
 
 function formatDropAmount(drop: LootboxDropResponse) {
-  if (drop.amount !== null && drop.amount !== undefined) return `${drop.amount} шт`
+  if (drop.amount !== null && drop.amount !== undefined) return `${drop.amount} шт`;
   if (drop.durationSeconds !== null && drop.durationSeconds !== undefined) {
-    const days = Math.floor(drop.durationSeconds / 86_400)
-    if (days > 0) return `${days} д.`
+    const days = Math.floor(drop.durationSeconds / 86_400);
+    if (days > 0) return `${days} д.`;
 
-    const hours = Math.max(1, Math.floor(drop.durationSeconds / 3_600))
-    return `${hours} ч.`
+    const hours = Math.max(1, Math.floor(drop.durationSeconds / 3_600));
+    return `${hours} ч.`;
   }
-  return '1 шт'
+  return "1 шт";
 }
 
 function formatDropDetails(drop: LootboxDropResponse) {
-  const rows = [formatDropAmount(drop)]
+  const rows = [formatDropAmount(drop)];
   if (drop.duplicateCompensationAmount !== null && drop.duplicateCompensationAmount !== undefined) {
-    rows.push(`компенсация дубля: ${drop.duplicateCompensationAmount}`)
+    rows.push(`компенсация дубля: ${drop.duplicateCompensationAmount}`);
   }
-  return rows.join(' · ')
+  return rows.join(" · ");
 }
 
 function formatDropChance(drop: LootboxDropResponse) {
-  if (drop.totalWeight <= 0) return null
-  const chance = drop.weight / drop.totalWeight * 100
-  return `${chance >= 10 ? chance.toFixed(0) : chance.toFixed(1)}%`
+  if (drop.totalWeight <= 0) return null;
+  const chance = (drop.weight / drop.totalWeight) * 100;
+  return `${chance >= 10 ? chance.toFixed(0) : chance.toFixed(1)}%`;
 }
 
 function LootboxDetailsModal({
@@ -437,33 +516,47 @@ function LootboxDetailsModal({
   assetMap,
   onClose,
 }: {
-  state: LootboxDetailsState
-  assetMap: Map<string, AssetResponse>
-  onClose: () => void
+  state: LootboxDetailsState;
+  assetMap: Map<string, AssetResponse>;
+  onClose: () => void;
 }) {
-  const { item } = state
-  const accent = assetAccent(item.asset, item.assetKey)
-  const drops = state.status === 'ready'
-    ? state.detail.drops.filter((drop) => drop.isActive).sort((left, right) => left.sortOrder - right.sortOrder)
-    : []
+  const { item } = state;
+  const accent = assetAccent(item.asset, item.assetKey);
+  const drops =
+    state.status === "ready"
+      ? state.detail.drops
+          .filter((drop) => drop.isActive)
+          .sort((left, right) => left.sortOrder - right.sortOrder)
+      : [];
 
   return (
     <AppPortal>
       <div className="ui-modal-backdrop" role="presentation" onClick={onClose}>
-        <div className="ui-modal skin-details-modal lootbox-details-modal" role="dialog" aria-modal="true" aria-labelledby="inventory-lootbox-details-title" onClick={(event) => event.stopPropagation()}>
+        <div
+          className="ui-modal skin-details-modal lootbox-details-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="inventory-lootbox-details-title"
+          onClick={(event) => event.stopPropagation()}
+        >
           <div className="ui-modal-header">
-            <h2 id="inventory-lootbox-details-title" className="ui-modal-title">{item.title}</h2>
+            <h2 id="inventory-lootbox-details-title" className="ui-modal-title">
+              {item.title}
+            </h2>
             <button className="ui-modal-close" type="button" aria-label="Закрыть" onClick={onClose}>
               ×
             </button>
           </div>
           <div className="ui-modal-body">
             <div className="skin-details-modal__body">
-              <InventoryVisual item={{ ...item, accent, fallbackLabel: 'Кейс' }} />
+              <InventoryVisual item={{ ...item, accent, fallbackLabel: "Кейс" }} />
               <div className="skin-details-modal__content">
-                <p>{item.description || 'Описание кейса пока не заполнено.'}</p>
+                <p>{item.description || "Описание кейса пока не заполнено."}</p>
                 <dl className="skin-details-modal__meta">
-                  {buildInventoryMetaItems(item.asset, { amount: item.amount, updatedAt: item.updatedAt }).map((metaItem) => (
+                  {buildInventoryMetaItems(item.asset, {
+                    amount: item.amount,
+                    updatedAt: item.updatedAt,
+                  }).map((metaItem) => (
                     <div key={`${metaItem.label}:${metaItem.value}`}>
                       <dt>{metaItem.label}</dt>
                       <dd>{metaItem.value}</dd>
@@ -473,31 +566,41 @@ function LootboxDetailsModal({
 
                 <section className="lootbox-details-modal__drops" aria-label="Содержимое кейса">
                   <h3>Может выпасть</h3>
-                  {state.status === 'loading' ? (
+                  {state.status === "loading" ? (
                     <p className="ownership-muted">Загружаем содержимое...</p>
                   ) : null}
-                  {state.status === 'error' ? (
+                  {state.status === "error" ? (
                     <p className="ownership-muted">{state.error}</p>
                   ) : null}
-                  {state.status === 'ready' && drops.length === 0 ? (
+                  {state.status === "ready" && drops.length === 0 ? (
                     <p className="ownership-muted">Активные награды не указаны.</p>
                   ) : null}
                   {drops.length ? (
                     <div className="lootbox-details-modal__drop-list">
                       {drops.map((drop) => {
-                        const reward = assetView(assetMap, drop.rewardAssetKey, drop.rewardAssetDefinitionId)
-                        const chance = formatDropChance(drop)
+                        const reward = assetView(
+                          assetMap,
+                          drop.rewardAssetKey,
+                          drop.rewardAssetDefinitionId,
+                        );
+                        const chance = formatDropChance(drop);
 
                         return (
-                          <article key={drop.id} className="lootbox-details-modal__drop" style={cardStyle(reward.accent)}>
+                          <article
+                            key={drop.id}
+                            className="lootbox-details-modal__drop"
+                            style={cardStyle(reward.accent)}
+                          >
                             <InventoryVisual item={reward} compact />
                             <div className="lootbox-details-modal__drop-main">
                               <strong>{drop.rewardAssetDisplayName || reward.title}</strong>
                               <span>{formatDropDetails(drop)}</span>
                             </div>
-                            {chance ? <span className="lootbox-details-modal__drop-chance">{chance}</span> : null}
+                            {chance ? (
+                              <span className="lootbox-details-modal__drop-chance">{chance}</span>
+                            ) : null}
                           </article>
-                        )
+                        );
                       })}
                     </div>
                   ) : null}
@@ -506,16 +609,24 @@ function LootboxDetailsModal({
             </div>
           </div>
           <div className="ui-modal-footer">
-            <button className="btn" type="button" onClick={onClose}>Закрыть</button>
+            <button className="btn" type="button" onClick={onClose}>
+              Закрыть
+            </button>
           </div>
         </div>
       </div>
     </AppPortal>
-  )
+  );
 }
 
-function LootboxCard({ item, onOpenDetails }: { item: LootboxCardItem; onOpenDetails: (item: LootboxCardItem) => void }) {
-  const accent = assetAccent(item.asset, item.assetKey)
+function LootboxCard({
+  item,
+  onOpenDetails,
+}: {
+  item: LootboxCardItem;
+  onOpenDetails: (item: LootboxCardItem) => void;
+}) {
+  const accent = assetAccent(item.asset, item.assetKey);
 
   return (
     <article
@@ -523,8 +634,12 @@ function LootboxCard({ item, onOpenDetails }: { item: LootboxCardItem; onOpenDet
       data-rarity="none"
       style={cardStyle(accent)}
     >
-      <button className="inventory-skin-card__preview" type="button" onClick={() => onOpenDetails(item)}>
-        <InventoryVisual item={{ ...item, accent, fallbackLabel: 'Кейс' }} />
+      <button
+        className="inventory-skin-card__preview"
+        type="button"
+        onClick={() => onOpenDetails(item)}
+      >
+        <InventoryVisual item={{ ...item, accent, fallbackLabel: "Кейс" }} />
       </button>
       <div className="inventory-skin-card__body">
         <div className="inventory-card-title">
@@ -535,27 +650,36 @@ function LootboxCard({ item, onOpenDetails }: { item: LootboxCardItem; onOpenDet
           <span>{item.amount} шт</span>
         </div>
         <div className="inventory-card-meta">
-          <span>Выдано: {formatDateTime(item.updatedAt).replace(', ', ' ')}</span>
+          <span>Выдано: {formatDateTime(item.updatedAt).replace(", ", " ")}</span>
         </div>
       </div>
     </article>
-  )
+  );
 }
 
-function RegularInventoryCard({ item, onOpenDetails }: { item: RegularInventoryItem; onOpenDetails: (item: RegularInventoryItem) => void }) {
-  const kindLabel = assetKindLabel(normalizedAssetKind(item.asset))
-  const statusLabel = item.amount !== undefined
-    ? `${item.amount} шт`
-    : item.expiresAt
-      ? item.isActive ? 'Активно' : 'Неактивно'
-      : 'В инвентаре'
+function RegularInventoryCard({
+  item,
+  onOpenDetails,
+}: {
+  item: RegularInventoryItem;
+  onOpenDetails: (item: RegularInventoryItem) => void;
+}) {
+  const kindLabel = assetKindLabel(normalizedAssetKind(item.asset));
+  const statusLabel =
+    item.amount !== undefined
+      ? `${item.amount} шт`
+      : item.expiresAt
+        ? item.isActive
+          ? "Активно"
+          : "Неактивно"
+        : "В инвентаре";
   const metaText = item.expiresAt
-    ? `Действует до ${formatDateTime(item.expiresAt).replace(', ', ' ')}`
+    ? `Действует до ${formatDateTime(item.expiresAt).replace(", ", " ")}`
     : item.grantedAt
-      ? `Выдано: ${formatDateTime(item.grantedAt).replace(', ', ' ')}`
+      ? `Выдано: ${formatDateTime(item.grantedAt).replace(", ", " ")}`
       : item.updatedAt
-        ? `Обновлено: ${formatDateTime(item.updatedAt).replace(', ', ' ')}`
-        : null
+        ? `Обновлено: ${formatDateTime(item.updatedAt).replace(", ", " ")}`
+        : null;
 
   return (
     <article
@@ -563,7 +687,11 @@ function RegularInventoryCard({ item, onOpenDetails }: { item: RegularInventoryI
       data-rarity="none"
       style={cardStyle(item.accent)}
     >
-      <button className="inventory-skin-card__preview" type="button" onClick={() => onOpenDetails(item)}>
+      <button
+        className="inventory-skin-card__preview"
+        type="button"
+        onClick={() => onOpenDetails(item)}
+      >
         <InventoryVisual item={{ ...item, fallbackLabel: kindLabel }} />
       </button>
       <div className="inventory-skin-card__body">
@@ -581,7 +709,7 @@ function RegularInventoryCard({ item, onOpenDetails }: { item: RegularInventoryI
         ) : null}
       </div>
     </article>
-  )
+  );
 }
 
 function ItemCard({ item }: { item: InventoryAssetView & StackableResponse }) {
@@ -597,7 +725,7 @@ function ItemCard({ item }: { item: InventoryAssetView & StackableResponse }) {
         <span>шт.</span>
       </div>
     </article>
-  )
+  );
 }
 
 function AccessCard({ item }: { item: InventoryAssetView & EntitlementResponse }) {
@@ -610,23 +738,26 @@ function AccessCard({ item }: { item: InventoryAssetView & EntitlementResponse }
       </div>
       <div className="inventory-access-state">
         <span className="ui-badge ui-badge-success">Открыт</span>
-        <small>с {formatDateTime(item.grantedAt).replace(', ', ' ')}</small>
+        <small>с {formatDateTime(item.grantedAt).replace(", ", " ")}</small>
       </div>
     </article>
-  )
+  );
 }
 
-type SubscriptionCardItem = InventoryAssetView & ExpirableResponse
+type SubscriptionCardItem = InventoryAssetView & ExpirableResponse;
 
 function SubscriptionCard({ item }: { item: SubscriptionCardItem }) {
-  const tier = subscriptionTier(item.asset, item.assetKey, item.title)
+  const tier = subscriptionTier(item.asset, item.assetKey, item.title);
 
   return (
-    <article className={`inventory-subscription-card ${item.isActive ? 'is-active' : 'is-expired'}`} style={cardStyle(item.accent)}>
+    <article
+      className={`inventory-subscription-card ${item.isActive ? "is-active" : "is-expired"}`}
+      style={cardStyle(item.accent)}
+    >
       <div className="inventory-subscription-card__top">
         <span className="inventory-subscription-tier">{tier}</span>
-        <span className={`ui-badge ${item.isActive ? 'ui-badge-success' : 'ui-badge-warning'}`}>
-          {item.isActive ? 'Активна' : 'Неактивна'}
+        <span className={`ui-badge ${item.isActive ? "ui-badge-success" : "ui-badge-warning"}`}>
+          {item.isActive ? "Активна" : "Неактивна"}
         </span>
       </div>
       <div className="inventory-card-title">
@@ -635,87 +766,96 @@ function SubscriptionCard({ item }: { item: SubscriptionCardItem }) {
       </div>
       <div className="inventory-subscription-status">
         <strong>{remainingText(item.expiresAt, item.isActive)}</strong>
-        <span>{item.isActive && item.expiresAt ? `до ${formatDateTime(item.expiresAt).replace(', ', ' ')}` : 'Подписка не подключена'}</span>
+        <span>
+          {item.isActive && item.expiresAt
+            ? `до ${formatDateTime(item.expiresAt).replace(", ", " ")}`
+            : "Подписка не подключена"}
+        </span>
       </div>
     </article>
-  )
+  );
 }
 
-void ItemCard
-void AccessCard
-void SubscriptionCard
+void ItemCard;
+void AccessCard;
+void SubscriptionCard;
 
-type InvSortKey = 'default' | 'rarity' | 'weapon'
-type InvRarityFilter = 'all' | 'none' | SkinRarity
-type InvWeaponFilter = 'all' | string
-type InvAssetKindFilter = 'all' | string
+type InvSortKey = "default" | "rarity" | "weapon";
+type InvRarityFilter = "all" | "none" | SkinRarity;
+type InvWeaponFilter = "all" | string;
+type InvAssetKindFilter = "all" | string;
 
 export default function OwnershipPage() {
-  const [state, setState] = useState<OwnershipState>({ status: 'loading' })
-  const [selectingSkinKey, setSelectingSkinKey] = useState<string | null>(null)
-  const [resettingSkinKey, setResettingSkinKey] = useState<string | null>(null)
-  const [detailsSkin, setDetailsSkin] = useState<SkinCardItem | null>(null)
-  const [detailsInventoryItem, setDetailsInventoryItem] = useState<RegularInventoryItem | null>(null)
-  const [detailsLootbox, setDetailsLootbox] = useState<LootboxDetailsState | null>(null)
-  const [invSort, setInvSort] = useState<InvSortKey>('default')
-  const [invRarityFilter, setInvRarityFilter] = useState<InvRarityFilter>('all')
-  const [invWeaponFilter, setInvWeaponFilter] = useState<InvWeaponFilter>('all')
-  const [invAssetKindFilter, setInvAssetKindFilter] = useState<InvAssetKindFilter>('all')
-  const [isInvFiltersModalOpen, setIsInvFiltersModalOpen] = useState(false)
+  const [state, setState] = useState<OwnershipState>({ status: "loading" });
+  const [selectingSkinKey, setSelectingSkinKey] = useState<string | null>(null);
+  const [resettingSkinKey, setResettingSkinKey] = useState<string | null>(null);
+  const [detailsSkin, setDetailsSkin] = useState<SkinCardItem | null>(null);
+  const [detailsInventoryItem, setDetailsInventoryItem] = useState<RegularInventoryItem | null>(
+    null,
+  );
+  const [detailsLootbox, setDetailsLootbox] = useState<LootboxDetailsState | null>(null);
+  const [invSort, setInvSort] = useState<InvSortKey>("default");
+  const [invRarityFilter, setInvRarityFilter] = useState<InvRarityFilter>("all");
+  const [invWeaponFilter, setInvWeaponFilter] = useState<InvWeaponFilter>("all");
+  const [invAssetKindFilter, setInvAssetKindFilter] = useState<InvAssetKindFilter>("all");
+  const [isInvFiltersModalOpen, setIsInvFiltersModalOpen] = useState(false);
 
   const load = async () => {
-    const token = getAuthToken()
+    const token = getAuthToken();
     if (!token) {
-      setState({ status: 'unauthorized' })
-      return
+      setState({ status: "unauthorized" });
+      return;
     }
 
-    setState({ status: 'loading' })
+    setState({ status: "loading" });
     try {
       const [inventory, assets, selectedGunskinItems, lootboxes] = await Promise.all([
         getMyInventory(token),
         listAllPublicAssets().catch(() => [] as AssetResponse[]),
         listMyGunskinSelections(token),
         getMyLootboxes(token),
-      ])
-      const selectedGunskins = selectedGunskinItems.map((item) => item.selected).filter(Boolean)
-      setState({ status: 'ready', inventory, assets, selectedGunskins, lootboxes })
+      ]);
+      const selectedGunskins = selectedGunskinItems.map((item) => item.selected).filter(Boolean);
+      setState({ status: "ready", inventory, assets, selectedGunskins, lootboxes });
     } catch (cause) {
-      setState({ status: 'error', error: toDisplayError(cause, 'Не удалось загрузить инвентарь.') })
+      setState({
+        status: "error",
+        error: toDisplayError(cause, "Не удалось загрузить инвентарь."),
+      });
     }
-  }
+  };
 
   useEffect(() => {
-    queueMicrotask(() => void load())
-  }, [])
+    queueMicrotask(() => void load());
+  }, []);
 
   const assetMap = useMemo(() => {
-    if (state.status !== 'ready') return new Map<string, AssetResponse>()
-    return makeAssetMap(state.assets)
-  }, [state])
+    if (state.status !== "ready") return new Map<string, AssetResponse>();
+    return makeAssetMap(state.assets);
+  }, [state]);
 
   const selectedGunskinByWeapon = useMemo(() => {
-    const map = new Map<string, SelectedGunskinResponse>()
-    if (state.status !== 'ready') return map
+    const map = new Map<string, SelectedGunskinResponse>();
+    if (state.status !== "ready") return map;
 
     for (const selected of state.selectedGunskins) {
-      map.set(selected.weaponKey, selected)
+      map.set(selected.weaponKey, selected);
     }
-    return map
-  }, [state])
+    return map;
+  }, [state]);
 
   const baseSkinEntries = useMemo((): SkinCardItem[] => {
-    if (state.status !== 'ready') return []
+    if (state.status !== "ready") return [];
 
-    const map = makeAssetMap(state.assets)
+    const map = makeAssetMap(state.assets);
     const stackableEntries = state.inventory.stackables.map((item) => ({
       ...item,
       ...assetView(map, item.assetKey, item.assetDefinitionId),
-    }))
+    }));
     const entitlementEntries = state.inventory.entitlements.map((item) => ({
       ...item,
       ...assetView(map, item.assetKey, item.assetDefinitionId),
-    }))
+    }));
 
     return [
       ...stackableEntries
@@ -724,235 +864,263 @@ export default function OwnershipPage() {
       ...entitlementEntries
         .filter((item) => isSkinAsset(item.asset, item.assetKey))
         .map((item) => ({ ...item, grantedAt: item.grantedAt, updatedAt: item.updatedAt })),
-    ]
-  }, [state])
+    ];
+  }, [state]);
 
   const lootboxEntries = useMemo((): LootboxCardItem[] => {
-    if (state.status !== 'ready') return []
+    if (state.status !== "ready") return [];
 
-    const stackablesByKey = new Map(state.inventory.stackables.map((item) => [item.assetKey, item]))
+    const stackablesByKey = new Map(
+      state.inventory.stackables.map((item) => [item.assetKey, item]),
+    );
 
     return state.lootboxes
       .filter((item) => item.amount > 0)
       .filter((item) => stackablesByKey.has(item.assetKey))
       .map((item) => {
-        const stackable = stackablesByKey.get(item.assetKey)!
-        const view = assetView(assetMap, item.assetKey, stackable.assetDefinitionId)
+        const stackable = stackablesByKey.get(item.assetKey)!;
+        const view = assetView(assetMap, item.assetKey, stackable.assetDefinitionId);
         return {
           ...item,
           assetDefinitionId: stackable.assetDefinitionId,
           updatedAt: stackable.updatedAt,
           ...view,
           title: view.asset?.displayName ?? item.displayName,
-          description: view.asset?.description ?? 'Кейс',
-        }
+          description: view.asset?.description ?? "Кейс",
+        };
       })
-      .sort((left, right) => left.title.localeCompare(right.title, 'ru'))
-  }, [assetMap, state])
+      .sort((left, right) => left.title.localeCompare(right.title, "ru"));
+  }, [assetMap, state]);
 
   const regularItemEntries = useMemo((): RegularInventoryItem[] => {
-    if (state.status !== 'ready') return []
+    if (state.status !== "ready") return [];
 
-    const map = makeAssetMap(state.assets)
-    const lootboxAssetKeys = new Set(state.lootboxes.map((item) => item.assetKey))
+    const map = makeAssetMap(state.assets);
+    const lootboxAssetKeys = new Set(state.lootboxes.map((item) => item.assetKey));
     const stackableEntries = state.inventory.stackables
       .filter((item) => !lootboxAssetKeys.has(item.assetKey))
       .map((item) => ({
         ...item,
         ...assetView(map, item.assetKey, item.assetDefinitionId),
-        source: 'stackable' as const,
+        source: "stackable" as const,
       }))
-      .filter((item) => !isSkinAsset(item.asset, item.assetKey))
+      .filter((item) => !isSkinAsset(item.asset, item.assetKey));
     const entitlementEntries = state.inventory.entitlements
       .map((item) => ({
         ...item,
         ...assetView(map, item.assetKey, item.assetDefinitionId),
-        source: 'entitlement' as const,
+        source: "entitlement" as const,
       }))
-      .filter((item) => !isSkinAsset(item.asset, item.assetKey))
+      .filter((item) => !isSkinAsset(item.asset, item.assetKey));
     const expirableEntries = state.inventory.expirables
       .map((item) => ({
         ...item,
         ...assetView(map, item.assetKey, item.assetDefinitionId),
-        source: 'expirable' as const,
+        source: "expirable" as const,
       }))
-      .filter((item) => !isSkinAsset(item.asset, item.assetKey))
+      .filter((item) => !isSkinAsset(item.asset, item.assetKey));
 
-    return [...stackableEntries, ...entitlementEntries, ...expirableEntries]
-  }, [state])
+    return [...stackableEntries, ...entitlementEntries, ...expirableEntries];
+  }, [state]);
 
   const invAssetKindOptions = useMemo(() => {
-    const values = new Set<string>()
+    const values = new Set<string>();
     for (const item of [...baseSkinEntries, ...lootboxEntries, ...regularItemEntries]) {
-      values.add(normalizedAssetKind(item.asset))
+      values.add(normalizedAssetKind(item.asset));
     }
-    return [...values].sort((left, right) => assetKindLabel(left).localeCompare(assetKindLabel(right), 'ru'))
-  }, [baseSkinEntries, lootboxEntries, regularItemEntries])
+    return [...values].sort((left, right) =>
+      assetKindLabel(left).localeCompare(assetKindLabel(right), "ru"),
+    );
+  }, [baseSkinEntries, lootboxEntries, regularItemEntries]);
 
   const invWeaponOptions = useMemo(
     () => uniqueSortedWeaponKeys(baseSkinEntries.map((item) => item.weaponKey)),
     [baseSkinEntries],
-  )
+  );
 
   const displayedSkinEntries = useMemo(() => {
-    let rows = baseSkinEntries
+    let rows = baseSkinEntries;
 
-    if (invAssetKindFilter !== 'all') {
-      rows = rows.filter((item) => normalizedAssetKind(item.asset) === invAssetKindFilter)
+    if (invAssetKindFilter !== "all") {
+      rows = rows.filter((item) => normalizedAssetKind(item.asset) === invAssetKindFilter);
     }
 
-    if (invRarityFilter === 'none') {
-      rows = rows.filter((item) => !item.rarity)
-    } else if (invRarityFilter !== 'all') {
-      rows = rows.filter((item) => item.rarity === invRarityFilter)
+    if (invRarityFilter === "none") {
+      rows = rows.filter((item) => !item.rarity);
+    } else if (invRarityFilter !== "all") {
+      rows = rows.filter((item) => item.rarity === invRarityFilter);
     }
 
-    if (invWeaponFilter !== 'all') {
-      rows = rows.filter((item) => (item.weaponKey ?? '').trim() === invWeaponFilter)
+    if (invWeaponFilter !== "all") {
+      rows = rows.filter((item) => (item.weaponKey ?? "").trim() === invWeaponFilter);
     }
 
-    const sorted = [...rows]
-    const tieTitle = (a: SkinCardItem, b: SkinCardItem) => a.title.localeCompare(b.title, 'ru')
+    const sorted = [...rows];
+    const tieTitle = (a: SkinCardItem, b: SkinCardItem) => a.title.localeCompare(b.title, "ru");
 
     switch (invSort) {
-      case 'rarity':
-        sorted.sort((a, b) => skinRarityRank(a.rarity) - skinRarityRank(b.rarity) || tieTitle(a, b))
-        break
-      case 'weapon': {
-        const w = (item: SkinCardItem) => (item.weaponKey ?? '').trim().toLowerCase()
-        sorted.sort((a, b) => w(a).localeCompare(w(b), 'ru') || tieTitle(a, b))
-        break
+      case "rarity":
+        sorted.sort(
+          (a, b) => skinRarityRank(a.rarity) - skinRarityRank(b.rarity) || tieTitle(a, b),
+        );
+        break;
+      case "weapon": {
+        const w = (item: SkinCardItem) => (item.weaponKey ?? "").trim().toLowerCase();
+        sorted.sort((a, b) => w(a).localeCompare(w(b), "ru") || tieTitle(a, b));
+        break;
       }
       default:
-        sorted.sort(tieTitle)
+        sorted.sort(tieTitle);
     }
 
-    return sorted
-  }, [baseSkinEntries, invSort, invRarityFilter, invWeaponFilter, invAssetKindFilter])
+    return sorted;
+  }, [baseSkinEntries, invSort, invRarityFilter, invWeaponFilter, invAssetKindFilter]);
 
   const displayedLootboxEntries = useMemo(() => {
-    if (invAssetKindFilter === 'all') return lootboxEntries
-    return lootboxEntries.filter((item) => normalizedAssetKind(item.asset) === invAssetKindFilter)
-  }, [lootboxEntries, invAssetKindFilter])
+    if (invAssetKindFilter === "all") return lootboxEntries;
+    return lootboxEntries.filter((item) => normalizedAssetKind(item.asset) === invAssetKindFilter);
+  }, [lootboxEntries, invAssetKindFilter]);
 
   const displayedRegularItemEntries = useMemo(() => {
-    let rows = regularItemEntries
+    let rows = regularItemEntries;
 
-    if (invAssetKindFilter !== 'all') {
-      rows = rows.filter((item) => normalizedAssetKind(item.asset) === invAssetKindFilter)
+    if (invAssetKindFilter !== "all") {
+      rows = rows.filter((item) => normalizedAssetKind(item.asset) === invAssetKindFilter);
     }
 
-    return [...rows].sort((left, right) => left.title.localeCompare(right.title, 'ru'))
-  }, [regularItemEntries, invAssetKindFilter])
+    return [...rows].sort((left, right) => left.title.localeCompare(right.title, "ru"));
+  }, [regularItemEntries, invAssetKindFilter]);
 
-  const displayedInventoryCount = displayedSkinEntries.length + displayedLootboxEntries.length + displayedRegularItemEntries.length
-  const baseInventoryCount = baseSkinEntries.length + lootboxEntries.length + regularItemEntries.length
+  const displayedInventoryCount =
+    displayedSkinEntries.length +
+    displayedLootboxEntries.length +
+    displayedRegularItemEntries.length;
+  const baseInventoryCount =
+    baseSkinEntries.length + lootboxEntries.length + regularItemEntries.length;
 
-  if (state.status === 'loading') {
-    return <LoadingState title="Загружаем инвентарь" />
+  if (state.status === "loading") {
+    return <LoadingState title="Загружаем инвентарь" />;
   }
 
-  if (state.status === 'unauthorized') {
+  if (state.status === "unauthorized") {
     return (
       <section className="card profile-state-card">
         <span className="ui-badge ui-badge-warning">Доступ</span>
         <h1 className="card-title">Нужно войти</h1>
         <p className="card-text">Инвентарь доступен только после входа через Discord.</p>
-        <button className="btn primary" type="button" onClick={() => redirectToAuth(currentAppPath())}>
+        <button
+          className="btn primary"
+          type="button"
+          onClick={() => redirectToAuth(currentAppPath())}
+        >
           Войти
         </button>
       </section>
-    )
+    );
   }
 
-  if (state.status === 'error') {
-    return <ErrorState title="Инвентарь недоступен" message={state.error} primaryActionLabel="Повторить" onPrimaryAction={() => void load()} />
+  if (state.status === "error") {
+    return (
+      <ErrorState
+        title="Инвентарь недоступен"
+        message={state.error}
+        primaryActionLabel="Повторить"
+        onPrimaryAction={() => void load()}
+      />
+    );
   }
 
   const selectSkin = async (item: SkinCardItem) => {
-    const token = getAuthToken()
+    const token = getAuthToken();
     if (!token) {
-      setState({ status: 'unauthorized' })
-      return
+      setState({ status: "unauthorized" });
+      return;
     }
-    if (!item.weaponKey || selectingSkinKey) return
+    if (!item.weaponKey || selectingSkinKey) return;
 
-    const requestKey = `${item.weaponKey}:${item.assetKey}`
-    setSelectingSkinKey(requestKey)
+    const requestKey = `${item.weaponKey}:${item.assetKey}`;
+    setSelectingSkinKey(requestKey);
     try {
       const selected = await selectMyGunskin(token, item.weaponKey, {
         assetKey: item.assetKey,
-        reasonCode: 'inventory_page',
-        reasonText: 'Selected from inventory page',
-      })
+        reasonCode: "inventory_page",
+        reasonText: "Selected from inventory page",
+      });
 
       setState((prev) => {
-        if (prev.status !== 'ready') return prev
+        if (prev.status !== "ready") return prev;
 
-        const nextSelections = prev.selectedGunskins.filter((entry) => entry.weaponKey !== selected.weaponKey)
-        nextSelections.push(selected)
+        const nextSelections = prev.selectedGunskins.filter(
+          (entry) => entry.weaponKey !== selected.weaponKey,
+        );
+        nextSelections.push(selected);
 
         return {
           ...prev,
           selectedGunskins: nextSelections,
-        }
-      })
-      toast.success('Скин выбран активным.')
+        };
+      });
+      toast.success("Скин выбран активным.");
     } catch (cause) {
-      toast.error(toDisplayError(cause, 'Не удалось выбрать скин.'))
+      toast.error(toDisplayError(cause, "Не удалось выбрать скин."));
     } finally {
-      setSelectingSkinKey(null)
+      setSelectingSkinKey(null);
     }
-  }
+  };
 
   const resetSkin = async (item: SkinCardItem) => {
-    const token = getAuthToken()
+    const token = getAuthToken();
     if (!token) {
-      setState({ status: 'unauthorized' })
-      return
+      setState({ status: "unauthorized" });
+      return;
     }
-    if (!item.weaponKey || selectingSkinKey || resettingSkinKey) return
+    if (!item.weaponKey || selectingSkinKey || resettingSkinKey) return;
 
-    const requestKey = `${item.weaponKey}:${item.assetKey}`
-    setResettingSkinKey(requestKey)
+    const requestKey = `${item.weaponKey}:${item.assetKey}`;
+    setResettingSkinKey(requestKey);
     try {
-      await resetMyGunskin(token, item.weaponKey)
+      await resetMyGunskin(token, item.weaponKey);
 
       setState((prev) => {
-        if (prev.status !== 'ready') return prev
+        if (prev.status !== "ready") return prev;
 
         return {
           ...prev,
-          selectedGunskins: prev.selectedGunskins.filter((entry) => entry.weaponKey !== item.weaponKey),
-        }
-      })
-      toast.success('Выбор скина снят.')
+          selectedGunskins: prev.selectedGunskins.filter(
+            (entry) => entry.weaponKey !== item.weaponKey,
+          ),
+        };
+      });
+      toast.success("Выбор скина снят.");
     } catch (cause) {
-      toast.error(toDisplayError(cause, 'Не удалось снять выбранный скин.'))
+      toast.error(toDisplayError(cause, "Не удалось снять выбранный скин."));
     } finally {
-      setResettingSkinKey(null)
+      setResettingSkinKey(null);
     }
-  }
+  };
 
   const openLootboxDetails = async (item: LootboxCardItem) => {
-    setDetailsLootbox({ status: 'loading', item })
+    setDetailsLootbox({ status: "loading", item });
     try {
-      const detail = await getPublicLootbox(item.lootboxId)
-      setDetailsLootbox({ status: 'ready', item, detail })
+      const detail = await getPublicLootbox(item.lootboxId);
+      setDetailsLootbox({ status: "ready", item, detail });
     } catch (cause) {
       setDetailsLootbox({
-        status: 'error',
+        status: "error",
         item,
-        error: toDisplayError(cause, 'Не удалось загрузить содержимое кейса.'),
-      })
+        error: toDisplayError(cause, "Не удалось загрузить содержимое кейса."),
+      });
     }
-  }
+  };
 
   return (
     <main className="page ownership-page">
       <section className="card ownership-hero">
         <h1 className="card-title">Инвентарь</h1>
-        <p className="card-text">Скины, предметы и подписки аккаунта собраны по типам, чтобы быстро найти нужное даже в большом инвентаре.</p>
+        <p className="card-text">
+          Скины, предметы и подписки аккаунта собраны по типам, чтобы быстро найти нужное даже в
+          большом инвентаре.
+        </p>
       </section>
 
       <section className="ownership-section inventory-section">
@@ -979,8 +1147,8 @@ export default function OwnershipPage() {
         {displayedInventoryCount ? (
           <div className="inventory-skin-grid">
             {displayedSkinEntries.map((item) => {
-              const selected = item.weaponKey ? selectedGunskinByWeapon.get(item.weaponKey) : null
-              const requestKey = item.weaponKey ? `${item.weaponKey}:${item.assetKey}` : null
+              const selected = item.weaponKey ? selectedGunskinByWeapon.get(item.weaponKey) : null;
+              const requestKey = item.weaponKey ? `${item.weaponKey}:${item.assetKey}` : null;
 
               return (
                 <SkinCard
@@ -993,16 +1161,30 @@ export default function OwnershipPage() {
                   onSelect={selectSkin}
                   onReset={resetSkin}
                 />
-              )
+              );
             })}
             {displayedLootboxEntries.map((item) => (
-              <LootboxCard key={item.lootboxId} item={item} onOpenDetails={(selected) => void openLootboxDetails(selected)} />
+              <LootboxCard
+                key={item.lootboxId}
+                item={item}
+                onOpenDetails={(selected) => void openLootboxDetails(selected)}
+              />
             ))}
             {displayedRegularItemEntries.map((item) => (
-              <RegularInventoryCard key={`${item.source}:${item.assetKey}:${item.assetDefinitionId}`} item={item} onOpenDetails={setDetailsInventoryItem} />
+              <RegularInventoryCard
+                key={`${item.source}:${item.assetKey}:${item.assetDefinitionId}`}
+                item={item}
+                onOpenDetails={setDetailsInventoryItem}
+              />
             ))}
           </div>
-        ) : <EmptySection text={baseInventoryCount ? 'Нет предметов по выбранным фильтрам.' : 'Инвентарь пока пуст.'} />}
+        ) : (
+          <EmptySection
+            text={
+              baseInventoryCount ? "Нет предметов по выбранным фильтрам." : "Инвентарь пока пуст."
+            }
+          />
+        )}
       </section>
 
       {isInvFiltersModalOpen ? (
@@ -1021,7 +1203,9 @@ export default function OwnershipPage() {
               onClick={(event) => event.stopPropagation()}
             >
               <div className="ui-modal-header">
-                <h2 id="inv-filters-modal-title" className="ui-modal-title">Сортировка и фильтры</h2>
+                <h2 id="inv-filters-modal-title" className="ui-modal-title">
+                  Сортировка и фильтры
+                </h2>
                 <button
                   type="button"
                   className="ui-modal-close"
@@ -1032,15 +1216,18 @@ export default function OwnershipPage() {
                 </button>
               </div>
               <div className="ui-modal-body inventory-filters-modal__body">
-                <div className="inventory-toolbar inventory-toolbar--modal" aria-label="Сортировка и фильтры инвентаря">
+                <div
+                  className="inventory-toolbar inventory-toolbar--modal"
+                  aria-label="Сортировка и фильтры инвентаря"
+                >
                   <div className="inventory-toolbar__row">
                     <fieldset className="ui-radio-group inventory-toolbar__fieldset inventory-toolbar__fieldset--inline">
                       <legend className="ui-radio-legend">Сортировка</legend>
                       {(
                         [
-                          ['default', 'По умолчанию'],
-                          ['rarity', 'По редкости'],
-                          ['weapon', 'По оружию'],
+                          ["default", "По умолчанию"],
+                          ["rarity", "По редкости"],
+                          ["weapon", "По оружию"],
                         ] as const
                       ).map(([value, label]) => (
                         <label key={value} className="ui-radio">
@@ -1066,8 +1253,8 @@ export default function OwnershipPage() {
                             type="radio"
                             name="inv-filter-kind"
                             value="all"
-                            checked={invAssetKindFilter === 'all'}
-                            onChange={() => setInvAssetKindFilter('all')}
+                            checked={invAssetKindFilter === "all"}
+                            onChange={() => setInvAssetKindFilter("all")}
                           />
                           <span className="ui-radio-mark" aria-hidden />
                           <span>Все</span>
@@ -1095,8 +1282,8 @@ export default function OwnershipPage() {
                             type="radio"
                             name="inv-filter-rarity"
                             value="all"
-                            checked={invRarityFilter === 'all'}
-                            onChange={() => setInvRarityFilter('all')}
+                            checked={invRarityFilter === "all"}
+                            onChange={() => setInvRarityFilter("all")}
                           />
                           <span className="ui-radio-mark" aria-hidden />
                           <span>Все</span>
@@ -1125,8 +1312,8 @@ export default function OwnershipPage() {
                             type="radio"
                             name="inv-filter-weapon"
                             value="all"
-                            checked={invWeaponFilter === 'all'}
-                            onChange={() => setInvWeaponFilter('all')}
+                            checked={invWeaponFilter === "all"}
+                            onChange={() => setInvWeaponFilter("all")}
                           />
                           <span className="ui-radio-mark" aria-hidden />
                           <span>Все</span>
@@ -1150,7 +1337,11 @@ export default function OwnershipPage() {
                 </div>
               </div>
               <div className="ui-modal-footer">
-                <button type="button" className="btn primary" onClick={() => setIsInvFiltersModalOpen(false)}>
+                <button
+                  type="button"
+                  className="btn primary"
+                  onClick={() => setIsInvFiltersModalOpen(false)}
+                >
                   Готово
                 </button>
               </div>
@@ -1169,7 +1360,7 @@ export default function OwnershipPage() {
             rarity: detailsSkin.rarity,
             weaponKey: detailsSkin.weaponKey,
             modelPreview: detailsSkin.modelPreview,
-            statusText: 'Уже в инвентаре',
+            statusText: "Уже в инвентаре",
             metaItems: buildInventoryMetaItems(detailsSkin.asset, {
               amount: detailsSkin.amount,
               updatedAt: detailsSkin.updatedAt,
@@ -1177,9 +1368,11 @@ export default function OwnershipPage() {
           }}
           titleId="inventory-skin-details-title"
           onClose={() => setDetailsSkin(null)}
-          footer={(
-            <button className="btn" type="button" onClick={() => setDetailsSkin(null)}>Закрыть</button>
-          )}
+          footer={
+            <button className="btn" type="button" onClick={() => setDetailsSkin(null)}>
+              Закрыть
+            </button>
+          }
         />
       ) : null}
 
@@ -1193,7 +1386,7 @@ export default function OwnershipPage() {
             rarity: detailsInventoryItem.rarity,
             weaponKey: detailsInventoryItem.weaponKey,
             modelPreview: detailsInventoryItem.modelPreview,
-            statusText: 'Уже в инвентаре',
+            statusText: "Уже в инвентаре",
             metaItems: buildInventoryMetaItems(detailsInventoryItem.asset, {
               amount: detailsInventoryItem.amount,
               expiresAt: detailsInventoryItem.expiresAt,
@@ -1202,9 +1395,11 @@ export default function OwnershipPage() {
           }}
           titleId="inventory-item-details-title"
           onClose={() => setDetailsInventoryItem(null)}
-          footer={(
-            <button className="btn" type="button" onClick={() => setDetailsInventoryItem(null)}>Закрыть</button>
-          )}
+          footer={
+            <button className="btn" type="button" onClick={() => setDetailsInventoryItem(null)}>
+              Закрыть
+            </button>
+          }
         />
       ) : null}
 
@@ -1215,7 +1410,7 @@ export default function OwnershipPage() {
           onClose={() => setDetailsLootbox(null)}
         />
       ) : null}
-{/*
+      {/*
       <section className="ownership-section inventory-section">
         <div className="ownership-section-head">
           <div className="ownership-section-title"><h2 className="card-title">Предметы</h2></div>
@@ -1238,5 +1433,5 @@ export default function OwnershipPage() {
       </section>
       */}
     </main>
-  )
+  );
 }
