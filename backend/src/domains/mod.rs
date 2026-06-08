@@ -7,6 +7,7 @@ pub mod lootboxes;
 pub mod littlemice;
 pub mod meta;
 pub mod ownership;
+pub mod referrals;
 pub mod shop;
 pub mod skins;
 pub mod squads;

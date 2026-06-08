@@ -3039,6 +3039,278 @@ enum UserSelectedGunskin {
     UpdatedAt,
 }
 
+pub struct CreateReferralTables;
+
+impl MigrationName for CreateReferralTables {
+    fn name(&self) -> &str {
+        "m20260608_000037_create_referral_tables"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for CreateReferralTables {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .create_table(
+                Table::create()
+                    .table(ReferralCampaign::Table)
+                    .if_not_exists()
+                    .col(
+                        ColumnDef::new(ReferralCampaign::Id)
+                            .uuid()
+                            .not_null()
+                            .primary_key(),
+                    )
+                    .col(ColumnDef::new(ReferralCampaign::Code).string().not_null())
+                    .col(ColumnDef::new(ReferralCampaign::Title).string().not_null())
+                    .col(
+                        ColumnDef::new(ReferralCampaign::ContentCreatorUserId)
+                            .uuid()
+                            .null(),
+                    )
+                    .col(ColumnDef::new(ReferralCampaign::Status).string().not_null())
+                    .col(
+                        ColumnDef::new(ReferralCampaign::StartsAt)
+                            .timestamp_with_time_zone()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(ReferralCampaign::EndsAt)
+                            .timestamp_with_time_zone()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(ReferralCampaign::CreatedByUserId)
+                            .uuid()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(ReferralCampaign::RevokedAt)
+                            .timestamp_with_time_zone()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(ReferralCampaign::CreatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .col(
+                        ColumnDef::new(ReferralCampaign::UpdatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_table(
+                Table::create()
+                    .table(ReferralCampaignReward::Table)
+                    .if_not_exists()
+                    .col(
+                        ColumnDef::new(ReferralCampaignReward::Id)
+                            .uuid()
+                            .not_null()
+                            .primary_key(),
+                    )
+                    .col(
+                        ColumnDef::new(ReferralCampaignReward::CampaignId)
+                            .uuid()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(ReferralCampaignReward::AssetKey)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(ReferralCampaignReward::Amount)
+                            .big_integer()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(ReferralCampaignReward::DurationSeconds)
+                            .big_integer()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(ReferralCampaignReward::SortOrder)
+                            .integer()
+                            .not_null()
+                            .default(0),
+                    )
+                    .col(
+                        ColumnDef::new(ReferralCampaignReward::Metadata)
+                            .text()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(ReferralCampaignReward::CreatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .col(
+                        ColumnDef::new(ReferralCampaignReward::UpdatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_table(
+                Table::create()
+                    .table(ReferralRegistration::Table)
+                    .if_not_exists()
+                    .col(
+                        ColumnDef::new(ReferralRegistration::Id)
+                            .uuid()
+                            .not_null()
+                            .primary_key(),
+                    )
+                    .col(
+                        ColumnDef::new(ReferralRegistration::CampaignId)
+                            .uuid()
+                            .not_null(),
+                    )
+                    .col(ColumnDef::new(ReferralRegistration::UserId).uuid().not_null())
+                    .col(
+                        ColumnDef::new(ReferralRegistration::CodeSnapshot)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(ReferralRegistration::CampaignTitleSnapshot)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(ReferralRegistration::ContentCreatorUserIdSnapshot)
+                            .uuid()
+                            .null(),
+                    )
+                    .col(ColumnDef::new(ReferralRegistration::Source).string().not_null())
+                    .col(
+                        ColumnDef::new(ReferralRegistration::RewardStatus)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(ReferralRegistration::RewardError)
+                            .text()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(ReferralRegistration::Metadata)
+                            .text()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(ReferralRegistration::RegisteredAt)
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+
+        let backend = manager.get_database_backend();
+        for sql in [
+            r#"CREATE UNIQUE INDEX IF NOT EXISTS "idx_referral_campaign_code" ON "referral_campaign" ("code")"#,
+            r#"CREATE INDEX IF NOT EXISTS "idx_referral_campaign_creator" ON "referral_campaign" ("content_creator_user_id")"#,
+            r#"CREATE INDEX IF NOT EXISTS "idx_referral_campaign_reward_campaign" ON "referral_campaign_reward" ("campaign_id", "sort_order")"#,
+            r#"CREATE UNIQUE INDEX IF NOT EXISTS "idx_referral_registration_user" ON "referral_registration" ("user_id")"#,
+            r#"CREATE INDEX IF NOT EXISTS "idx_referral_registration_campaign_time" ON "referral_registration" ("campaign_id", "registered_at")"#,
+            r#"CREATE INDEX IF NOT EXISTS "idx_referral_registration_creator_time" ON "referral_registration" ("content_creator_user_id_snapshot", "registered_at")"#,
+        ] {
+            match manager
+                .get_connection()
+                .execute(Statement::from_string(backend, sql.to_string()))
+                .await
+            {
+                Ok(_) => {}
+                Err(error) if is_duplicate_index_error(&error) => {}
+                Err(error) => return Err(error),
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_table(
+                Table::drop()
+                    .table(ReferralRegistration::Table)
+                    .to_owned(),
+            )
+            .await?;
+        manager
+            .drop_table(
+                Table::drop()
+                    .table(ReferralCampaignReward::Table)
+                    .to_owned(),
+            )
+            .await?;
+        manager
+            .drop_table(Table::drop().table(ReferralCampaign::Table).to_owned())
+            .await
+    }
+}
+
+#[derive(DeriveIden)]
+enum ReferralCampaign {
+    Table,
+    Id,
+    Code,
+    Title,
+    ContentCreatorUserId,
+    Status,
+    StartsAt,
+    EndsAt,
+    CreatedByUserId,
+    RevokedAt,
+    CreatedAt,
+    UpdatedAt,
+}
+
+#[derive(DeriveIden)]
+enum ReferralCampaignReward {
+    Table,
+    Id,
+    CampaignId,
+    AssetKey,
+    Amount,
+    DurationSeconds,
+    SortOrder,
+    Metadata,
+    CreatedAt,
+    UpdatedAt,
+}
+
+#[derive(DeriveIden)]
+enum ReferralRegistration {
+    Table,
+    Id,
+    CampaignId,
+    UserId,
+    CodeSnapshot,
+    CampaignTitleSnapshot,
+    ContentCreatorUserIdSnapshot,
+    Source,
+    RewardStatus,
+    RewardError,
+    Metadata,
+    RegisteredAt,
+}
+
 pub struct CreateAppKvTable;
 
 impl MigrationName for CreateAppKvTable {

@@ -1,7 +1,7 @@
 use anyhow::Result;
 use sea_orm::entity::prelude::*;
 use sea_orm::{
-    ActiveModelBehavior, ActiveValue, DatabaseConnection, DeriveRelation, EntityTrait, EnumIter,
+    ActiveModelBehavior, ActiveValue, ConnectionTrait, DeriveRelation, EntityTrait, EnumIter,
     QueryFilter,
 };
 use uuid::Uuid;
@@ -36,7 +36,7 @@ pub struct UpsertUserResult {
 
 impl Entity {
     pub async fn find_by_discord_id(
-        db: &DatabaseConnection,
+        db: &impl ConnectionTrait,
         discord_id: &str,
     ) -> Result<Option<Model>> {
         Ok(Self::find()
@@ -46,7 +46,7 @@ impl Entity {
     }
 
     pub async fn update_or_register_by_discord_id(
-        db: &DatabaseConnection,
+        db: &impl ConnectionTrait,
         discord_id: String,
         username: String,
         avatar_url: Option<String>,
@@ -105,7 +105,7 @@ fn is_valid_nickname(nickname: &str) -> bool {
     nickname_regex.is_match(nickname)
 }
 
-async fn is_nickname_taken(db: &DatabaseConnection, nickname: &str) -> Result<bool> {
+async fn is_nickname_taken(db: &impl ConnectionTrait, nickname: &str) -> Result<bool> {
     use sea_orm::EntityTrait;
 
     let count = Entity::find()
@@ -116,7 +116,7 @@ async fn is_nickname_taken(db: &DatabaseConnection, nickname: &str) -> Result<bo
     Ok(count > 0)
 }
 
-async fn generate_unique_nickname(db: &DatabaseConnection) -> Result<String> {
+async fn generate_unique_nickname(db: &impl ConnectionTrait) -> Result<String> {
     let mut tries = 0;
     loop {
         let nickname = crate::util::nickname::random_nickname();

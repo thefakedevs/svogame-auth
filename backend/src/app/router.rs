@@ -18,6 +18,7 @@ pub fn build_router(state: SharedAppState) -> Router {
         .merge(domains::discord::router())
         .merge(domains::gunskins::router())
         .merge(domains::ownership::router())
+        .merge(domains::referrals::router())
         .merge(domains::lootboxes::router())
         .merge(domains::littlemice::router())
         .merge(domains::shop::router())

@@ -2,6 +2,7 @@ pub mod discord;
 pub mod email;
 pub mod handlers;
 pub mod littlemice;
+pub mod referrals;
 pub mod service_tokens;
 pub mod skins;
 pub mod squads;
@@ -105,6 +106,22 @@ pub fn router() -> Router<crate::app::state::SharedAppState> {
         .route(
             "/api/admin/service-tokens/{token_id}/revoke",
             post(service_tokens::revoke_service_token),
+        )
+        .route(
+            "/api/admin/referral-campaigns",
+            get(referrals::list_campaigns).post(referrals::create_campaign),
+        )
+        .route(
+            "/api/admin/referral-campaigns/{campaign_id}",
+            get(referrals::get_campaign).patch(referrals::patch_campaign),
+        )
+        .route(
+            "/api/admin/referral-campaigns/{campaign_id}/revoke",
+            post(referrals::revoke_campaign),
+        )
+        .route(
+            "/api/admin/referral-campaigns/{campaign_id}/stats",
+            get(referrals::campaign_stats),
         )
         .route(
             "/api/admin/users/{user_id}/restrictions",

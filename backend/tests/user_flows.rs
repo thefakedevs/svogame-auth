@@ -4,7 +4,7 @@ use common::TestApp;
 use image::{ImageBuffer, Rgba};
 use sea_orm::ActiveModelTrait;
 use sea_orm::ActiveValue::Set;
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter};
 use serial_test::serial;
 
 fn make_skin_png(fill: [u8; 4]) -> Vec<u8> {
@@ -200,6 +200,379 @@ async fn registration_creates_user_and_audits_legal_acceptance() {
             .await,
         1
     );
+}
+
+#[tokio::test]
+#[serial]
+async fn first_registration_with_referral_code_grants_reward_and_tracks_stats() {
+    let app = TestApp::spawn().await;
+    let admin = app.issue_user_token("ReferralAdmin", true, &[]).await;
+    let campaign_response = app
+        .post_json(
+            "/api/admin/referral-campaigns",
+            &admin.access_token,
+            serde_json::json!({
+                "code": "creator-one",
+                "title": "Creator One Welcome",
+                "rewards": [
+                    {
+                        "assetKey": "coin_default",
+                        "amount": 2
+                    }
+                ]
+            }),
+        )
+        .await;
+    assert!(
+        campaign_response.status().is_success(),
+        "create campaign failed: {}",
+        campaign_response.text().await.unwrap_or_default()
+    );
+    let campaign: serde_json::Value = campaign_response.json().await.expect("campaign json");
+    assert_eq!(campaign["code"], "CREATOR-ONE");
+
+    let preview = app
+        .get_json_value_without_auth("/api/referrals/creator-one")
+        .await;
+    assert_eq!(preview["code"], "CREATOR-ONE");
+    assert_eq!(preview["rewards"][0]["assetKey"], "coin_default");
+
+    let registration_token = uuid::Uuid::new_v4().to_string();
+    auth::entities::AuthRayActiveModel {
+        id: sea_orm::ActiveValue::NotSet,
+        pow_prefix: Set("pending-referral-ok".to_string()),
+        pow_complexity: Set(1),
+        delivery_method: Set(auth::entities::AuthRayTokenDeliveryMethod::Redirect),
+        delivery_target: Set("/profile".to_string()),
+        registration_token: Set(Some(registration_token.clone())),
+        pending_discord_id: Set(Some("discord-referral-ok".to_string())),
+        pending_username: Set(Some("ReferralUser".to_string())),
+        pending_avatar_url: Set(Some("https://cdn.discord.test/ref.png".to_string())),
+        pending_email: Set(Some("referral-ok@example.com".to_string())),
+        created_at: Set(chrono::Utc::now()),
+    }
+    .insert(&app.db)
+    .await
+    .expect("insert pending auth ray");
+
+    let response = app
+        .post_without_auth(
+            "/api/auth/register",
+            serde_json::json!({
+                "registrationToken": registration_token,
+                "acceptedUserAgreement": true,
+                "acceptedPrivacyPolicy": true,
+                "referralCode": "creator-one",
+                "referralSource": "link"
+            }),
+        )
+        .await;
+    assert_eq!(response.status(), reqwest::StatusCode::OK);
+
+    let user = auth::entities::User::find()
+        .filter(auth::entities::UserColumn::DiscordId.eq("discord-referral-ok"))
+        .one(&app.db)
+        .await
+        .expect("lookup created referral user")
+        .expect("created referral user exists");
+    let coin = app
+        .asset_by_key("coin_default")
+        .await
+        .expect("coin_default asset");
+    let balance = auth::entities::WalletBalance::find_by_id((user.id, coin.id))
+        .one(&app.db)
+        .await
+        .expect("lookup wallet balance")
+        .expect("wallet balance exists");
+    assert_eq!(balance.balance, 2);
+
+    let referral_count = auth::entities::ReferralRegistration::find()
+        .filter(auth::entities::ReferralRegistrationColumn::UserId.eq(user.id))
+        .count(&app.db)
+        .await
+        .expect("count referral registrations");
+    assert_eq!(referral_count, 1);
+    assert_eq!(app.wallet_transaction_count("credit").await, 1);
+
+    let stats_response = app
+        .get_json(
+            &format!(
+                "/api/admin/referral-campaigns/{}/stats",
+                campaign["id"].as_str().expect("campaign id")
+            ),
+            &admin.access_token,
+        )
+        .await;
+    assert!(stats_response.status().is_success());
+    let stats: serde_json::Value = stats_response.json().await.expect("stats json");
+    assert_eq!(stats["total"], 1);
+}
+
+#[tokio::test]
+#[serial]
+async fn referral_reward_is_not_granted_for_existing_user() {
+    let app = TestApp::spawn().await;
+    let admin = app.issue_user_token("ReferralAdminTwo", true, &[]).await;
+    let campaign_response = app
+        .post_json(
+            "/api/admin/referral-campaigns",
+            &admin.access_token,
+            serde_json::json!({
+                "code": "second-code",
+                "title": "Second Welcome",
+                "rewards": [
+                    {
+                        "assetKey": "coin_default",
+                        "amount": 2
+                    }
+                ]
+            }),
+        )
+        .await;
+    assert!(campaign_response.status().is_success());
+
+    let first_token = uuid::Uuid::new_v4().to_string();
+    auth::entities::AuthRayActiveModel {
+        id: sea_orm::ActiveValue::NotSet,
+        pow_prefix: Set("pending-referral-first".to_string()),
+        pow_complexity: Set(1),
+        delivery_method: Set(auth::entities::AuthRayTokenDeliveryMethod::Redirect),
+        delivery_target: Set("/profile".to_string()),
+        registration_token: Set(Some(first_token.clone())),
+        pending_discord_id: Set(Some("discord-referral-once".to_string())),
+        pending_username: Set(Some("ReferralOnce".to_string())),
+        pending_avatar_url: Set(Some("https://cdn.discord.test/once.png".to_string())),
+        pending_email: Set(Some("referral-once@example.com".to_string())),
+        created_at: Set(chrono::Utc::now()),
+    }
+    .insert(&app.db)
+    .await
+    .expect("insert first pending auth ray");
+    let first_response = app
+        .post_without_auth(
+            "/api/auth/register",
+            serde_json::json!({
+                "registrationToken": first_token,
+                "acceptedUserAgreement": true,
+                "acceptedPrivacyPolicy": true,
+                "referralCode": "second-code",
+                "referralSource": "manual"
+            }),
+        )
+        .await;
+    assert_eq!(first_response.status(), reqwest::StatusCode::OK);
+
+    let second_token = uuid::Uuid::new_v4().to_string();
+    auth::entities::AuthRayActiveModel {
+        id: sea_orm::ActiveValue::NotSet,
+        pow_prefix: Set("pending-referral-second".to_string()),
+        pow_complexity: Set(1),
+        delivery_method: Set(auth::entities::AuthRayTokenDeliveryMethod::Redirect),
+        delivery_target: Set("/profile".to_string()),
+        registration_token: Set(Some(second_token.clone())),
+        pending_discord_id: Set(Some("discord-referral-once".to_string())),
+        pending_username: Set(Some("ReferralOnce".to_string())),
+        pending_avatar_url: Set(Some("https://cdn.discord.test/once-2.png".to_string())),
+        pending_email: Set(Some("referral-once-2@example.com".to_string())),
+        created_at: Set(chrono::Utc::now()),
+    }
+    .insert(&app.db)
+    .await
+    .expect("insert second pending auth ray");
+    let second_response = app
+        .post_without_auth(
+            "/api/auth/register",
+            serde_json::json!({
+                "registrationToken": second_token,
+                "acceptedUserAgreement": true,
+                "acceptedPrivacyPolicy": true,
+                "referralCode": "second-code",
+                "referralSource": "manual"
+            }),
+        )
+        .await;
+    assert_eq!(second_response.status(), reqwest::StatusCode::OK);
+
+    let user = auth::entities::User::find()
+        .filter(auth::entities::UserColumn::DiscordId.eq("discord-referral-once"))
+        .one(&app.db)
+        .await
+        .expect("lookup referral user")
+        .expect("referral user exists");
+    let coin = app
+        .asset_by_key("coin_default")
+        .await
+        .expect("coin_default asset");
+    let balance = auth::entities::WalletBalance::find_by_id((user.id, coin.id))
+        .one(&app.db)
+        .await
+        .expect("lookup wallet balance")
+        .expect("wallet balance exists");
+    assert_eq!(balance.balance, 2);
+
+    let referral_count = auth::entities::ReferralRegistration::find()
+        .filter(auth::entities::ReferralRegistrationColumn::UserId.eq(user.id))
+        .count(&app.db)
+        .await
+        .expect("count referral registrations");
+    assert_eq!(referral_count, 1);
+    assert_eq!(app.wallet_transaction_count("credit").await, 1);
+}
+
+#[tokio::test]
+#[serial]
+async fn revoked_referral_code_rejects_registration_without_creating_user() {
+    let app = TestApp::spawn().await;
+    let admin = app.issue_user_token("ReferralRevokeAdmin", true, &[]).await;
+    let campaign_response = app
+        .post_json(
+            "/api/admin/referral-campaigns",
+            &admin.access_token,
+            serde_json::json!({
+                "code": "revoked-code",
+                "title": "Revoked Welcome",
+                "rewards": [
+                    {
+                        "assetKey": "coin_default",
+                        "amount": 2
+                    }
+                ]
+            }),
+        )
+        .await;
+    assert!(campaign_response.status().is_success());
+    let campaign: serde_json::Value = campaign_response.json().await.expect("campaign json");
+
+    let revoke_response = app
+        .post_json(
+            &format!(
+                "/api/admin/referral-campaigns/{}/revoke",
+                campaign["id"].as_str().expect("campaign id")
+            ),
+            &admin.access_token,
+            serde_json::json!({}),
+        )
+        .await;
+    assert!(revoke_response.status().is_success());
+
+    let preview_response = app.get_without_auth("/api/referrals/revoked-code").await;
+    assert_eq!(preview_response.status(), reqwest::StatusCode::NOT_FOUND);
+
+    let registration_token = uuid::Uuid::new_v4().to_string();
+    auth::entities::AuthRayActiveModel {
+        id: sea_orm::ActiveValue::NotSet,
+        pow_prefix: Set("pending-referral-revoked".to_string()),
+        pow_complexity: Set(1),
+        delivery_method: Set(auth::entities::AuthRayTokenDeliveryMethod::Redirect),
+        delivery_target: Set("/profile".to_string()),
+        registration_token: Set(Some(registration_token.clone())),
+        pending_discord_id: Set(Some("discord-referral-revoked".to_string())),
+        pending_username: Set(Some("ReferralRevoked".to_string())),
+        pending_avatar_url: Set(Some("https://cdn.discord.test/revoked.png".to_string())),
+        pending_email: Set(Some("referral-revoked@example.com".to_string())),
+        created_at: Set(chrono::Utc::now()),
+    }
+    .insert(&app.db)
+    .await
+    .expect("insert pending auth ray");
+
+    let response = app
+        .post_without_auth(
+            "/api/auth/register",
+            serde_json::json!({
+                "registrationToken": registration_token,
+                "acceptedUserAgreement": true,
+                "acceptedPrivacyPolicy": true,
+                "referralCode": "revoked-code",
+                "referralSource": "manual"
+            }),
+        )
+        .await;
+    assert_eq!(response.status(), reqwest::StatusCode::BAD_REQUEST);
+
+    let user = auth::entities::User::find()
+        .filter(auth::entities::UserColumn::DiscordId.eq("discord-referral-revoked"))
+        .one(&app.db)
+        .await
+        .expect("lookup revoked referral user");
+    assert!(user.is_none());
+
+    let referral_count = auth::entities::ReferralRegistration::find()
+        .count(&app.db)
+        .await
+        .expect("count referral registrations");
+    assert_eq!(referral_count, 0);
+    assert_eq!(app.wallet_transaction_count("credit").await, 0);
+}
+
+#[tokio::test]
+#[serial]
+async fn content_creator_can_view_anonymized_referral_stats() {
+    let app = TestApp::spawn().await;
+    let admin = app.issue_user_token("ReferralCreatorAdmin", true, &[]).await;
+    let creator = app.issue_user_token("ReferralCreator", false, &[]).await;
+    let campaign_response = app
+        .post_json(
+            "/api/admin/referral-campaigns",
+            &admin.access_token,
+            serde_json::json!({
+                "code": "creator-stats",
+                "title": "Creator Stats Welcome",
+                "contentCreatorUserId": creator.user_id,
+                "rewards": [
+                    {
+                        "assetKey": "coin_default",
+                        "amount": 1
+                    }
+                ]
+            }),
+        )
+        .await;
+    assert!(
+        campaign_response.status().is_success(),
+        "create campaign failed: {}",
+        campaign_response.text().await.unwrap_or_default()
+    );
+
+    let registration_token = uuid::Uuid::new_v4().to_string();
+    auth::entities::AuthRayActiveModel {
+        id: sea_orm::ActiveValue::NotSet,
+        pow_prefix: Set("pending-referral-creator-stats".to_string()),
+        pow_complexity: Set(1),
+        delivery_method: Set(auth::entities::AuthRayTokenDeliveryMethod::Redirect),
+        delivery_target: Set("/profile".to_string()),
+        registration_token: Set(Some(registration_token.clone())),
+        pending_discord_id: Set(Some("discord-referral-creator-stats".to_string())),
+        pending_username: Set(Some("ReferralStatsUser".to_string())),
+        pending_avatar_url: Set(Some("https://cdn.discord.test/stats.png".to_string())),
+        pending_email: Set(Some("referral-stats@example.com".to_string())),
+        created_at: Set(chrono::Utc::now()),
+    }
+    .insert(&app.db)
+    .await
+    .expect("insert pending auth ray");
+
+    let response = app
+        .post_without_auth(
+            "/api/auth/register",
+            serde_json::json!({
+                "registrationToken": registration_token,
+                "acceptedUserAgreement": true,
+                "acceptedPrivacyPolicy": true,
+                "referralCode": "creator-stats",
+                "referralSource": "link"
+            }),
+        )
+        .await;
+    assert_eq!(response.status(), reqwest::StatusCode::OK);
+
+    let stats_response = app
+        .get_json("/api/referrals/me/stats", &creator.access_token)
+        .await;
+    assert!(stats_response.status().is_success());
+    let stats: serde_json::Value = stats_response.json().await.expect("creator stats json");
+    assert_eq!(stats["total"], 1);
+    assert!(stats["buckets"].as_array().expect("stats buckets").len() >= 1);
 }
 
 #[tokio::test]

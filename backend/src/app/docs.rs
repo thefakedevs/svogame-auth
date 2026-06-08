@@ -3,6 +3,7 @@ use crate::app::http::ProblemResponse;
 use crate::domains::admin::discord as admin_discord;
 use crate::domains::admin::email as admin_email;
 use crate::domains::admin::handlers as admin_handlers;
+use crate::domains::admin::referrals as admin_referrals;
 use crate::domains::admin::service_tokens as admin_service_tokens;
 use crate::domains::admin::squads as admin_squads;
 use crate::domains::auth::handlers as auth_handlers;
@@ -15,6 +16,7 @@ use crate::domains::littlemice::handlers as littlemice_handlers;
 use crate::domains::lootboxes::handlers as lootbox_handlers;
 use crate::domains::meta::handlers as meta_handlers;
 use crate::domains::ownership::handlers as ownership_handlers;
+use crate::domains::referrals::handlers as referral_handlers;
 use crate::domains::shop::handlers as shop_handlers;
 use crate::domains::skins::handlers as skins_handlers;
 use crate::domains::skins::types as skins_types;
@@ -56,6 +58,12 @@ use utoipa::OpenApi;
         admin_service_tokens::get_service_token_audit,
         admin_service_tokens::rotate_service_token,
         admin_service_tokens::revoke_service_token,
+        admin_referrals::list_campaigns,
+        admin_referrals::create_campaign,
+        admin_referrals::get_campaign,
+        admin_referrals::patch_campaign,
+        admin_referrals::revoke_campaign,
+        admin_referrals::campaign_stats,
         admin_squads::list_squads,
         admin_squads::get_squad,
         admin_squads::patch_squad,
@@ -157,6 +165,8 @@ use utoipa::OpenApi;
         ownership_handlers::credit_wallet,
         ownership_handlers::debit_wallet,
         ownership_handlers::adjust_wallet_balance,
+        referral_handlers::get_referral,
+        referral_handlers::my_referral_stats,
         shop_handlers::list_public_products,
         shop_handlers::get_public_product,
         shop_handlers::list_my_orders,
@@ -220,6 +230,8 @@ use utoipa::OpenApi;
             admin_service_tokens::RevokeServiceTokenRequest,
             admin_service_tokens::ServiceTokenResponse,
             admin_service_tokens::ServiceTokenAuditResponse,
+            admin_referrals::ListReferralCampaignsQuery,
+            admin_referrals::ReferralCampaignStatsQuery,
             admin_squads::ListSquadsQuery,
             admin_squads::PatchAdminSquadRequest,
             admin_squads::ReasonRequest,
@@ -283,6 +295,16 @@ use utoipa::OpenApi;
             ownership_handlers::WalletTransactionResponse,
             ownership_handlers::SubscriptionStatusResponse,
             ownership_handlers::OkResponse,
+            crate::services::referrals::CreateReferralCampaignInput,
+            crate::services::referrals::UpdateReferralCampaignInput,
+            crate::services::referrals::ReferralRewardInput,
+            crate::services::referrals::ReferralRewardView,
+            crate::services::referrals::ReferralCampaignView,
+            crate::services::referrals::ReferralCampaignListResponse,
+            crate::services::referrals::PublicReferralCampaignView,
+            crate::services::referrals::ReferralStatsBucket,
+            crate::services::referrals::ReferralStatsResponse,
+            referral_handlers::ReferralStatsQuery,
             shop_handlers::ShopQuery,
             shop_handlers::AdminShopOrdersQuery,
             shop_handlers::ShopProductLocaleResponse,
@@ -338,6 +360,8 @@ use utoipa::OpenApi;
         (name = "littlemice", description = "Service anti-cheat verification API for creating checks, uploading snapshots, and reporting client-side failures"),
         (name = "ownership", description = "Public and self-service ownership catalog and inventory API"),
         (name = "ownership-admin", description = "Administrative inventory and asset catalog API"),
+        (name = "referrals", description = "Referral campaign preview and creator analytics API"),
+        (name = "referrals-admin", description = "Administrative referral campaign and registration statistics API"),
         (name = "meta", description = "Public metadata used by clients to drive UI and validation"),
         (name = "shop", description = "Public catalog and self-service purchase flow for shop products"),
         (name = "shop-admin", description = "Administrative shop product configuration API"),

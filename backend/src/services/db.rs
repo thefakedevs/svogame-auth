@@ -8,12 +8,13 @@ use crate::services::migration::{
     CreateDiscordDeliveryTable, CreateEmailDeliveryTable, CreateInventoryOperationTable,
     CreateLittlemiceCheckTable,
     CreateLootboxDefinitionTable, CreateLootboxDropDefinitionTable,
-    CreateLootboxOpenOperationTable, CreateServiceTokenAuditTable, CreateServiceTokenTable,
-    CreateShopOrderTable, CreateShopPaymentAttemptTable, CreateShopProductLocaleTable,
-    CreateShopProductTable, CreateShopReceiptTable, CreateSquadInviteTable, CreateSquadTable,
-    CreateUserEntitlementTable, CreateUserExpirableAssetTable, CreateUserRestrictionTable,
-    CreateUserSelectedGunskinTable, CreateUserStackableAssetTable, CreateUserTable,
-    CreateWalletBalanceTable, CreateWalletTransactionTable,
+    CreateLootboxOpenOperationTable, CreateReferralTables, CreateServiceTokenAuditTable,
+    CreateServiceTokenTable, CreateShopOrderTable, CreateShopPaymentAttemptTable,
+    CreateShopProductLocaleTable, CreateShopProductTable, CreateShopReceiptTable,
+    CreateSquadInviteTable, CreateSquadTable, CreateUserEntitlementTable,
+    CreateUserExpirableAssetTable, CreateUserRestrictionTable, CreateUserSelectedGunskinTable,
+    CreateUserStackableAssetTable, CreateUserTable, CreateWalletBalanceTable,
+    CreateWalletTransactionTable,
 };
 use anyhow::Result;
 use sea_orm::{Database, DatabaseConnection};
@@ -74,5 +75,6 @@ pub async fn run_migrations(db: &DatabaseConnection) -> Result<()> {
         .await?;
     AddAssetDefinitionGunskinColumns.up(&schema_manager).await?;
     CreateUserSelectedGunskinTable.up(&schema_manager).await?;
+    CreateReferralTables.up(&schema_manager).await?;
     Ok(())
 }

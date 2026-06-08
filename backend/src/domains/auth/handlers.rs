@@ -7,7 +7,7 @@ use crate::services::discord::exchange_code;
 use crate::services::token::sign_token;
 use axum::Json;
 use axum::extract::State;
-use sea_orm::ModelTrait;
+use sea_orm::{ModelTrait, TransactionTrait};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tracing::error;
@@ -56,6 +56,8 @@ pub struct AuthorizeResponse {
     delivery_method: Option<String>,
     #[serde(rename = "deliveryTarget", skip_serializing_if = "Option::is_none")]
     delivery_target: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    referral: Option<crate::services::referrals::PublicReferralCampaignView>,
 }
 
 impl AuthorizeResponse {
@@ -76,6 +78,7 @@ impl AuthorizeResponse {
             avatar_url: Some(avatar_url),
             delivery_method: Some(delivery_method),
             delivery_target: Some(delivery_target),
+            referral: None,
         }
     }
 
@@ -89,6 +92,7 @@ impl AuthorizeResponse {
             avatar_url: None,
             delivery_method: None,
             delivery_target: None,
+            referral: None,
         }
     }
 }
@@ -111,6 +115,10 @@ pub struct RegisterRequest {
     pub accepted_user_agreement: bool,
     #[serde(rename = "acceptedPrivacyPolicy")]
     pub accepted_privacy_policy: bool,
+    #[serde(rename = "referralCode")]
+    pub referral_code: Option<String>,
+    #[serde(rename = "referralSource")]
+    pub referral_source: Option<String>,
 }
 
 #[utoipa::path(
@@ -391,8 +399,13 @@ pub async fn register(
     let pending_avatar_url = ray.pending_avatar_url.clone();
     let pending_email = ray.pending_email.clone();
 
+    let tx = state.db.begin().await.map_err(|e| {
+        error!("Failed to start registration transaction: {:?}", e);
+        HttpError::internal_error("Failed to start registration transaction")
+    })?;
+
     let user_result = User::update_or_register_by_discord_id(
-        &state.db,
+        &tx,
         pending_discord_id.clone(),
         pending_username,
         pending_avatar_url,
@@ -405,9 +418,11 @@ pub async fn register(
     })?;
     let user = user_result.user;
 
+    let mut applied_referral_code = None;
+
     if user_result.created {
         write_audit_log(
-            &state.db,
+            &tx,
             ACTION_USER_REGISTERED,
             None,
             Some(user.id),
@@ -424,7 +439,7 @@ pub async fn register(
         })?;
 
         write_audit_log(
-            &state.db,
+            &tx,
             ACTION_USER_LEGAL_ACCEPTED,
             None,
             Some(user.id),
@@ -436,13 +451,46 @@ pub async fn register(
             error!("Failed to write legal acceptance audit log: {:?}", e);
             HttpError::internal_error("Failed to write legal acceptance audit log")
         })?;
+
+        if let Some(referral_code) = body
+            .referral_code
+            .as_deref()
+            .map(str::trim)
+            .filter(|code| !code.is_empty())
+        {
+            let source = body
+                .referral_source
+                .as_deref()
+                .unwrap_or(crate::services::referrals::REGISTRATION_SOURCE_MANUAL);
+            let applied = crate::services::referrals::apply_registration_referral(
+                &tx,
+                user.id,
+                referral_code,
+                source,
+            )
+            .await
+            .map_err(|e| {
+                error!("Failed to apply referral registration: {:?}", e);
+                HttpError::bad_request(e.to_string())
+            })?;
+            if applied.is_some() {
+                applied_referral_code = Some(referral_code.to_string());
+            }
+        }
     }
 
     if !user.is_active {
         return Err(HttpError::forbidden("User is deactivated"));
     }
 
-    let response = authorize_existing_user(
+    delete_auth_ray(&tx, &ray).await?;
+
+    tx.commit().await.map_err(|e| {
+        error!("Failed to commit registration transaction: {:?}", e);
+        HttpError::internal_error("Failed to commit registration")
+    })?;
+
+    let mut response = authorize_existing_user(
         state,
         user,
         delivery_method_name(&ray.delivery_method),
@@ -450,8 +498,12 @@ pub async fn register(
         matches!(ray.delivery_method, TokenDeliveryMethod::Polling),
     )
     .await?;
-
-    delete_auth_ray(&state.db, &ray).await?;
+    if let Some(referral_code) = applied_referral_code {
+        response.referral =
+            crate::services::referrals::get_public_campaign(&state.db, &referral_code)
+                .await
+                .ok();
+    }
 
     Ok(Json(response))
 }
@@ -503,7 +555,7 @@ async fn load_auth_ray_by_prefix(
         .ok_or_else(|| HttpError::bad_request("Invalid or expired pow_prefix"))
 }
 
-async fn delete_auth_ray(db: &sea_orm::DatabaseConnection, ray: &AuthRayModel) -> HttpResult<()> {
+async fn delete_auth_ray(db: &impl sea_orm::ConnectionTrait, ray: &AuthRayModel) -> HttpResult<()> {
     ray.clone().delete(db).await.map_err(|e| {
         error!("Failed to delete auth ray: {:?}", e);
         HttpError::internal_error("Failed to delete auth ray")
