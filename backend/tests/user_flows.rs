@@ -577,6 +577,85 @@ async fn content_creator_can_view_anonymized_referral_stats() {
 
 #[tokio::test]
 #[serial]
+async fn content_creator_can_list_own_referral_campaigns() {
+    let app = TestApp::spawn().await;
+    let admin = app.issue_user_token("ReferralListAdmin", true, &[]).await;
+    let creator = app.issue_user_token("ReferralListCreator", false, &[]).await;
+    let other_creator = app.issue_user_token("ReferralOtherCreator", false, &[]).await;
+
+    let own_response = app
+        .post_json(
+            "/api/admin/referral-campaigns",
+            &admin.access_token,
+            serde_json::json!({
+                "code": "creator-list-own",
+                "title": "Creator List Own",
+                "contentCreatorUserId": creator.user_id,
+                "rewards": [
+                    {
+                        "assetKey": "coin_default",
+                        "amount": 1
+                    }
+                ]
+            }),
+        )
+        .await;
+    assert!(
+        own_response.status().is_success(),
+        "create own campaign failed: {}",
+        own_response.text().await.unwrap_or_default()
+    );
+
+    let other_response = app
+        .post_json(
+            "/api/admin/referral-campaigns",
+            &admin.access_token,
+            serde_json::json!({
+                "code": "creator-list-other",
+                "title": "Creator List Other",
+                "contentCreatorUserId": other_creator.user_id,
+                "rewards": []
+            }),
+        )
+        .await;
+    assert!(other_response.status().is_success());
+
+    let unassigned_response = app
+        .post_json(
+            "/api/admin/referral-campaigns",
+            &admin.access_token,
+            serde_json::json!({
+                "code": "creator-list-unassigned",
+                "title": "Creator List Unassigned",
+                "rewards": []
+            }),
+        )
+        .await;
+    assert!(unassigned_response.status().is_success());
+
+    let response = app
+        .get_json("/api/referrals/me/campaigns", &creator.access_token)
+        .await;
+    assert!(response.status().is_success());
+    let body: serde_json::Value = response.json().await.expect("my campaigns json");
+    assert_eq!(body["total"], 1);
+    assert_eq!(body["items"][0]["code"], "CREATOR-LIST-OWN");
+    assert_eq!(body["items"][0]["title"], "Creator List Own");
+    assert_eq!(body["items"][0]["isActive"], true);
+    assert_eq!(body["items"][0]["rewards"][0]["assetKey"], "coin_default");
+
+    let other_list_response = app
+        .get_json("/api/referrals/me/campaigns", &other_creator.access_token)
+        .await;
+    assert!(other_list_response.status().is_success());
+    let other_body: serde_json::Value =
+        other_list_response.json().await.expect("other campaigns json");
+    assert_eq!(other_body["total"], 1);
+    assert_eq!(other_body["items"][0]["code"], "CREATOR-LIST-OTHER");
+}
+
+#[tokio::test]
+#[serial]
 async fn system_asset_seeding_fails_when_existing_asset_breaks_invariants() {
     let app = TestApp::spawn().await;
 

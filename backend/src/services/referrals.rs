@@ -86,6 +86,27 @@ pub struct PublicReferralCampaignView {
 }
 
 #[derive(Clone, Debug, Serialize, ToSchema)]
+pub struct MyReferralCampaignView {
+    pub id: Uuid,
+    pub code: String,
+    pub title: String,
+    pub status: String,
+    #[serde(rename = "isActive")]
+    pub is_active: bool,
+    #[serde(rename = "startsAt")]
+    pub starts_at: Option<DateTime<Utc>>,
+    #[serde(rename = "endsAt")]
+    pub ends_at: Option<DateTime<Utc>>,
+    pub rewards: Vec<ReferralRewardView>,
+}
+
+#[derive(Clone, Debug, Serialize, ToSchema)]
+pub struct MyReferralCampaignListResponse {
+    pub items: Vec<MyReferralCampaignView>,
+    pub total: u64,
+}
+
+#[derive(Clone, Debug, Serialize, ToSchema)]
 pub struct ReferralCampaignListResponse {
     pub items: Vec<ReferralCampaignView>,
     pub total: u64,
@@ -211,6 +232,29 @@ pub async fn get_public_campaign(
         title: view.title,
         content_creator_user_id: view.content_creator_user_id,
         rewards: view.rewards,
+    })
+}
+
+pub async fn list_creator_campaigns(
+    db: &sea_orm::DatabaseConnection,
+    creator_user_id: Uuid,
+) -> Result<MyReferralCampaignListResponse> {
+    let campaigns = ReferralCampaign::find()
+        .filter(ReferralCampaignColumn::ContentCreatorUserId.eq(Some(creator_user_id)))
+        .order_by_desc(ReferralCampaignColumn::CreatedAt)
+        .all(db)
+        .await?;
+    let rewards = ReferralCampaignReward::find().all(db).await?;
+    let now = Utc::now();
+
+    let mut items = Vec::new();
+    for campaign in campaigns {
+        items.push(map_my_campaign_view(db, campaign, &rewards, now).await?);
+    }
+
+    Ok(MyReferralCampaignListResponse {
+        total: items.len() as u64,
+        items,
     })
 }
 
@@ -473,6 +517,31 @@ async fn map_campaign_view(
         revoked_at: campaign.revoked_at,
         created_at: campaign.created_at,
         updated_at: campaign.updated_at,
+        rewards,
+    })
+}
+
+async fn map_my_campaign_view(
+    db: &impl ConnectionTrait,
+    campaign: ReferralCampaignModel,
+    all_rewards: &[ReferralCampaignRewardModel],
+    now: DateTime<Utc>,
+) -> Result<MyReferralCampaignView> {
+    let rewards = all_rewards
+        .iter()
+        .filter(|reward| reward.campaign_id == campaign.id)
+        .cloned()
+        .collect::<Vec<_>>();
+    let rewards = map_reward_views(db, rewards).await?;
+    let is_active = campaign_is_active(&campaign, now);
+    Ok(MyReferralCampaignView {
+        id: campaign.id,
+        code: campaign.code,
+        title: campaign.title,
+        status: campaign.status,
+        is_active,
+        starts_at: campaign.starts_at,
+        ends_at: campaign.ends_at,
         rewards,
     })
 }
