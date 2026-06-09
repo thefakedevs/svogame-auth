@@ -90,10 +90,12 @@ const legalDocumentGroups: LegalDocumentGroup[] = [
   },
 ]
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function isLegalPath(pathname: string) {
   return pathname === paths.legal || pathname in legalDocuments
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function legalPageHeading(pathname: string) {
   if (pathname === paths.legal) {
     return 'Правовые документы'
