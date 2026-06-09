@@ -404,6 +404,7 @@ export default function GeckoModelViewer({
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [initialRotationX, initialRotationY, initialRotationZ] = initialRotation
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -412,7 +413,6 @@ export default function GeckoModelViewer({
 
     let disposed = false
     let renderQueued = false
-    const [initialRotationX, initialRotationY, initialRotationZ] = initialRotation
     const rotation = { x: degToRad(initialRotationX), y: degToRad(initialRotationY) }
     const zoom = { value: initialZoom }
     const fitRadius = { value: cameraDistance ?? 24 }
@@ -650,9 +650,9 @@ export default function GeckoModelViewer({
   }, [
     background,
     cameraDistance,
-    initialRotation[0],
-    initialRotation[1],
-    initialRotation[2],
+    initialRotationX,
+    initialRotationY,
+    initialRotationZ,
     initialZoom,
     mirrorVertical,
     modelUrl,

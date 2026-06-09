@@ -1,23 +1,79 @@
-import { useEffect } from 'react'
+import { lazy, Suspense, useEffect, type ReactNode } from 'react'
 import { Toaster } from 'react-hot-toast'
-import AdminPage from '../components/admin/AdminPage'
 import AppHeader from '../components/layout/AppHeader'
-import ProfilePage from '../components/profile/ProfilePage'
-import ContactsPage from '../pages/_ContactsPage'
-import DownloadsPage from '../pages/_DownloadsPage'
-import HomePage from '../pages/_HomePage'
-import LegalPage, { isLegalPath, legalPageHeading } from '../pages/LegalPage'
-import OwnershipPage from '../pages/OwnershipPage'
-import ShopCheckoutReturnPage from '../pages/ShopCheckoutReturnPage'
-import ShopPage from '../pages/ShopPage'
-import UiKitPage from '../pages/_UiKitPage'
-import WalletPage from '../pages/WalletPage'
 import { paths } from '../routes/paths'
 import { buildAnalyticsPath, trackPageView } from '../services/analytics'
+import { applySeoMeta } from '../services/seo'
 import { usePathname, useSearch } from '../shared/navigation/history'
 import { normalizePathname, pageTitleForPath } from '../shared/navigation/routes'
-import AuthRoute from './AuthRoute'
-import TokenRoute from './TokenRoute'
+
+const AdminPage = lazy(() => import('../components/admin/AdminPage'))
+const ProfilePage = lazy(() => import('../components/profile/ProfilePage'))
+const ContactsPage = lazy(() => import('../pages/_ContactsPage'))
+const DownloadsPage = lazy(() => import('../pages/_DownloadsPage'))
+const HomePage = lazy(() => import('../pages/_HomePage'))
+const LegalPage = lazy(() => import('../pages/LegalPage'))
+const OwnershipPage = lazy(() => import('../pages/OwnershipPage'))
+const ShopCheckoutReturnPage = lazy(() => import('../pages/ShopCheckoutReturnPage'))
+const ShopPage = lazy(() => import('../pages/ShopPage'))
+const UiKitPage = lazy(() => import('../pages/_UiKitPage'))
+const WalletPage = lazy(() => import('../pages/WalletPage'))
+const AuthRoute = lazy(() => import('./AuthRoute'))
+const TokenRoute = lazy(() => import('./TokenRoute'))
+
+const legalPaths = new Set<string>([
+  paths.legal,
+  paths.legalPrivacyPolicy,
+  paths.legalPublicOffer,
+  paths.legalRefundPolicy,
+  paths.legalUserAgreement,
+  paths.legalProjectRules,
+  paths.legalCommunityRules,
+  paths.legalCtfRules,
+])
+
+const legalHeadings = new Map<string, string>([
+  [paths.legal, 'Правовые документы'],
+  [paths.legalPrivacyPolicy, 'Политика конфиденциальности'],
+  [paths.legalPublicOffer, 'Публичная оферта'],
+  [paths.legalRefundPolicy, 'Политика возвратов'],
+  [paths.legalUserAgreement, 'Пользовательское соглашение'],
+  [paths.legalProjectRules, 'Общие правила проекта'],
+  [paths.legalCommunityRules, 'Правила сообщества'],
+  [paths.legalCtfRules, 'Правила режима CTF'],
+])
+
+function isLegalPath(pathname: string) {
+  return legalPaths.has(pathname)
+}
+
+function legalPageHeading(pathname: string) {
+  return legalHeadings.get(pathname) ?? 'Правовые документы'
+}
+
+function RoutePending() {
+  const shouldRenderRoutePending = false
+  if (!shouldRenderRoutePending) return null
+
+  return (
+    <div className="page">
+      <div className="route-pending" role="status" aria-label="Загрузка страницы">
+        <span className="ui-spinner" aria-hidden>
+          <span className="ui-spinner-track">
+            <span className="ui-spinner-orb" />
+            <span className="ui-spinner-orb" />
+            <span className="ui-spinner-orb" />
+            <span className="ui-spinner-orb" />
+          </span>
+        </span>
+      </div>
+    </div>
+  )
+}
+
+function RouteSuspense({ children }: { children: ReactNode }) {
+  return <Suspense fallback={<RoutePending />}>{children}</Suspense>
+}
 
 function ProfileShell({ pageTitle, defaultTab }: { pageTitle: string; defaultTab?: 'settings' }) {
   return (
@@ -240,7 +296,7 @@ export default function AccountApp() {
       return
     }
 
-    document.title = pageTitleForPath(pathname)
+    applySeoMeta(pathname)
   }, [pathname])
 
   useEffect(() => {
@@ -312,7 +368,7 @@ export default function AccountApp() {
           },
         }}
       />
-      {page}
+      <RouteSuspense>{page}</RouteSuspense>
     </>
   )
 }

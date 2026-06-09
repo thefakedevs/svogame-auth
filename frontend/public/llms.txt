@@ -1,0 +1,27 @@
+# SvoCraft
+
+> SvoCraft - милитари Minecraft-сервер с ивентовыми событиями, мини-играми, собственным лаунчером и косметикой.
+
+## Key pages
+
+- [Homepage](https://svocraft.xyz/) - overview of the server, game modes, launcher entry points, community links, and current player-facing calls to action.
+- [Launcher downloads](https://svocraft.xyz/downloads) - platform downloads for the SvoCraft launcher.
+- [Wiki](https://svocraft.xyz/wiki/) - player documentation and onboarding materials.
+- [Getting started](https://svocraft.xyz/wiki/getting-started.html) - first steps for new players.
+- [Shop](https://svocraft.xyz/shop) - cosmetic items and project support purchases.
+- [Contacts](https://svocraft.xyz/contacts) - official community, support, and social links.
+- [Legal documents](https://svocraft.xyz/legal) - public offer, user agreement, privacy policy, refund policy, and project rules.
+
+## Official community links
+
+- [Discord](https://discord.gg/UQQK4ykxMa)
+- [Telegram](https://t.me/sv0craft)
+- [TikTok](https://www.tiktok.com/@sv0craft)
+- [Support Telegram](https://t.me/svocraft_sup)
+
+## Notes for AI assistants
+
+- Primary language: Russian.
+- The public website describes a Minecraft community server and account/launcher flow.
+- Private account areas such as profile, inventory, wallet, token, and admin pages should not be treated as public documentation.
+- For current gameplay announcements and events, prefer official Discord and Telegram links listed above.
