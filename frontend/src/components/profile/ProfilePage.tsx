@@ -3,6 +3,10 @@ import { getMyReferralCampaigns } from '../../api/referrals'
 import { replaceUrl } from '../../util/navigation'
 import { useQuery } from '../../util/query'
 import { consumeNewPlayerOnboardingPending } from '../../shared/session/new-player-onboarding'
+import {
+  loadCachedReferralCampaignAccess,
+  saveCachedReferralCampaignAccess,
+} from '../../shared/session/referral-campaign-cache'
 import '../../pages/ProfilePage.css'
 import ProfileNewPlayerModal from './ProfileNewPlayerModal'
 import ProfileOverviewTab from './ProfileOverviewTab'
@@ -27,7 +31,9 @@ export default function ProfilePage({ defaultTab }: { defaultTab?: ProfileTab })
   const [skinVersion, setSkinVersion] = useState(() => Date.now())
   const [skinFailed, setSkinFailed] = useState(false)
   const [showNewPlayerModal, setShowNewPlayerModal] = useState(false)
-  const [hasReferralCampaigns, setHasReferralCampaigns] = useState(false)
+  const [checkedReferralCampaignAccess, setCheckedReferralCampaignAccess] = useState<boolean | null>(null)
+  const cachedReferralCampaignAccess = data ? loadCachedReferralCampaignAccess(data.user.id) : false
+  const hasReferralCampaigns = checkedReferralCampaignAccess ?? cachedReferralCampaignAccess
 
   const requestedTab = normalizeRequestedTab(query.get('tab') ?? defaultTab ?? null)
   const activeTab = requestedTab === 'referrals' && !hasReferralCampaigns ? 'overview' : requestedTab
@@ -48,19 +54,28 @@ export default function ProfilePage({ defaultTab }: { defaultTab?: ProfileTab })
   }, [data, status])
 
   useEffect(() => {
-    if (!authToken || status !== 'loaded') {
-      setHasReferralCampaigns(false)
+    setCheckedReferralCampaignAccess(null)
+  }, [data?.user.id])
+
+  useEffect(() => {
+    if (!authToken || status !== 'loaded' || !data) {
+      setCheckedReferralCampaignAccess(null)
       return
     }
 
     let cancelled = false
+    const userId = data.user.id
 
     const run = async () => {
       try {
         const response = await getMyReferralCampaigns(authToken)
-        if (!cancelled) setHasReferralCampaigns(response.total > 0 || response.items.length > 0)
+        if (cancelled) return
+
+        const nextHasAccess = response.total > 0 || response.items.length > 0
+        saveCachedReferralCampaignAccess(userId, nextHasAccess)
+        setCheckedReferralCampaignAccess(nextHasAccess)
       } catch {
-        if (!cancelled) setHasReferralCampaigns(false)
+        if (!cancelled) setCheckedReferralCampaignAccess(null)
       }
     }
 
@@ -68,7 +83,7 @@ export default function ProfilePage({ defaultTab }: { defaultTab?: ProfileTab })
     return () => {
       cancelled = true
     }
-  }, [authToken, status])
+  }, [authToken, data, status])
 
   if (status === 'unauthorized') return <ProfileUnauthorizedState />
   if (status === 'error' || (!data && status !== 'loading')) {

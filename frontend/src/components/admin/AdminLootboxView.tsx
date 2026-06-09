@@ -14,7 +14,7 @@ import {
 import { paths } from '../../routes/paths'
 import ErrorState from '../ErrorState'
 import LoadingState from '../LoadingState'
-import AdminAssetImage from './AdminAssetImage'
+import AdminAssetSelect from './AdminAssetSelect'
 import AdminLink from './AdminLink'
 
 type DropDraft = {
@@ -373,7 +373,7 @@ export default function AdminLootboxView({ token, lootboxId }: { token: string; 
                       <span className="admin-lootbox-row-index">{index + 1}</span>
                     </div>
                     <div className="admin-lootbox-cell-asset">
-                      <AssetPicker token={token} assets={assets} value={drop.rewardAssetKey} disabled />
+                      <AdminAssetSelect token={token} assets={assets} value={drop.rewardAssetKey} disabled onChange={() => undefined} />
                       <small className="admin-lootbox-field-caption">
                         reward_asset_key · {drop.isActive ? 'active' : 'inactive'}
                       </small>
@@ -434,7 +434,7 @@ export default function AdminLootboxView({ token, lootboxId }: { token: string; 
                   <span className="admin-lootbox-plus" aria-hidden>+</span>
                 </div>
                 <div className="admin-lootbox-cell-asset">
-                  <AssetPicker
+                  <AdminAssetSelect
                     token={token}
                     assets={assets}
                     value={newDrop.rewardAssetKey}
@@ -494,7 +494,6 @@ export default function AdminLootboxView({ token, lootboxId }: { token: string; 
     </div>
   )
 }
-
 function DynamicDropValueField({
   asset,
   draft,
@@ -560,83 +559,5 @@ function DuplicateCompensationField({
       />
       <small>duplicate compensation</small>
     </label>
-  )
-}
-
-function AssetPicker({
-  token,
-  assets,
-  value,
-  onChange,
-  disabled = false,
-}: {
-  token: string
-  assets: AssetResponse[]
-  value: string
-  onChange?: (assetKey: string) => void
-  disabled?: boolean
-}) {
-  const [isOpen, setIsOpen] = useState(false)
-  const [query, setQuery] = useState('')
-  const selected = assets.find((asset) => asset.key === value) ?? null
-  const visible = assets.filter((asset) =>
-    `${asset.key} ${asset.displayName} ${asset.description ?? ''}`.toLowerCase().includes(query.trim().toLowerCase()),
-  )
-
-  return (
-    <div className="admin-asset-picker">
-      <button
-        type="button"
-        className="admin-asset-picker-trigger"
-        disabled={disabled}
-        onClick={() => {
-          if (!disabled) setIsOpen((current) => !current)
-        }}
-      >
-        {selected ? (
-          <>
-            <AdminAssetImage token={token} asset={selected} className="admin-asset-image-preview--thumb" />
-            <span>
-              <strong>{selected.displayName}</strong>
-              <small>{selected.key}{selected.isCurrency ? ' · currency' : ''}</small>
-            </span>
-          </>
-        ) : (
-          <span className="admin-inline-muted">{value || 'Выбрать ассет...'}</span>
-        )}
-      </button>
-      {isOpen ? (
-        <div className="admin-asset-picker-menu">
-          <input
-            className="ui-input"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Поиск ассета"
-            autoFocus
-          />
-          <div className="admin-asset-picker-options">
-            {visible.map((asset) => (
-              <button
-                key={asset.id}
-                type="button"
-                className="admin-asset-picker-option"
-                onClick={() => {
-                  onChange?.(asset.key)
-                  setIsOpen(false)
-                  setQuery('')
-                }}
-              >
-                <AdminAssetImage token={token} asset={asset} className="admin-asset-image-preview--thumb" />
-                <span>
-                  <strong>{asset.displayName}</strong>
-                  <small>{asset.key} · {asset.ownershipModel}{asset.isCurrency ? ' · currency' : ''}</small>
-                </span>
-              </button>
-            ))}
-            {!visible.length ? <p className="admin-inline-muted">Нет подходящих ассетов.</p> : null}
-          </div>
-        </div>
-      ) : null}
-    </div>
   )
 }

@@ -13,6 +13,7 @@ import AppPortal from '../../shared/ui/portal/AppPortal'
 import ErrorState from '../ErrorState'
 import LoadingState from '../LoadingState'
 import AdminLink from './AdminLink'
+import AdminAssetSelect from './AdminAssetSelect'
 
 type LocaleRow = { locale: string; name: string; description: string }
 
@@ -519,14 +520,14 @@ export default function AdminShopPanel({ token }: { token: string }) {
                       <span className="admin-inline-muted">Загружаем каталог ассетов…</span>
                     ) : null}
                     {!assetsError && catalogAssets ? (
-                      <select className="ui-input" value={assetKey} onChange={(e) => setAssetKey(e.target.value)} aria-label="Ключ ассета">
-                        <option value="">— выберите ассет —</option>
-                        {pickableAssets.map((a) => (
-                          <option key={a.id} value={a.key}>
-                            {a.displayName} ({a.key}) · {a.ownershipModel}
-                          </option>
-                        ))}
-                      </select>
+                      <AdminAssetSelect
+                        token={token}
+                        assets={catalogAssets}
+                        value={assetKey}
+                        onChange={(nextAssetKey) => setAssetKey(nextAssetKey)}
+                        filterAsset={(asset) => !asset.isCurrency && !usedShopAssetKeys.has(asset.key)}
+                        placeholder="Найти ассет для товара"
+                      />
                     ) : null}
                     {!assetsError && catalogAssets && pickableAssets.length === 0 ? (
                       <span className="admin-inline-muted">Нет свободных невалютных ассетов: все уже привязаны к товарам или отсутствуют в каталоге.</span>

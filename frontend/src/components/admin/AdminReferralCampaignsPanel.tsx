@@ -12,9 +12,15 @@ import {
   type AdminReferralCampaignStatus,
 } from '../../api/admin'
 import { toDisplayError } from '../../api/http'
+import {
+  listAllAdminAssets,
+  type AssetResponse,
+} from '../../api/inventory'
 import type { ReferralStatsResponse } from '../../api/referrals'
 import ErrorState from '../ErrorState'
 import LoadingState from '../LoadingState'
+import AdminAssetSelect from './AdminAssetSelect'
+import AdminUserSelect from './AdminUserSelect'
 
 const REFERRAL_PAGE_SIZE = 20
 
@@ -111,7 +117,7 @@ function rewardLabel(reward: AdminReferralCampaignResponse['rewards'][number]) {
   return name
 }
 
-function draftToPayload(draft: CampaignDraft): {
+function draftToPayload(draft: CampaignDraft, assetMap: Map<string, AssetResponse>): {
   code: string
   title: string
   contentCreatorUserId: string | null
@@ -128,12 +134,20 @@ function draftToPayload(draft: CampaignDraft): {
         metadata = JSON.parse(reward.metadataText)
       }
 
-      return {
+      const asset = assetMap.get(reward.assetKey.trim())
+      const payload: AdminReferralCampaignRewardInput = {
         assetKey: reward.assetKey.trim(),
-        ...(reward.amount.trim() ? { amount: Number(reward.amount) } : {}),
-        ...(reward.durationSeconds.trim() ? { durationSeconds: Number(reward.durationSeconds) } : {}),
         metadata,
       }
+
+      if (asset?.ownershipModel === 'stackable' && reward.amount.trim()) {
+        payload.amount = Number(reward.amount)
+      }
+      if (asset?.ownershipModel === 'expirable' && reward.durationSeconds.trim()) {
+        payload.durationSeconds = Number(reward.durationSeconds)
+      }
+
+      return payload
     })
 
   return {
@@ -191,8 +205,17 @@ export default function AdminReferralCampaignsPanel({ token }: { token: string }
   const [detailError, setDetailError] = useState('')
   const [draft, setDraft] = useState<CampaignDraft>(() => emptyCampaignDraft())
   const [isSaving, setIsSaving] = useState(false)
+  const [assets, setAssets] = useState<AssetResponse[]>([])
+  const [assetsError, setAssetsError] = useState('')
 
   const statsRange = useMemo(() => buildStatsRange(), [])
+  const assetMap = useMemo(() => {
+    const map = new Map<string, AssetResponse>()
+    for (const asset of assets) {
+      map.set(asset.key, asset)
+    }
+    return map
+  }, [assets])
 
   const reloadList = useCallback(async (preferredSelectedId?: string) => {
     setIsLoadingList(true)
@@ -204,19 +227,38 @@ export default function AdminReferralCampaignsPanel({ token }: { token: string }
       setTotalPages(Math.max(1, response.totalPages))
       if (preferredSelectedId) {
         setSelectedId(preferredSelectedId)
-      } else if (!selectedId && response.items[0]) {
-        setSelectedId(response.items[0].id)
+      } else {
+        setSelectedId((current) => current ?? response.items[0]?.id ?? null)
       }
     } catch (cause) {
       setListError(toDisplayError(cause, 'Не удалось загрузить реферальные кампании.'))
     } finally {
       setIsLoadingList(false)
     }
-  }, [page, selectedId, token])
+  }, [page, token])
 
   useEffect(() => {
     void reloadList()
   }, [reloadList])
+
+  useEffect(() => {
+    let cancelled = false
+
+    const run = async () => {
+      setAssetsError('')
+      try {
+        const response = await listAllAdminAssets(token)
+        if (!cancelled) setAssets(response)
+      } catch (cause) {
+        if (!cancelled) setAssetsError(toDisplayError(cause, 'Не удалось загрузить ассеты для выбора наград.'))
+      }
+    }
+
+    void run()
+    return () => {
+      cancelled = true
+    }
+  }, [token])
 
   useEffect(() => {
     if (!selectedId) {
@@ -256,7 +298,7 @@ export default function AdminReferralCampaignsPanel({ token }: { token: string }
     if (isSaving) return
     setIsSaving(true)
     try {
-      const payload = draftToPayload(draft)
+      const payload = draftToPayload(draft, assetMap)
       if (!payload.code || !payload.title) {
         toast.error('Укажите код и название кампании.')
         return
@@ -276,7 +318,7 @@ export default function AdminReferralCampaignsPanel({ token }: { token: string }
     if (!selectedCampaign || isSaving) return
     setIsSaving(true)
     try {
-      const payload = draftToPayload(draft)
+      const payload = draftToPayload(draft, assetMap)
       if (!payload.title) {
         toast.error('Укажите название кампании.')
         return
@@ -326,6 +368,14 @@ export default function AdminReferralCampaignsPanel({ token }: { token: string }
         rewardIndex === index ? { ...reward, ...patch } : reward
       )),
     }))
+  }
+
+  const updateRewardAsset = (index: number, assetKey: string, asset: AssetResponse | null) => {
+    updateReward(index, {
+      assetKey,
+      amount: asset?.ownershipModel === 'stackable' ? draft.rewards[index]?.amount ?? '' : '',
+      durationSeconds: asset?.ownershipModel === 'expirable' ? draft.rewards[index]?.durationSeconds ?? '' : '',
+    })
   }
 
   return (
@@ -405,7 +455,11 @@ export default function AdminReferralCampaignsPanel({ token }: { token: string }
           </label>
           <label className="admin-shop-field">
             <span>Контентмейкер UUID</span>
-            <input className="ui-input" value={draft.contentCreatorUserId} onChange={(event) => setDraft((current) => ({ ...current, contentCreatorUserId: event.target.value }))} placeholder="Опционально" />
+            <AdminUserSelect
+              token={token}
+              value={draft.contentCreatorUserId}
+              onChange={(userId) => setDraft((current) => ({ ...current, contentCreatorUserId: userId }))}
+            />
           </label>
           <label className="admin-shop-field">
             <span>Статус</span>
@@ -436,21 +490,37 @@ export default function AdminReferralCampaignsPanel({ token }: { token: string }
             </button>
           </div>
 
+          {assetsError ? <ErrorState message={assetsError} /> : null}
           <div className="admin-referral-rewards">
-            {draft.rewards.map((reward, index) => (
+            {draft.rewards.map((reward, index) => {
+              const selectedRewardAsset = assetMap.get(reward.assetKey) ?? null
+              return (
               <article key={index} className="admin-referral-reward">
                 <label className="admin-shop-field">
                   <span>assetKey</span>
-                  <input className="ui-input" value={reward.assetKey} onChange={(event) => updateReward(index, { assetKey: event.target.value })} placeholder="coin_default" />
+                  <AdminAssetSelect
+                    token={token}
+                    assets={assets}
+                    value={reward.assetKey}
+                    onChange={(assetKey, asset) => updateRewardAsset(index, assetKey, asset)}
+                    placeholder="Найти ассет для награды"
+                  />
                 </label>
-                <label className="admin-shop-field">
-                  <span>amount</span>
-                  <input className="ui-input" type="number" min="1" value={reward.amount} onChange={(event) => updateReward(index, { amount: event.target.value })} />
-                </label>
-                <label className="admin-shop-field">
-                  <span>durationSeconds</span>
-                  <input className="ui-input" type="number" min="1" value={reward.durationSeconds} onChange={(event) => updateReward(index, { durationSeconds: event.target.value })} />
-                </label>
+                {selectedRewardAsset?.ownershipModel === 'stackable' ? (
+                  <label className="admin-shop-field">
+                    <span>amount</span>
+                    <input className="ui-input" type="number" min="1" value={reward.amount} onChange={(event) => updateReward(index, { amount: event.target.value })} />
+                  </label>
+                ) : null}
+                {selectedRewardAsset?.ownershipModel === 'expirable' ? (
+                  <label className="admin-shop-field">
+                    <span>durationSeconds</span>
+                    <input className="ui-input" type="number" min="1" value={reward.durationSeconds} onChange={(event) => updateReward(index, { durationSeconds: event.target.value })} />
+                  </label>
+                ) : null}
+                {selectedRewardAsset?.ownershipModel === 'entitlement' ? (
+                  <p className="admin-field-hint">Для entitlement дополнительных числовых полей нет.</p>
+                ) : null}
                 <label className="admin-shop-field admin-shop-field--full">
                   <span>metadata JSON</span>
                   <textarea className="ui-input admin-shop-textarea" value={reward.metadataText} onChange={(event) => updateReward(index, { metadataText: event.target.value })} spellCheck={false} />
@@ -463,7 +533,8 @@ export default function AdminReferralCampaignsPanel({ token }: { token: string }
                   Удалить
                 </button>
               </article>
-            ))}
+              )
+            })}
           </div>
         </section>
 

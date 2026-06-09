@@ -27,6 +27,7 @@ import {
 } from '../../api/inventory'
 import AppPortal from '../../shared/ui/portal/AppPortal'
 import AdminAssetImage from './AdminAssetImage'
+import AdminAssetSelect from './AdminAssetSelect'
 
 type AdminOwnershipState =
   | { status: 'loading' }
@@ -333,6 +334,7 @@ export default function AdminUserOwnershipPanel({ token, userId }: { token: stri
       {activeModal === 'entitlements' ? (
         <AdminOwnershipModal title="Скины игрока" titleId="admin-entitlements-modal-title" isBusy={isMutating} onClose={() => setActiveModal(null)}>
           <InventoryGrantForm
+            token={token}
             assets={entitlementAssets}
             selectedKey={selectedEntitlement?.key ?? ''}
             reasonText={reasonText}
@@ -362,6 +364,7 @@ export default function AdminUserOwnershipPanel({ token, userId }: { token: stri
       {activeModal === 'stackables' ? (
         <AdminOwnershipModal title="Предметы с количеством" titleId="admin-stackables-modal-title" isBusy={isMutating} onClose={() => setActiveModal(null)}>
           <StackableControlForm
+            token={token}
             assets={stackableAssets}
             selectedKey={selectedStackable?.key ?? ''}
             amount={stackableAmount}
@@ -394,6 +397,7 @@ export default function AdminUserOwnershipPanel({ token, userId }: { token: stri
       {activeModal === 'expirables' ? (
         <AdminOwnershipModal title="Временные бонусы" titleId="admin-expirables-modal-title" isBusy={isMutating} onClose={() => setActiveModal(null)}>
           <ExpirableControlForm
+            token={token}
             assets={expirableAssets}
             selectedKey={selectedExpirable?.key ?? ''}
             durationDays={durationDays}
@@ -486,6 +490,7 @@ function AdminOwnershipModal({
 }
 
 function InventoryGrantForm({
+  token,
   assets,
   selectedKey,
   reasonText,
@@ -495,6 +500,7 @@ function InventoryGrantForm({
   onReasonTextChange,
   onGrant,
 }: {
+  token: string
   assets: AssetResponse[]
   selectedKey: string
   reasonText: string
@@ -508,11 +514,7 @@ function InventoryGrantForm({
 
   return (
     <div className="admin-ownership-form">
-      <select className="ui-input" value={selectedKey} disabled={disabled} onChange={(event) => onSelectedKeyChange(event.target.value)}>
-        {assets.map((asset) => (
-          <option key={asset.id} value={asset.key}>{asset.displayName}</option>
-        ))}
-      </select>
+      <AdminAssetSelect token={token} assets={assets} value={selectedKey} disabled={disabled} onChange={(assetKey) => onSelectedKeyChange(assetKey)} />
       <input className="ui-input" value={reasonText} disabled={disabled} onChange={(event) => onReasonTextChange(event.target.value)} placeholder="Причина операции" />
       <div className="admin-ownership-actions">
         <button className="btn btn-sm primary" type="button" disabled={disabled} onClick={onGrant}>Выдать</button>
@@ -522,6 +524,7 @@ function InventoryGrantForm({
 }
 
 function StackableControlForm({
+  token,
   assets,
   selectedKey,
   amount,
@@ -534,6 +537,7 @@ function StackableControlForm({
   onRemove,
   onSet,
 }: {
+  token: string
   assets: AssetResponse[]
   selectedKey: string
   amount: string
@@ -550,11 +554,7 @@ function StackableControlForm({
 
   return (
     <div className="admin-ownership-form">
-      <select className="ui-input" value={selectedKey} disabled={disabled} onChange={(event) => onSelectedKeyChange(event.target.value)}>
-        {assets.map((asset) => (
-          <option key={asset.id} value={asset.key}>{asset.displayName}</option>
-        ))}
-      </select>
+      <AdminAssetSelect token={token} assets={assets} value={selectedKey} disabled={disabled} onChange={(assetKey) => onSelectedKeyChange(assetKey)} />
       <input className="ui-input" inputMode="numeric" value={amount} disabled={disabled} onChange={(event) => onAmountChange(event.target.value)} placeholder="Количество" />
       <input className="ui-input" value={reasonText} disabled={disabled} onChange={(event) => onReasonTextChange(event.target.value)} placeholder="Причина операции" />
       <div className="admin-ownership-actions">
@@ -567,6 +567,7 @@ function StackableControlForm({
 }
 
 function ExpirableControlForm({
+  token,
   assets,
   selectedKey,
   durationDays,
@@ -580,6 +581,7 @@ function ExpirableControlForm({
   onProlong,
   onSetExpiration,
 }: {
+  token: string
   assets: AssetResponse[]
   selectedKey: string
   durationDays: string
@@ -597,11 +599,7 @@ function ExpirableControlForm({
 
   return (
     <div className="admin-ownership-form">
-      <select className="ui-input" value={selectedKey} disabled={disabled} onChange={(event) => onSelectedKeyChange(event.target.value)}>
-        {assets.map((asset) => (
-          <option key={asset.id} value={asset.key}>{asset.displayName}</option>
-        ))}
-      </select>
+      <AdminAssetSelect token={token} assets={assets} value={selectedKey} disabled={disabled} onChange={(assetKey) => onSelectedKeyChange(assetKey)} />
       <input className="ui-input" inputMode="numeric" value={durationDays} disabled={disabled} onChange={(event) => onDurationDaysChange(event.target.value)} placeholder="Дней продления" />
       <input className="ui-input" type="datetime-local" value={expiresAt} disabled={disabled} onChange={(event) => onExpiresAtChange(event.target.value)} />
       <input className="ui-input" value={reasonText} disabled={disabled} onChange={(event) => onReasonTextChange(event.target.value)} placeholder="Причина операции" />

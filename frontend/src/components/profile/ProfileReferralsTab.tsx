@@ -75,7 +75,7 @@ export default function ProfileReferralsTab({ authToken }: { authToken: string |
             <div className="profile-referral-guide">
               <div>
                 <h3>Как работает рефералка</h3>
-                <p>Здесь показаны регистрации по кодам, где ваш профиль указали во время регистрации.</p>
+                <p>Здесь показаны регистрации по вашим реферальным кодам. Учитываются сразу все коды привязанные к вашему аккаунту если таковые имеются</p>
               </div>
             </div>
             <div className="profile-stats">
