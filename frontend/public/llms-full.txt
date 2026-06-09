@@ -1,0 +1,72 @@
+# SvoCraft
+
+SvoCraft - милитари Minecraft-сервер с ивентовыми событиями, мини-играми, собственным лаунчером и косметикой. The public site introduces the project, explains how to start playing, links to launcher downloads, provides documentation, and routes players to community and support channels.
+
+## Public site map
+
+### Homepage
+
+URL: https://svocraft.xyz/
+
+The homepage presents the SvoCraft server, highlights quick PvP matches and team events, explains Discord authorization, links to the launcher, links to the project wiki, and points players to the shop and community channels.
+
+### Downloads
+
+URL: https://svocraft.xyz/downloads
+
+The downloads page provides launcher builds for supported desktop platforms. Players use the launcher to sign in, download updates, and start the game client without manual setup.
+
+### Wiki
+
+URL: https://svocraft.xyz/wiki/
+
+The wiki contains player documentation. The getting started guide is available at https://svocraft.xyz/wiki/getting-started.html and should be treated as the canonical onboarding document for new players.
+
+### Shop
+
+URL: https://svocraft.xyz/shop
+
+The shop presents cosmetic items and support purchases. Purchases are tied to the player's SvoCraft account and inventory.
+
+### Contacts
+
+URL: https://svocraft.xyz/contacts
+
+The contacts page lists official support and social channels:
+
+- Discord: https://discord.gg/UQQK4ykxMa
+- Telegram: https://t.me/sv0craft
+- TikTok: https://www.tiktok.com/@sv0craft
+- Support: https://t.me/svocraft_sup
+
+### Legal documents
+
+URL: https://svocraft.xyz/legal
+
+The legal section includes the public offer, user agreement, privacy policy, refund policy, project rules, community rules, and CTF rules. Use these pages for policy questions instead of inferring rules from marketing copy.
+
+## Private or non-public areas
+
+The following routes require account context or are not meant as public documentation:
+
+- https://svocraft.xyz/profile
+- https://svocraft.xyz/inventory
+- https://svocraft.xyz/wallet
+- https://svocraft.xyz/token
+- https://svocraft.xyz/admin
+
+## Entity summary
+
+Name: SvoCraft
+
+Website: https://svocraft.xyz/
+
+Language: Russian
+
+Category: Minecraft server, online game community, launcher, account portal
+
+Official community profiles:
+
+- https://discord.gg/UQQK4ykxMa
+- https://t.me/sv0craft
+- https://www.tiktok.com/@sv0craft
