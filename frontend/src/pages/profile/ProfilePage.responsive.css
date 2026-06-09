@@ -5,6 +5,15 @@
     grid-template-columns: 1fr;
   }
 
+  .profile-onboarding-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .profile-onboarding-download {
+    grid-column: auto;
+    border-bottom: 1px solid var(--ui-border);
+  }
+
   .profile-stats,
   .profile-skeleton-stats,
   .profile-inventory-grid {
@@ -104,5 +113,33 @@
   .profile-shimmer-button,
   .profile-shimmer-button--sm {
     width: 100%;
+  }
+
+  .profile-onboarding-backdrop {
+    align-items: stretch;
+    padding: 0.75rem;
+  }
+
+  .profile-onboarding-download__body .btn {
+    width: 100%;
+  }
+
+  .profile-onboarding-modal {
+    max-height: none;
+  }
+
+  .profile-onboarding-download {
+    grid-template-columns: 1fr;
+  }
+
+  .profile-onboarding-panel--discord {
+    border-right: 0;
+    border-bottom: 1px solid var(--ui-border);
+  }
+
+  .profile-onboarding-download__image {
+    min-height: 150px;
+    border-right: 0;
+    border-bottom: 1px solid var(--ui-border);
   }
 }

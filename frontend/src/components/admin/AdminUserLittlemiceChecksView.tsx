@@ -10,7 +10,7 @@ import {
   type LittlemiceCheckListResponse,
 } from '../../api/littlemice'
 import { toDisplayError } from '../../api/http'
-import { adminUserLittlemiceCheckPath, adminUserLittlemicePath, adminUserPath } from '../../routes/paths'
+import { adminUserLittlemiceCheckPath, adminLittlemicePath, adminUserPath } from '../../routes/paths'
 import AppPortal from '../../shared/ui/portal/AppPortal'
 import ErrorState from '../ErrorState'
 import LoadingState from '../LoadingState'
@@ -605,7 +605,7 @@ function AdminUserLittlemiceDetailView({ token, userId, checkId }: { token: stri
   return (
     <div className="admin-page">
       <section className="admin-top-actions admin-page-toolbar">
-        <AdminLink className="btn btn-sm" href={adminUserLittlemicePath(userId)}>
+        <AdminLink className="btn btn-sm" href={adminLittlemicePath()}>
           ← К проверкам littlemice
         </AdminLink>
         <AdminLink className="btn btn-sm" href={adminUserPath(userId)}>

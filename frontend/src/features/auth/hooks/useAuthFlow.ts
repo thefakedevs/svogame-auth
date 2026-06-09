@@ -17,6 +17,7 @@ import {
   saveStoredReferralCode,
   type StoredReferralCode,
 } from '../../../shared/session/auth-referral'
+import { markNewPlayerOnboardingPending } from '../../../shared/session/new-player-onboarding'
 import { validateTokenFormat } from '../../../shared/session/token'
 import { solvePow, type PowProgressUpdate } from '../../../services/pow'
 import { finishAuthDelivery } from '../lib/delivery'
@@ -176,7 +177,7 @@ export function useAuthFlow(options: AuthFlowOptions) {
           setReferralStatus('unavailable')
           setReferralMessage(
             referralCandidate.source === 'manual'
-              ? 'Код не найден или кампания сейчас неактивна.'
+              ? 'Код не найден'
               : 'Реферальный код из ссылки недоступен.',
           )
           return
@@ -433,6 +434,7 @@ export function useAuthFlow(options: AuthFlowOptions) {
           : {},
       )
       saveStoredReferralCode(null)
+      markNewPlayerOnboardingPending()
       await finishAuthDelivery(auth)
     } catch (error) {
       setState({

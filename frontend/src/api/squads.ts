@@ -1,4 +1,4 @@
-import { authHeaders, request, requestNullable } from './http'
+import { ApiError, authHeaders, request, requestNullable } from './http'
 import type { SquadConfigResponse } from './meta'
 
 export interface SquadResponse {
@@ -53,6 +53,11 @@ export function getMySquad(token: string): Promise<SquadResponse | null> {
     headers: authHeaders(token, {
       'Content-Type': 'application/json',
     }),
+  }).catch((error) => {
+    if (error instanceof ApiError && error.status === 400 && error.message.includes('Invalid squad ID')) {
+      return null
+    }
+    throw error
   })
 }
 

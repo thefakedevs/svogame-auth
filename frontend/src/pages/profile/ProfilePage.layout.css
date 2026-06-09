@@ -475,6 +475,45 @@
   font-size: 1.1rem;
 }
 
+.profile-referral-guide {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 1rem;
+  border: 1px solid var(--ui-border);
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.profile-referral-guide h3 {
+  margin: 0 0 0.35rem;
+  color: var(--ui-text);
+  font-size: 1rem;
+}
+
+.profile-referral-guide p {
+  margin: 0;
+  color: var(--ui-text-muted);
+  line-height: 1.55;
+}
+
+.profile-referral-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid rgba(247, 164, 29, 0.35);
+  background: rgba(247, 164, 29, 0.08);
+}
+
+.profile-referral-empty strong {
+  color: #f7a41d;
+}
+
+.profile-referral-empty span {
+  color: var(--ui-text-muted);
+}
+
 .profile-referral-chart {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(48px, 1fr));
@@ -576,4 +615,179 @@
   padding: 0.45rem 0.7rem;
   font-size: 0.74rem;
   line-height: 1.1;
+}
+
+.profile-onboarding-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+
+.profile-onboarding-modal {
+  width: min(960px, 100%);
+  max-height: min(92vh, 760px);
+  overflow: auto;
+}
+
+.profile-onboarding-modal .ui-card-header {
+  align-items: flex-start;
+}
+
+.profile-onboarding-modal .ui-card-header > div {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.65rem;
+  min-width: 0;
+}
+
+.profile-onboarding-modal .card-title {
+  margin: 0;
+  text-align: left;
+}
+
+.profile-onboarding-close {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid var(--ui-border);
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--ui-text-muted);
+  font: inherit;
+  font-size: 1.35rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.profile-onboarding-close:hover,
+.profile-onboarding-close:focus-visible {
+  border-color: rgba(247, 164, 29, 0.45);
+  color: #f7a41d;
+}
+
+.profile-onboarding-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 1vh;
+  margin-top: 1rem;
+}
+
+.profile-onboarding-download,
+.profile-onboarding-panel {
+  border: 0;
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.profile-onboarding-download {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.55fr) minmax(0, 1fr);
+  grid-column: 1 / -1;
+  min-width: 0;
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.profile-onboarding-download__image {
+  display: grid;
+  place-items: center;
+  min-height: 220px;
+  border-right: 1px solid var(--ui-border);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent),
+    rgba(0, 0, 0, 0.32);
+}
+
+.profile-onboarding-download__image img {
+  width: min(44%, 112px);
+  height: auto;
+  display: block;
+  object-fit: contain;
+  filter: brightness(0) invert(1);
+}
+
+.profile-onboarding-download__body,
+.profile-onboarding-panel,
+.profile-onboarding-event {
+  display: flex;
+  flex-direction: column;
+}
+
+.profile-onboarding-download__body {
+  gap: 0.9rem;
+  padding: 1rem;
+  min-width: 0;
+}
+
+.profile-onboarding-download__body h3,
+.profile-onboarding-panel strong {
+  margin: 0.55rem 0 0;
+  color: var(--ui-text);
+  font-size: 1.05rem;
+}
+
+.profile-onboarding-download__body p,
+.profile-onboarding-panel p,
+.profile-onboarding-muted,
+.profile-onboarding-event span:not(.ui-badge) {
+  margin: 0;
+  color: var(--ui-text-muted);
+  line-height: 1.5;
+}
+
+.profile-onboarding-download__body .btn {
+  width: 50%;
+  min-height: 56px;
+  flex-direction: column;
+  gap: 0.12rem;
+}
+
+.profile-onboarding-download__body .btn span {
+  font-size: 0.65rem;
+  opacity: 0.78;
+}
+
+.profile-onboarding-link {
+  color: #8ea4ff;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.profile-onboarding-link:hover,
+.profile-onboarding-link:focus-visible {
+  color: #f7a41d;
+}
+
+.profile-onboarding-panel {
+  gap: 0.75rem;
+  padding: 1rem;
+  min-width: 0;
+}
+
+.profile-onboarding-panel--discord {
+  border-right: 1px solid var(--ui-border);
+}
+
+.profile-onboarding-panel .btn {
+  width: 100%;
+}
+
+.profile-onboarding-event {
+  gap: 0.55rem;
+}
+
+.profile-onboarding-event strong {
+  margin: 0;
+  color: var(--ui-text);
+  overflow-wrap: anywhere;
 }

@@ -1,7 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { replaceUrl } from '../../util/navigation'
 import { useQuery } from '../../util/query'
+import { consumeNewPlayerOnboardingPending } from '../../shared/session/new-player-onboarding'
 import '../../pages/ProfilePage.css'
+import ProfileNewPlayerModal from './ProfileNewPlayerModal'
 import ProfileOverviewTab from './ProfileOverviewTab'
 import ProfileReferralsTab from './ProfileReferralsTab'
 import ProfileSettingsTab from './ProfileSettingsTab'
@@ -23,6 +25,7 @@ export default function ProfilePage({ defaultTab }: { defaultTab?: ProfileTab })
   const { authToken, status, data, error, setData, setAuthUser, reload, reloadSquads, logout } = useProfileDashboard(query)
   const [skinVersion, setSkinVersion] = useState(() => Date.now())
   const [skinFailed, setSkinFailed] = useState(false)
+  const [showNewPlayerModal, setShowNewPlayerModal] = useState(false)
 
   const activeTab = normalizeRequestedTab(query.get('tab') ?? defaultTab ?? null)
   const isLoading = status === 'loading'
@@ -33,6 +36,13 @@ export default function ProfilePage({ defaultTab }: { defaultTab?: ProfileTab })
     url.searchParams.set('tab', tab)
     replaceUrl(url.pathname + url.search)
   }
+
+  useEffect(() => {
+    if (!data || status !== 'loaded') return
+    if (consumeNewPlayerOnboardingPending()) {
+      setShowNewPlayerModal(true)
+    }
+  }, [data, status])
 
   if (status === 'unauthorized') return <ProfileUnauthorizedState />
   if (status === 'error' || (!data && status !== 'loading')) {
@@ -109,6 +119,7 @@ export default function ProfilePage({ defaultTab }: { defaultTab?: ProfileTab })
           ) : null}
         </div>
       </div>
+      {showNewPlayerModal ? <ProfileNewPlayerModal onClose={() => setShowNewPlayerModal(false)} /> : null}
     </div>
   )
 }

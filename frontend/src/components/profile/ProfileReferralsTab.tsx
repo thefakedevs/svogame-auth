@@ -38,6 +38,7 @@ export default function ProfileReferralsTab({ authToken }: { authToken: string |
   const [stats, setStats] = useState<ReferralStatsResponse | null>(null)
   const [error, setError] = useState('')
   const range = useMemo(() => buildStatsRange(), [])
+  const hasRegistrations = Boolean(stats && stats.total > 0)
 
   useEffect(() => {
     if (!authToken) return
@@ -66,24 +67,29 @@ export default function ProfileReferralsTab({ authToken }: { authToken: string |
       <section className="card profile-panel">
         <div className="ui-card-header">
           <h2 className="card-title">Реферальная статистика</h2>
-          <span className="ui-badge ui-badge-neutral">UTC</span>
         </div>
         {error ? <ErrorState message={error} /> : null}
         {!stats && !error ? <LoadingState title="Загружаем статистику" /> : null}
         {stats ? (
           <div className="profile-stack">
+            <div className="profile-referral-guide">
+              <div>
+                <h3>Как работает рефералка</h3>
+                <p>Здесь показаны регистрации по кодам, где ваш профиль указали во время регистрации.</p>
+              </div>
+            </div>
             <div className="profile-stats">
               <article className="card profile-stat-card">
                 <span className="profile-stat-label">Регистрации</span>
                 <strong className="profile-stat-value">{stats.total}</strong>
                 <span className="profile-stat-note">За последние 7 дней</span>
               </article>
-              <article className="card profile-stat-card">
-                <span className="profile-stat-label">Дней в графике</span>
-                <strong className="profile-stat-value">{stats.buckets.length}</strong>
-                <span className="profile-stat-note">Backend возвращает дни с нулем</span>
-              </article>
             </div>
+            {!hasRegistrations ? (
+              <div className="profile-referral-empty">
+                <strong>Регистраций пока нет</strong>
+              </div>
+            ) : null}
             <DailyReferralChart stats={stats} />
           </div>
         ) : null}

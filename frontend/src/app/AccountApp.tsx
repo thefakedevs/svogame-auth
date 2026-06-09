@@ -4,7 +4,7 @@ import AppHeader from '../components/layout/AppHeader'
 import { paths } from '../routes/paths'
 import { buildAnalyticsPath, trackPageView } from '../services/analytics'
 import { applySeoMeta } from '../services/seo'
-import { usePathname, useSearch } from '../shared/navigation/history'
+import { replaceUrl, usePathname, useSearch } from '../shared/navigation/history'
 import { normalizePathname, pageTitleForPath } from '../shared/navigation/routes'
 
 const AdminPage = lazy(() => import('../components/admin/AdminPage'))
@@ -73,6 +73,16 @@ function RoutePending() {
 
 function RouteSuspense({ children }: { children: ReactNode }) {
   return <Suspense fallback={<RoutePending />}>{children}</Suspense>
+}
+
+function authReferralRedirectUrl(pathname: string, search: string) {
+  if (pathname !== paths.home || !search) return null
+
+  const params = new URLSearchParams(search)
+  const referralCode = params.get('ref')
+  if (!referralCode) return null
+
+  return `${paths.auth}?ref=${encodeURIComponent(referralCode)}`
 }
 
 function ProfileShell({ pageTitle, defaultTab }: { pageTitle: string; defaultTab?: 'settings' }) {
@@ -290,6 +300,12 @@ export default function AccountApp() {
   const pathname = normalizePathname(usePathname() || paths.home)
   const search = useSearch()
   const adminRoute = adminRouteForPath(pathname)
+  const referralRedirectUrl = authReferralRedirectUrl(pathname, search)
+
+  useEffect(() => {
+    if (!referralRedirectUrl) return
+    replaceUrl(referralRedirectUrl)
+  }, [referralRedirectUrl])
 
   useEffect(() => {
     if (typeof document === 'undefined') {
@@ -303,9 +319,11 @@ export default function AccountApp() {
     trackPageView(buildAnalyticsPath(pathname, search), pageTitleForPath(pathname))
   }, [pathname, search])
 
-  let page = <NotFoundShell />
+  let page = referralRedirectUrl ? null : <NotFoundShell />
 
-  if (adminRoute) {
+  if (referralRedirectUrl) {
+    page = null
+  } else if (adminRoute) {
     page = <AdminShell />
   } else if (isLegalPath(pathname)) {
     page = <LegalShell pathname={pathname} />
