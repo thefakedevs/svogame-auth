@@ -1,3 +1,4 @@
+import toast from 'react-hot-toast'
 import type { AuthorizedAuthResponse } from '../../../api/auth'
 import { paths } from '../../../routes/paths'
 import { navigateTo } from '../../../shared/navigation/history'
@@ -8,6 +9,10 @@ export async function finishAuthDelivery(auth: AuthorizedAuthResponse) {
     token: auth.accessToken,
     user: auth.user,
   })
+
+  if (auth.referral) {
+    toast.success('Welcome pack получен.')
+  }
 
   if (auth.deliveryMethod === 'polling') {
     navigateTo(paths.profile, { replace: true })

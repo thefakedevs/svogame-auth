@@ -3,6 +3,7 @@ import { replaceUrl } from '../../util/navigation'
 import { useQuery } from '../../util/query'
 import '../../pages/ProfilePage.css'
 import ProfileOverviewTab from './ProfileOverviewTab'
+import ProfileReferralsTab from './ProfileReferralsTab'
 import ProfileSettingsTab from './ProfileSettingsTab'
 import ProfileSkeleton from './ProfileSkeleton'
 import { ProfileErrorState, ProfileUnauthorizedState } from './ProfileStates'
@@ -12,6 +13,7 @@ import { useProfileDashboard } from './useProfileDashboard'
 
 function normalizeRequestedTab(value: string | null): ProfileTab {
   if (value === 'squads') return 'squads'
+  if (value === 'referrals') return 'referrals'
   if (value === 'settings') return 'settings'
   return 'overview'
 }
@@ -40,6 +42,7 @@ export default function ProfilePage({ defaultTab }: { defaultTab?: ProfileTab })
   const tabs = [
     ['overview', 'Обзор'],
     ['squads', 'Сквад'],
+    ['referrals', 'Рефералки'],
     ['settings', 'Настройки'],
   ] as const
 
@@ -76,6 +79,10 @@ export default function ProfilePage({ defaultTab }: { defaultTab?: ProfileTab })
 
               {activeTab === 'squads' ? (
                 <ProfileSquadsTab data={data} authToken={authToken} onChanged={reloadSquads} />
+              ) : null}
+
+              {activeTab === 'referrals' ? (
+                <ProfileReferralsTab authToken={authToken} />
               ) : null}
 
               {activeTab === 'settings' ? (

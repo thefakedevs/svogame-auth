@@ -1,4 +1,5 @@
 import { authHeaders, request, requestNullable } from './http'
+import type { ReferralStatsResponse } from './referrals'
 import type { ShopProductResponse } from './shop'
 import type { ShopOrderResponse } from './shop'
 import type { SquadMemberResponse } from './squads'
@@ -178,6 +179,67 @@ export interface UpdateShopProductInput {
   sort_order?: number | null
   stackable_amount?: number | null
   starts_at?: string | null
+}
+
+export type AdminReferralCampaignStatus = 'active' | 'draft' | 'revoked'
+
+export interface AdminReferralCampaignReward {
+  assetKey: string
+  assetDisplayName?: string | null
+  assetKind?: string | null
+  ownershipModel?: string | null
+  isCurrency?: boolean | null
+  amount: number | null
+  durationSeconds: number | null
+  metadata: unknown
+}
+
+export interface AdminReferralCampaignResponse {
+  id: string
+  code: string
+  title: string
+  contentCreatorUserId: string | null
+  status: AdminReferralCampaignStatus
+  startsAt: string | null
+  endsAt: string | null
+  rewards: AdminReferralCampaignReward[]
+  createdAt?: string | null
+  updatedAt?: string | null
+  revokedAt?: string | null
+}
+
+export interface AdminReferralCampaignListResponse {
+  items: AdminReferralCampaignResponse[]
+  total: number
+  page: number
+  perPage: number
+  totalPages: number
+}
+
+export interface AdminReferralCampaignRewardInput {
+  assetKey: string
+  amount?: number | null
+  durationSeconds?: number | null
+  metadata?: unknown
+}
+
+export interface CreateAdminReferralCampaignInput {
+  code: string
+  title: string
+  contentCreatorUserId?: string | null
+  status: AdminReferralCampaignStatus
+  startsAt?: string | null
+  endsAt?: string | null
+  rewards: AdminReferralCampaignRewardInput[]
+}
+
+export interface PatchAdminReferralCampaignInput {
+  title?: string
+  contentCreatorUserId?: string | null
+  status?: AdminReferralCampaignStatus
+  startsAt?: string | null
+  endsAt?: string | null
+  rewards?: AdminReferralCampaignRewardInput[]
 }
 
 export function getAdminMe(token: string): Promise<AdminMeResponse> {
@@ -606,4 +668,95 @@ export function patchAdminShopProduct(
     }),
     body: JSON.stringify(body),
   })
+}
+
+export function listAdminReferralCampaigns(
+  token: string,
+  query?: {
+    page?: number
+    perPage?: number
+  },
+): Promise<AdminReferralCampaignListResponse> {
+  const params = new URLSearchParams()
+  if (query?.page) params.set('page', String(query.page))
+  if (query?.perPage) params.set('perPage', String(query.perPage))
+  const suffix = params.toString()
+
+  return request<AdminReferralCampaignListResponse>(`/api/admin/referral-campaigns${suffix ? `?${suffix}` : ''}`, {
+    headers: authHeaders(token, {
+      'Content-Type': 'application/json',
+    }),
+  })
+}
+
+export function createAdminReferralCampaign(
+  token: string,
+  body: CreateAdminReferralCampaignInput,
+): Promise<AdminReferralCampaignResponse> {
+  return request<AdminReferralCampaignResponse>('/api/admin/referral-campaigns', {
+    method: 'POST',
+    headers: authHeaders(token, {
+      'Content-Type': 'application/json',
+    }),
+    body: JSON.stringify(body),
+  })
+}
+
+export function getAdminReferralCampaign(
+  token: string,
+  campaignId: string,
+): Promise<AdminReferralCampaignResponse> {
+  return request<AdminReferralCampaignResponse>(`/api/admin/referral-campaigns/${encodeURIComponent(campaignId)}`, {
+    headers: authHeaders(token, {
+      'Content-Type': 'application/json',
+    }),
+  })
+}
+
+export function patchAdminReferralCampaign(
+  token: string,
+  campaignId: string,
+  body: PatchAdminReferralCampaignInput,
+): Promise<AdminReferralCampaignResponse> {
+  return request<AdminReferralCampaignResponse>(`/api/admin/referral-campaigns/${encodeURIComponent(campaignId)}`, {
+    method: 'PATCH',
+    headers: authHeaders(token, {
+      'Content-Type': 'application/json',
+    }),
+    body: JSON.stringify(body),
+  })
+}
+
+export function revokeAdminReferralCampaign(
+  token: string,
+  campaignId: string,
+): Promise<AdminReferralCampaignResponse> {
+  return request<AdminReferralCampaignResponse>(`/api/admin/referral-campaigns/${encodeURIComponent(campaignId)}/revoke`, {
+    method: 'POST',
+    headers: authHeaders(token, {
+      'Content-Type': 'application/json',
+    }),
+  })
+}
+
+export function getAdminReferralCampaignStats(
+  token: string,
+  campaignId: string,
+  query: {
+    from: string
+    to: string
+  },
+): Promise<ReferralStatsResponse> {
+  const params = new URLSearchParams()
+  params.set('from', query.from)
+  params.set('to', query.to)
+
+  return request<ReferralStatsResponse>(
+    `/api/admin/referral-campaigns/${encodeURIComponent(campaignId)}/stats?${params.toString()}`,
+    {
+      headers: authHeaders(token, {
+        'Content-Type': 'application/json',
+      }),
+    },
+  )
 }

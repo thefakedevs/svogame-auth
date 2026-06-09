@@ -475,6 +475,38 @@
   font-size: 1.1rem;
 }
 
+.profile-referral-chart {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(48px, 1fr));
+  gap: 0.6rem;
+  min-height: 210px;
+  padding: 1rem;
+  border: 1px solid var(--ui-border);
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.profile-referral-chart__bar-wrap {
+  display: grid;
+  grid-template-rows: auto minmax(90px, 1fr) auto;
+  gap: 0.45rem;
+  align-items: end;
+  justify-items: center;
+}
+
+.profile-referral-chart__value,
+.profile-referral-chart__date {
+  color: var(--ui-text-muted);
+  font-size: 0.75rem;
+}
+
+.profile-referral-chart__bar {
+  width: 100%;
+  max-width: 38px;
+  min-height: 8px;
+  border: 1px solid rgba(247, 164, 29, 0.48);
+  background: rgba(247, 164, 29, 0.25);
+}
+
 .profile-alert {
   max-width: none;
 }

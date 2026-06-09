@@ -1,6 +1,6 @@
 import { buildSkinUrl } from '../../api/skins'
 import SkinPreview2D from '../SkinPreview2D'
-import type { ProfileDashboardData } from './types'
+import type { ProfileDashboardData, ProfileTab } from './types'
 
 const dateTimeFormatter = new Intl.DateTimeFormat('ru-RU', {
   day: '2-digit',
@@ -30,7 +30,7 @@ export default function ProfileOverviewTab({
   data: ProfileDashboardData
   skinFailed: boolean
   setSkinFailed: (value: boolean) => void
-  setActiveTab: (tab: 'overview' | 'squads' | 'settings') => void
+  setActiveTab: (tab: ProfileTab) => void
   skinVersion: number
 }) {
   return (

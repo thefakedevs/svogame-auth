@@ -42,6 +42,7 @@ import AdminGunskinShopWizard from './AdminGunskinShopWizard'
 import AdminLootboxesPanel from './AdminLootboxesPanel'
 import AdminLootboxView from './AdminLootboxView'
 import AdminLittlemiceTimelineView from './AdminLittlemiceTimelineView'
+import AdminReferralCampaignsPanel from './AdminReferralCampaignsPanel'
 import AdminShopPanel from './AdminShopPanel'
 import AdminShopProductView from './AdminShopProductView'
 import AdminSquadProfile from './AdminSquadProfile'
@@ -66,7 +67,7 @@ type AdminRoute =
   | { type: 'userLootboxHistory'; userId: string }
   | { type: 'userLittlemice'; userId: string; checkId?: string }
 type AccessState = 'loading' | 'allowed' | 'denied' | 'error'
-type HomeTab = 'overview' | 'users' | 'squads' | 'tokens' | 'assets' | 'timeline' | 'shop' | 'skinShop' | 'lootboxes'
+type HomeTab = 'overview' | 'users' | 'squads' | 'tokens' | 'assets' | 'timeline' | 'shop' | 'skinShop' | 'lootboxes' | 'referrals'
 const PAGE_SIZE = 30
 
 const dateTimeFormatter = new Intl.DateTimeFormat('ru-RU', {
@@ -149,6 +150,7 @@ function tabFromQuery(tab: string | null): HomeTab {
   if (tab === 'shop') return 'shop'
   if (tab === 'skinShop') return 'skinShop'
   if (tab === 'lootboxes') return 'lootboxes'
+  if (tab === 'referrals') return 'referrals'
   if (tab === 'users') return 'users'
   return 'overview'
 }
@@ -569,6 +571,7 @@ function AdminHome({
           <AdminLink href={adminHomeTabPath('shop')} replace className={`admin-tab ${tab === 'shop' ? 'is-active' : ''}`}>Магазин</AdminLink>
           <AdminLink href={adminHomeTabPath('skinShop')} replace className={`admin-tab ${tab === 'skinShop' ? 'is-active' : ''}`}>Скины → магазин</AdminLink>
           <AdminLink href={adminHomeTabPath('lootboxes')} replace className={`admin-tab ${tab === 'lootboxes' ? 'is-active' : ''}`}>Лутбоксы</AdminLink>
+          <AdminLink href={adminHomeTabPath('referrals')} replace className={`admin-tab ${tab === 'referrals' ? 'is-active' : ''}`}>Рефералки</AdminLink>
           <AdminLink href={adminLittlemicePath()} className="admin-tab">Littlemice</AdminLink>
           <AdminLink href={adminHomeTabPath('tokens')} replace className={`admin-tab ${tab === 'tokens' ? 'is-active' : ''}`}>Сервисные токены</AdminLink>
         </nav>
@@ -829,6 +832,7 @@ function AdminHome({
       {tab === 'shop' ? <AdminShopPanel token={token} /> : null}
       {tab === 'skinShop' ? <AdminGunskinShopWizard token={token} /> : null}
       {tab === 'lootboxes' ? <AdminLootboxesPanel token={token} /> : null}
+      {tab === 'referrals' ? <AdminReferralCampaignsPanel token={token} /> : null}
 
       {tokenModalSecret ? (
         <div className="admin-token-modal-backdrop" role="dialog" aria-modal="true" aria-label="Новый сервисный токен">

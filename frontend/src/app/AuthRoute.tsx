@@ -15,8 +15,9 @@ export default function AuthRoute() {
   const errorDescription = query.get('error_description')
   const discordCode = query.get('code')
   const registrationToken = query.get('registrationToken')
+  const referralCode = query.get('ref')
 
-  const { state, retry, acceptTerms } = useAuthFlow({
+  const { state, referral, retry, acceptTerms, updateReferralInput, applyManualReferral, clearReferral } = useAuthFlow({
     authHydrated,
     discordCode,
     pollingData,
@@ -24,6 +25,7 @@ export default function AuthRoute() {
     errorCode,
     errorDescription,
     registrationToken,
+    referralCode,
   })
 
   if (typeof window !== 'undefined' && window.location.hostname === '127.0.0.1') {
@@ -39,6 +41,10 @@ export default function AuthRoute() {
       <AuthTermsCard
         onAccept={acceptTerms}
         onRestart={retry}
+        referral={referral}
+        onReferralInputChange={updateReferralInput}
+        onApplyReferral={applyManualReferral}
+        onClearReferral={clearReferral}
         errorMessage={state.errorMessage}
         isSubmitting={state.status === 'submitting_terms'}
       />

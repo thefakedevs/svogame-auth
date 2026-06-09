@@ -1,4 +1,5 @@
 import { request } from './http'
+import type { ReferralPreviewResponse, ReferralSource } from './referrals'
 
 export interface DiscordAuthInitResponse {
   oauthUrl: string
@@ -26,6 +27,7 @@ export interface AuthorizedAuthResponse extends AuthResponseBase {
   avatarUrl: string
   deliveryMethod: 'redirect' | 'polling'
   deliveryTarget: string
+  referral?: ReferralPreviewResponse | null
   user: UserProfile
 }
 
@@ -43,6 +45,7 @@ type RawAuthorizedAuthResponse = {
   isSuperuser?: boolean
   deliveryMethod: 'redirect' | 'polling'
   deliveryTarget: string
+  referral?: ReferralPreviewResponse | null
 }
 
 type RawTermsRequiredAuthResponse = {
@@ -51,6 +54,11 @@ type RawTermsRequiredAuthResponse = {
 }
 
 export type AuthorizationCallbackResponse = AuthorizedAuthResponse | TermsRequiredAuthResponse
+
+export interface CompleteRegistrationOptions {
+  referralCode?: string
+  referralSource?: ReferralSource
+}
 
 export async function requestDiscordAuthInit(
   redirectUrl: string | null,
@@ -105,7 +113,10 @@ export async function fetchAuthorize(
   return normalizeAuthResponse(data)
 }
 
-export async function completeRegistration(registrationToken: string): Promise<AuthorizedAuthResponse> {
+export async function completeRegistration(
+  registrationToken: string,
+  options: CompleteRegistrationOptions = {},
+): Promise<AuthorizedAuthResponse> {
   const data = await request<RawAuthorizedAuthResponse>('/api/auth/register', {
     method: 'POST',
     headers: {
@@ -115,6 +126,12 @@ export async function completeRegistration(registrationToken: string): Promise<A
       registrationToken,
       acceptedUserAgreement: true,
       acceptedPrivacyPolicy: true,
+      ...(options.referralCode && options.referralSource
+        ? {
+            referralCode: options.referralCode,
+            referralSource: options.referralSource,
+          }
+        : {}),
     }),
   })
 

@@ -5,10 +5,18 @@ import {
   requestDiscordAuthInit,
   type DiscordAuthInitResponse,
 } from '../../../api/auth'
-import { toDisplayError } from '../../../api/http'
+import { ApiError, toDisplayError } from '../../../api/http'
+import { getReferralPreview, type ReferralPreviewResponse } from '../../../api/referrals'
 import { paths } from '../../../routes/paths'
 import { navigateTo, replaceUrl } from '../../../shared/navigation/history'
 import { clearAuthSession, getAuthToken, getPowData, setPowData } from '../../../shared/session/auth-session'
+import {
+  isReferralCodeFormatValid,
+  loadStoredReferralCode,
+  normalizeReferralCode,
+  saveStoredReferralCode,
+  type StoredReferralCode,
+} from '../../../shared/session/auth-referral'
 import { validateTokenFormat } from '../../../shared/session/token'
 import { solvePow, type PowProgressUpdate } from '../../../services/pow'
 import { finishAuthDelivery } from '../lib/delivery'
@@ -59,6 +67,16 @@ type AuthTermsState =
 
 export type AuthState = AuthFlowState | AuthTermsState
 
+export type AuthReferralStatus = 'idle' | 'loading' | 'ready' | 'unavailable' | 'error'
+
+export interface AuthReferralState {
+  candidate: StoredReferralCode | null
+  inputValue: string
+  preview: ReferralPreviewResponse | null
+  status: AuthReferralStatus
+  message: string
+}
+
 type AuthFlowOptions = {
   authHydrated: boolean
   discordCode: string | null
@@ -67,6 +85,7 @@ type AuthFlowOptions = {
   errorCode: string | null
   errorDescription: string | null
   registrationToken: string | null
+  referralCode: string | null
 }
 
 function registrationUrl(token: string) {
@@ -79,11 +98,97 @@ export function useAuthFlow(options: AuthFlowOptions) {
       ? { status: 'awaiting_terms', registrationToken: options.registrationToken }
       : { status: 'loading' },
   )
+  const [referralCandidate, setReferralCandidate] = useState<StoredReferralCode | null>(() => loadStoredReferralCode())
+  const [referralInputValue, setReferralInputValue] = useState('')
+  const [referralPreview, setReferralPreview] = useState<ReferralPreviewResponse | null>(null)
+  const [referralStatus, setReferralStatus] = useState<AuthReferralStatus>('idle')
+  const [referralMessage, setReferralMessage] = useState('')
   const authHydrated = options.authHydrated
 
   useEffect(() => {
     normalizeLoopbackHost()
   }, [])
+
+  useEffect(() => {
+    const urlReferralCode = options.referralCode
+    if (!urlReferralCode) {
+      return
+    }
+
+    const normalizedCode = normalizeReferralCode(urlReferralCode)
+    if (!isReferralCodeFormatValid(normalizedCode)) {
+      saveStoredReferralCode(null)
+      setReferralCandidate(null)
+      setReferralPreview(null)
+      setReferralStatus('unavailable')
+      setReferralMessage('Реферальный код из ссылки недоступен.')
+      return
+    }
+
+    const nextCandidate = {
+      code: normalizedCode,
+      source: 'link' as const,
+    }
+    saveStoredReferralCode(nextCandidate)
+    setReferralCandidate(nextCandidate)
+  }, [options.referralCode])
+
+  useEffect(() => {
+    if (!referralCandidate) {
+      setReferralPreview(null)
+      setReferralStatus((current) => (current === 'unavailable' ? current : 'idle'))
+      return
+    }
+
+    if (!isReferralCodeFormatValid(referralCandidate.code)) {
+      setReferralPreview(null)
+      setReferralStatus('unavailable')
+      setReferralMessage(
+        referralCandidate.source === 'manual'
+          ? 'Код должен содержать 3-32 символа: A-Z, 0-9, _ или -.'
+          : 'Реферальный код из ссылки недоступен.',
+      )
+      return
+    }
+
+    let cancelled = false
+    setReferralStatus('loading')
+    setReferralMessage('')
+
+    void getReferralPreview(referralCandidate.code)
+      .then((preview) => {
+        if (cancelled) return
+        setReferralPreview(preview)
+        setReferralStatus('ready')
+        setReferralMessage('')
+        saveStoredReferralCode({
+          code: preview.code,
+          source: referralCandidate.source,
+        })
+        if (referralCandidate.source === 'manual') {
+          setReferralInputValue(preview.code)
+        }
+      })
+      .catch((cause) => {
+        if (cancelled) return
+        setReferralPreview(null)
+        if (cause instanceof ApiError && cause.status === 404) {
+          setReferralStatus('unavailable')
+          setReferralMessage(
+            referralCandidate.source === 'manual'
+              ? 'Код не найден или кампания сейчас неактивна.'
+              : 'Реферальный код из ссылки недоступен.',
+          )
+          return
+        }
+        setReferralStatus('error')
+        setReferralMessage(toDisplayError(cause, 'Не удалось проверить реферальный код.'))
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [referralCandidate])
 
   useEffect(() => {
     if (!authHydrated || options.discordCode) {
@@ -258,6 +363,46 @@ export function useAuthFlow(options: AuthFlowOptions) {
     void startAuth()
   }, [options.discordCode, options.registrationToken, startAuth])
 
+  const updateReferralInput = useCallback((value: string) => {
+    setReferralInputValue(value)
+  }, [])
+
+  const applyManualReferral = useCallback(() => {
+    const normalizedCode = normalizeReferralCode(referralInputValue)
+    if (!normalizedCode) {
+      setReferralCandidate(null)
+      setReferralPreview(null)
+      setReferralStatus('idle')
+      setReferralMessage('')
+      saveStoredReferralCode(null)
+      return
+    }
+
+    if (!isReferralCodeFormatValid(normalizedCode)) {
+      setReferralPreview(null)
+      setReferralStatus('unavailable')
+      setReferralMessage('Код должен содержать 3-32 символа: A-Z, 0-9, _ или -.')
+      return
+    }
+
+    const nextCandidate = {
+      code: normalizedCode,
+      source: 'manual' as const,
+    }
+    saveStoredReferralCode(nextCandidate)
+    setReferralCandidate(nextCandidate)
+    setReferralInputValue(normalizedCode)
+  }, [referralInputValue])
+
+  const clearReferral = useCallback(() => {
+    setReferralCandidate(null)
+    setReferralInputValue('')
+    setReferralPreview(null)
+    setReferralStatus('idle')
+    setReferralMessage('')
+    saveStoredReferralCode(null)
+  }, [])
+
   const acceptTerms = useCallback(async () => {
     const registrationToken =
       state.status === 'awaiting_terms' || state.status === 'submitting_terms'
@@ -278,7 +423,16 @@ export function useAuthFlow(options: AuthFlowOptions) {
     })
 
     try {
-      const auth = await completeRegistration(registrationToken)
+      const auth = await completeRegistration(
+        registrationToken,
+        referralPreview && referralCandidate
+          ? {
+              referralCode: referralPreview.code,
+              referralSource: referralCandidate.source,
+            }
+          : {},
+      )
+      saveStoredReferralCode(null)
       await finishAuthDelivery(auth)
     } catch (error) {
       setState({
@@ -290,14 +444,36 @@ export function useAuthFlow(options: AuthFlowOptions) {
         ),
       })
     }
-  }, [options.registrationToken, state])
+  }, [options.registrationToken, referralCandidate, referralPreview, state])
 
   return useMemo(
     () => ({
       state,
+      referral: {
+        candidate: referralCandidate,
+        inputValue: referralInputValue,
+        preview: referralPreview,
+        status: referralStatus,
+        message: referralMessage,
+      },
+      updateReferralInput,
+      applyManualReferral,
+      clearReferral,
       retry,
       acceptTerms,
     }),
-    [acceptTerms, retry, state],
+    [
+      acceptTerms,
+      applyManualReferral,
+      clearReferral,
+      referralCandidate,
+      referralInputValue,
+      referralMessage,
+      referralPreview,
+      referralStatus,
+      retry,
+      state,
+      updateReferralInput,
+    ],
   )
 }
