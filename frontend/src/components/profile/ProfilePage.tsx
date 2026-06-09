@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { getMyReferralCampaigns } from '../../api/referrals'
 import { replaceUrl } from '../../util/navigation'
 import { useQuery } from '../../util/query'
 import { consumeNewPlayerOnboardingPending } from '../../shared/session/new-player-onboarding'
@@ -26,8 +27,10 @@ export default function ProfilePage({ defaultTab }: { defaultTab?: ProfileTab })
   const [skinVersion, setSkinVersion] = useState(() => Date.now())
   const [skinFailed, setSkinFailed] = useState(false)
   const [showNewPlayerModal, setShowNewPlayerModal] = useState(false)
+  const [hasReferralCampaigns, setHasReferralCampaigns] = useState(false)
 
-  const activeTab = normalizeRequestedTab(query.get('tab') ?? defaultTab ?? null)
+  const requestedTab = normalizeRequestedTab(query.get('tab') ?? defaultTab ?? null)
+  const activeTab = requestedTab === 'referrals' && !hasReferralCampaigns ? 'overview' : requestedTab
   const isLoading = status === 'loading'
 
   const handleTabChange = (tab: ProfileTab) => {
@@ -44,6 +47,29 @@ export default function ProfilePage({ defaultTab }: { defaultTab?: ProfileTab })
     }
   }, [data, status])
 
+  useEffect(() => {
+    if (!authToken || status !== 'loaded') {
+      setHasReferralCampaigns(false)
+      return
+    }
+
+    let cancelled = false
+
+    const run = async () => {
+      try {
+        const response = await getMyReferralCampaigns(authToken)
+        if (!cancelled) setHasReferralCampaigns(response.total > 0 || response.items.length > 0)
+      } catch {
+        if (!cancelled) setHasReferralCampaigns(false)
+      }
+    }
+
+    void run()
+    return () => {
+      cancelled = true
+    }
+  }, [authToken, status])
+
   if (status === 'unauthorized') return <ProfileUnauthorizedState />
   if (status === 'error' || (!data && status !== 'loading')) {
     return <ProfileErrorState error={error} onRetry={() => void reload()} onLogout={logout} />
@@ -52,7 +78,7 @@ export default function ProfilePage({ defaultTab }: { defaultTab?: ProfileTab })
   const tabs = [
     ['overview', 'Обзор'],
     ['squads', 'Сквад'],
-    ['referrals', 'Рефералки'],
+    ...(hasReferralCampaigns ? ([['referrals', 'Рефералки']] as const) : []),
     ['settings', 'Настройки'],
   ] as const
 

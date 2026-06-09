@@ -20,6 +20,22 @@ export interface ReferralPreviewResponse {
   rewards: ReferralRewardResponse[]
 }
 
+export interface MyReferralCampaignResponse {
+  id: string
+  code: string
+  title: string
+  status: string
+  isActive: boolean
+  startsAt: string | null
+  endsAt: string | null
+  rewards: ReferralRewardResponse[]
+}
+
+export interface MyReferralCampaignListResponse {
+  items: MyReferralCampaignResponse[]
+  total: number
+}
+
 export interface ReferralStatsBucket {
   date: string
   registrations: number
@@ -35,6 +51,14 @@ export function getReferralPreview(code: string): Promise<ReferralPreviewRespons
     headers: {
       'Content-Type': 'application/json',
     },
+  })
+}
+
+export function getMyReferralCampaigns(token: string): Promise<MyReferralCampaignListResponse> {
+  return request<MyReferralCampaignListResponse>('/api/referrals/me/campaigns', {
+    headers: authHeaders(token, {
+      'Content-Type': 'application/json',
+    }),
   })
 }
 
