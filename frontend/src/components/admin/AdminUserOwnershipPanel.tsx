@@ -144,9 +144,9 @@ export default function AdminUserOwnershipPanel({ token, userId }: { token: stri
     return state.assets.filter((asset) => !asset.isCurrency && asset.ownershipModel === 'expirable')
   }, [state])
 
-  const selectedEntitlement = entitlementAssets.find((asset) => asset.key === selectedEntitlementKey) ?? entitlementAssets[0] ?? null
-  const selectedStackable = stackableAssets.find((asset) => asset.key === selectedStackableKey) ?? stackableAssets[0] ?? null
-  const selectedExpirable = expirableAssets.find((asset) => asset.key === selectedExpirableKey) ?? expirableAssets[0] ?? null
+  const selectedEntitlement = entitlementAssets.find((asset) => asset.key === selectedEntitlementKey) ?? null
+  const selectedStackable = stackableAssets.find((asset) => asset.key === selectedStackableKey) ?? null
+  const selectedExpirable = expirableAssets.find((asset) => asset.key === selectedExpirableKey) ?? null
 
   const inventoryMutationBody = (extra?: { amount?: number | null; durationSeconds?: number | null; expiresAt?: string | null }) => ({
     ...extra,
