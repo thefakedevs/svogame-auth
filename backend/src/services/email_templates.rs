@@ -12,7 +12,7 @@ pub fn shop_receipt(order: &ShopOrderModel, receipt: &ShopReceiptModel) -> Email
     let receipt_url = receipt.print_url.as_deref().unwrap_or("#");
     let order_id = order.id.to_string();
     render_shop_receipt(ShopReceiptTemplateData {
-        subject: format!("Чек SVO по заказу {order_id}"),
+        subject: format!("Чек по заказу #{order_id} на SvoCraft"),
         product_name: order.product_name.clone(),
         order_id,
         total_price_rub: order.total_price_rub,
@@ -59,7 +59,7 @@ fn render_shop_receipt(data: ShopReceiptTemplateData) -> EmailTemplate {
 <body style="margin:0;padding:24px;background:#f6f7fb;font-family:Arial,sans-serif;color:#1f2937">
   <div style="max-width:620px;margin:0 auto;background:#ffffff;border:1px solid #e5e7eb;padding:24px">
     <h1 style="margin:0 0 16px;font-size:22px;line-height:1.25;color:#111827">Спасибо за покупку</h1>
-    <p style="margin:0 0 14px;font-size:15px;line-height:1.5">Мы выписали чек по твоему заказу в SVO.</p>
+    <p style="margin:0 0 14px;font-size:15px;line-height:1.5">Мы выписали чек по твоему заказу на SvoCraft.</p>
     <table style="width:100%;border-collapse:collapse;margin:18px 0;font-size:14px">
       <tr>
         <td style="padding:8px 0;color:#6b7280">Покупка</td>
@@ -80,7 +80,7 @@ fn render_shop_receipt(data: ShopReceiptTemplateData) -> EmailTemplate {
     </table>
     <p style="margin:0 0 12px;font-size:14px;line-height:1.5">Картинка чека приложена к письму и показана ниже.</p>
     <div style="margin:0 0 16px;text-align:center">
-      <img src="__SVO_RECEIPT_IMAGE_SRC__" alt="Чек SVO" style="max-width:100%;height:auto;border:1px solid #e5e7eb" />
+      <img src="__SVO_RECEIPT_IMAGE_SRC__" alt="Чек SvoCraft" style="max-width:100%;height:auto;border:1px solid #e5e7eb" />
     </div>
     <p style="margin:0 0 16px;font-size:14px;line-height:1.5">Если картинка не открылась, чек можно посмотреть по ссылке:</p>
     <p style="margin:0">

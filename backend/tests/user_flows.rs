@@ -204,6 +204,51 @@ async fn registration_creates_user_and_audits_legal_acceptance() {
 
 #[tokio::test]
 #[serial]
+async fn user_nickname_update_writes_audit_log() {
+    let app = TestApp::spawn().await;
+    let user = app.issue_user_token("OldNickname", false, &[]).await;
+    let user_id = uuid::Uuid::parse_str(&user.user_id).expect("user id uuid");
+
+    let response = app
+        .post_json(
+            "/api/user/me/nickname",
+            &user.access_token,
+            serde_json::json!({ "nickname": "NewNickname" }),
+        )
+        .await;
+    assert!(
+        response.status().is_success(),
+        "nickname update failed: {}",
+        response.text().await.unwrap_or_default()
+    );
+    let body: serde_json::Value = response.json().await.expect("nickname response json");
+    assert_eq!(body["username"], "NewNickname");
+
+    let audit_log = auth::entities::AuditLog::find()
+        .filter(
+            auth::entities::AuditLogColumn::Action
+                .eq(auth::services::audit::ACTION_USER_NICKNAME_UPDATED),
+        )
+        .one(&app.db)
+        .await
+        .expect("query audit log")
+        .expect("nickname audit log exists");
+    assert_eq!(audit_log.actor_user_id, Some(user_id));
+    assert_eq!(audit_log.target_user_id, Some(user_id));
+
+    let metadata: serde_json::Value = serde_json::from_str(
+        audit_log
+            .metadata
+            .as_deref()
+            .expect("nickname audit metadata"),
+    )
+    .expect("nickname audit metadata json");
+    assert_eq!(metadata["oldNickname"], "OldNickname");
+    assert_eq!(metadata["newNickname"], "NewNickname");
+}
+
+#[tokio::test]
+#[serial]
 async fn first_registration_with_referral_code_grants_reward_and_tracks_stats() {
     let app = TestApp::spawn().await;
     let admin = app.issue_user_token("ReferralAdmin", true, &[]).await;

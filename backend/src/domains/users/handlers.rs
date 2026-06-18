@@ -6,12 +6,14 @@ use sea_orm::{
     ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Set,
 };
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use utoipa::{IntoParams, ToSchema};
 
 use crate::app::auth::get_user_from_headers;
 use crate::app::http::{HttpError, HttpResult};
 use crate::app::state::AppStateExtractor;
 use crate::entities::{NICKNAME_REGEX, User, UserColumn, UserModel};
+use crate::services::audit::{ACTION_USER_NICKNAME_UPDATED, write_audit_log};
 use crate::services::restrictions::list_user_restrictions;
 
 const DEFAULT_SEARCH_LIMIT: u64 = 10;
@@ -154,13 +156,31 @@ pub async fn update_nickname(
             .map_err(|e| HttpError::internal_error(format!("Failed to sync with GML: {}", e)))?;
     }
 
+    let user_id = user.id;
+    let previous_nickname = user.username.clone();
+    let new_nickname = body.nickname;
+
     let mut active_user: crate::entities::UserActiveModel = user.into();
-    active_user.username = Set(body.nickname);
+    active_user.username = Set(new_nickname.clone());
 
     let updated_user = active_user
         .update(&state_guard.db)
         .await
         .map_err(|e| HttpError::internal_error(format!("Failed to update user: {}", e)))?;
+
+    write_audit_log(
+        &state_guard.db,
+        ACTION_USER_NICKNAME_UPDATED,
+        Some(user_id),
+        Some(user_id),
+        None,
+        Some(json!({
+            "oldNickname": previous_nickname,
+            "newNickname": new_nickname,
+        })),
+    )
+    .await
+    .map_err(|e| HttpError::internal_error(format!("Failed to write audit log: {e}")))?;
 
     Ok(Json(updated_user.into()))
 }

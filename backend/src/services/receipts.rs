@@ -242,6 +242,7 @@ impl MyTaxClient {
         let operation_time =
             current_mytax_time(&self.config.zone_offset).map_err(MyTaxApiError::Other)?;
         let amount = json!(order.total_price_rub);
+        let service_name = receipt_service_name(order);
         let payload = json!({
             "paymentType": "CASH",
             "ignoreMaxTotalIncomeRestriction": false,
@@ -254,7 +255,7 @@ impl MyTaxClient {
             "operationTime": operation_time,
             "requestTime": operation_time,
             "services": [{
-                "name": order.product_name,
+                "name": service_name,
                 "quantity": 1,
                 "amount": amount,
             }],
@@ -832,4 +833,62 @@ async fn parse_mytax_response<T: for<'de> Deserialize<'de>>(
         });
     }
     serde_json::from_str(&body).map_err(MyTaxApiError::Serde)
+}
+
+fn receipt_service_name(order: &ShopOrderModel) -> String {
+    if order.quantity > 1 {
+        format!("{} х{}", order.product_name, order.quantity)
+    } else {
+        order.product_name.clone()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn test_order(quantity: i64) -> ShopOrderModel {
+        let now = chrono::Utc::now();
+        ShopOrderModel {
+            id: Uuid::new_v4(),
+            user_id: Uuid::new_v4(),
+            product_id: Uuid::new_v4(),
+            product_key: "test_product".to_string(),
+            product_locale: None,
+            product_name: "Test Product".to_string(),
+            product_description: None,
+            asset_definition_id: Uuid::new_v4(),
+            asset_key: "test_asset".to_string(),
+            ownership_model: "stackable".to_string(),
+            quantity,
+            unit_price_rub: 100,
+            total_price_rub: 100 * quantity,
+            stackable_amount_per_unit: Some(1),
+            expirable_duration_seconds_per_unit: None,
+            max_owned_amount_snapshot: None,
+            payment_provider: "mock".to_string(),
+            status: "paid".to_string(),
+            failure_problem: None,
+            payment_expires_at: None,
+            paid_at: Some(now),
+            fulfilled_at: None,
+            metadata: "{}".to_string(),
+            created_at: now,
+            updated_at: now,
+        }
+    }
+
+    #[test]
+    fn receipt_service_name_keeps_single_item_name() {
+        let order = test_order(1);
+
+        assert_eq!(receipt_service_name(&order), "Test Product");
+    }
+
+    #[test]
+    fn receipt_service_name_appends_multiple_item_quantity() {
+        let order = test_order(2);
+
+        assert_eq!(receipt_service_name(&order), "Test Product х2");
+    }
 }
