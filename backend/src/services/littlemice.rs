@@ -53,6 +53,7 @@ pub struct FailLittlemiceCheckPayload {
 #[derive(Clone, Debug)]
 pub struct LittlemiceListQuery {
     pub player_uuid: Option<Uuid>,
+    pub since_requested_at: Option<chrono::DateTime<chrono::Utc>>,
     pub page: u64,
     pub per_page: u64,
 }
@@ -248,6 +249,9 @@ pub async fn list_checks(
     let mut finder = LittlemiceCheck::find().order_by_desc(LittlemiceCheckColumn::RequestedAt);
     if let Some(player_uuid) = query.player_uuid {
         finder = finder.filter(LittlemiceCheckColumn::PlayerUuid.eq(player_uuid));
+    }
+    if let Some(since_requested_at) = query.since_requested_at {
+        finder = finder.filter(LittlemiceCheckColumn::RequestedAt.gte(since_requested_at));
     }
     let paginator = finder.paginate(db, query.per_page);
     let total = paginator.num_items().await?;

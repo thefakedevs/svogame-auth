@@ -43,7 +43,6 @@ export function listAdminUserLittlemiceChecks(
   const params = new URLSearchParams()
   if (query?.page) params.set('page', String(query.page))
   if (query?.perPage) params.set('perPage', String(query.perPage))
-
   const suffix = params.toString()
   return request<LittlemiceCheckListResponse>(
     `/api/admin/users/${encodeURIComponent(userId)}/littlemice-checks${suffix ? `?${suffix}` : ''}`,
@@ -60,11 +59,13 @@ export function listAdminLittlemiceChecks(
   query?: {
     page?: number
     perPage?: number
+    recentMinutes?: number
   },
 ): Promise<LittlemiceCheckListResponse> {
   const params = new URLSearchParams()
   if (query?.page) params.set('page', String(query.page))
   if (query?.perPage) params.set('perPage', String(query.perPage))
+  if (query?.recentMinutes) params.set('recentMinutes', String(query.recentMinutes))
 
   const suffix = params.toString()
   return request<LittlemiceCheckListResponse>(`/api/admin/littlemice/checks${suffix ? `?${suffix}` : ''}`, {

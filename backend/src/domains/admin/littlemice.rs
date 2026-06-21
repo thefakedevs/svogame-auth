@@ -3,6 +3,7 @@ use axum::body::Bytes;
 use axum::extract::{Path, Query, State};
 use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Response};
+use chrono::{Duration, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
@@ -20,6 +21,8 @@ const MAX_PER_PAGE: u64 = 100;
 pub struct ListLittlemiceChecksQuery {
     #[serde(rename = "playerUuid")]
     pub player_uuid: Option<String>,
+    #[serde(rename = "recentMinutes")]
+    pub recent_minutes: Option<i64>,
     pub page: Option<u64>,
     #[serde(rename = "perPage")]
     pub per_page: Option<u64>,
@@ -120,10 +123,16 @@ pub async fn list_checks(
         Some(value) => Some(Uuid::parse_str(value).map_err(|_| HttpError::bad_request("Invalid player UUID"))?),
         None => None,
     };
+    let since_requested_at = match query.recent_minutes {
+        Some(value) if value > 0 => Some(Utc::now() - Duration::minutes(value)),
+        Some(_) => return Err(HttpError::bad_request("recentMinutes must be positive")),
+        None => None,
+    };
     let result = littlemice::list_checks(
         &state.db,
         LittlemiceListQuery {
             player_uuid,
+            since_requested_at,
             page,
             per_page,
         },
@@ -168,6 +177,7 @@ pub async fn list_checks_by_player(
         headers,
         Query(ListLittlemiceChecksQuery {
             player_uuid: Some(player_uuid),
+            recent_minutes: query.recent_minutes,
             page: query.page,
             per_page: query.per_page,
         }),

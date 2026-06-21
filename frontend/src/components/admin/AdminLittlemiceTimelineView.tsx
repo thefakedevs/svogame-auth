@@ -12,6 +12,7 @@ import LoadingState from '../LoadingState'
 import AdminLink from './AdminLink'
 
 const PAGE_SIZE = 30
+const RECENT_FILTER_MINUTES = 5
 
 const dateTimeFormatter = new Intl.DateTimeFormat('ru-RU', {
   day: '2-digit',
@@ -109,6 +110,7 @@ function playerLabel(user: AdminUserResponse | null | undefined, playerUuid: str
 
 export default function AdminLittlemiceTimelineView({ token }: { token: string }) {
   const [page, setPage] = useState(1)
+  const [recentOnly, setRecentOnly] = useState(false)
   const [response, setResponse] = useState<LittlemiceCheckListResponse | null>(null)
   const [usersById, setUsersById] = useState<Record<string, AdminUserResponse | null>>({})
   const [error, setError] = useState('')
@@ -119,7 +121,11 @@ export default function AdminLittlemiceTimelineView({ token }: { token: string }
       setResponse(null)
       setError('')
       try {
-        const loaded = await listAdminLittlemiceChecks(token, { page, perPage: PAGE_SIZE })
+        const loaded = await listAdminLittlemiceChecks(token, {
+          page,
+          perPage: PAGE_SIZE,
+          recentMinutes: recentOnly ? RECENT_FILTER_MINUTES : undefined,
+        })
         if (!cancelled) setResponse(loaded)
       } catch (cause) {
         if (!cancelled) setError(toDisplayError(cause, 'Не удалось загрузить общий таймлайн littlemice.'))
@@ -129,7 +135,7 @@ export default function AdminLittlemiceTimelineView({ token }: { token: string }
     return () => {
       cancelled = true
     }
-  }, [page, token])
+  }, [page, recentOnly, token])
 
   useEffect(() => {
     if (!response) return
@@ -158,6 +164,10 @@ export default function AdminLittlemiceTimelineView({ token }: { token: string }
   }, [response, token, usersById])
 
   const totalPages = Math.max(1, response?.totalPages ?? 1)
+  const toggleRecentOnly = () => {
+    setPage(1)
+    setRecentOnly((current) => !current)
+  }
 
   return (
     <div className="admin-page">
@@ -175,6 +185,14 @@ export default function AdminLittlemiceTimelineView({ token }: { token: string }
           </div>
           {response ? (
             <div className="admin-littlemice-summary-badges">
+              <button
+                type="button"
+                className={`btn btn-sm ${recentOnly ? 'primary' : ''}`}
+                aria-pressed={recentOnly}
+                onClick={toggleRecentOnly}
+              >
+                За 5 минут
+              </button>
               <span className="ui-badge ui-badge-neutral">Всего: {response.total}</span>
               <span className="ui-badge ui-badge-neutral">Страница {page} из {totalPages}</span>
             </div>

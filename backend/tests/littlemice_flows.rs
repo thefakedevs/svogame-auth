@@ -122,6 +122,33 @@ async fn service_can_create_upload_and_admin_can_read_littlemice_check() {
     assert_eq!(admin_list_body["total"], 1);
     assert_eq!(admin_list_body["items"][0]["id"], check_id);
 
+    let model = LittlemiceCheck::find_by_id(Uuid::parse_str(check_id).expect("uuid"))
+        .one(&app.db)
+        .await
+        .expect("load check")
+        .expect("check exists");
+    let mut active: LittlemiceCheckActiveModel = model.into();
+    active.requested_at = Set(chrono::Utc::now() - chrono::Duration::minutes(6));
+    active.update(&app.db).await.expect("age check");
+
+    let recent_admin_list = app
+        .get_json(
+            "/api/admin/littlemice/checks?recentMinutes=5",
+            &admin.access_token,
+        )
+        .await;
+    assert!(recent_admin_list.status().is_success());
+    let recent_admin_list_body: serde_json::Value =
+        recent_admin_list.json().await.expect("recent admin list");
+    assert_eq!(recent_admin_list_body["total"], 0);
+    assert_eq!(
+        recent_admin_list_body["items"]
+            .as_array()
+            .expect("recent items")
+            .len(),
+        0
+    );
+
     let player_list = app
         .get_json(
             &format!("/api/admin/users/{}/littlemice-checks", player.user_id),
