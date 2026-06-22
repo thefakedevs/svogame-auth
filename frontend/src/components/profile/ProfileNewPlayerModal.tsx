@@ -3,7 +3,7 @@ import { listDiscordGuildEvents, type DiscordGuildEventResponse } from '../../ap
 import { paths } from '../../routes/paths'
 import AppPortal from '../../shared/ui/portal/AppPortal'
 
-type PlatformId = 'windows' | 'macos' | 'linux'
+type PlatformId = 'windows' | 'linux'
 
 type DownloadOption = {
   id: PlatformId
@@ -36,14 +36,6 @@ const downloadOptions: Record<PlatformId, DownloadOption> = {
     image: '/icons/windows.svg',
     href: 'https://launcher.svocraft.xyz/api/v1/file/win-x64-SvoLauncher.exe',
   },
-  macos: {
-    id: 'macos',
-    title: 'Apple',
-    label: 'macOS Apple Silicon',
-    description: 'Версия для современных Mac. Другие сборки доступны на странице загрузок.',
-    image: '/icons/apple.svg',
-    href: 'https://launcher.svocraft.xyz/api/v1/file/osx-arm64-SvoLauncher',
-  },
   linux: {
     id: 'linux',
     title: 'Linux',
@@ -67,7 +59,6 @@ function detectPlatform(): PlatformId {
   const nav = navigator as NavigatorWithUserAgentData
   const platform = `${nav.userAgentData?.platform ?? navigator.platform ?? navigator.userAgent}`.toLowerCase()
 
-  if (platform.includes('mac')) return 'macos'
   if (platform.includes('linux')) return 'linux'
   return 'windows'
 }

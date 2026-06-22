@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import './DownloadsPage.css'
 
-type PlatformId = 'windows' | 'macos' | 'linux'
+type PlatformId = 'windows' | 'linux'
 
 type DownloadArch = {
   id: string
@@ -35,10 +35,6 @@ function detectPlatform(): PlatformId | null {
 
   if (platform.includes('win')) {
     return 'windows'
-  }
-
-  if (platform.includes('mac')) {
-    return 'macos'
   }
 
   if (platform.includes('linux')) {
@@ -178,27 +174,6 @@ export default function DownloadsPage() {
               hint: 'Основная версия',
               href: 'https://launcher.svocraft.xyz/api/v1/file/win-x64-SvoLauncher.exe',
             }
-          ]}
-        />
-        <DownloadCard
-          title="Apple"
-          description="Версия для Mac. Выберите Apple Silicon или Intel в зависимости от процессора."
-          image="/icons/apple.svg"
-          alt="Символ Apple для загрузки лаунчера SvoCraft на macOS"
-          recommended={recommendedPlatform === 'macos'}
-          architectures={[
-            {
-              id: 'mac-arm64',
-              label: 'macOS Apple Silicon',
-              hint: 'M1, M2, M3 и новее',
-              href: 'https://launcher.svocraft.xyz/api/v1/file/osx-arm64-SvoLauncher',
-            },
-            {
-              id: 'mac-x64',
-              label: 'macOS Intel',
-              hint: 'Intel Mac',
-              href: 'https://launcher.svocraft.xyz/api/v1/file/osx-x64-SvoLauncher',
-            },
           ]}
         />
         <DownloadCard
