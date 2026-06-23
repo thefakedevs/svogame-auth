@@ -2130,3 +2130,96 @@ fn fake_payment_json(
         "metadata": metadata
     })
 }
+
+#[tokio::test]
+#[serial]
+async fn skin_purchase_automatically_equips_it() {
+    use auth::entities::DiscordDelivery;
+    use sea_orm::EntityTrait;
+
+    let app = TestApp::spawn().await;
+    let admin = app.issue_user_token("ShopAdminSkin", true, &[]).await;
+    let user = app.issue_user_token("ShopBuyerSkin", false, &[]).await;
+    let user_uuid = uuid::Uuid::parse_str(&user.user_id).unwrap();
+
+    // 1. Create a skin asset
+    app.create_asset(
+        &admin,
+        serde_json::json!({
+            "key": "test_akm_skin",
+            "display_name": "Test AKM Skin",
+            "description": "Awesome skin",
+            "asset_kind": "skin",
+            "ownership_model": "entitlement",
+            "is_currency": false,
+            "is_user_purchasable": true,
+            "is_public": true,
+            "weaponKey": "tacz:akm",
+            "rarity": "rare",
+            "metadata": {}
+        }),
+    )
+    .await;
+
+    // 2. Create a shop product for the skin asset
+    let product_res = app
+        .post_json(
+            "/api/admin/shop/products",
+            &admin.access_token,
+            serde_json::json!({
+                "key": "test_akm_skin_product",
+                "asset_key": "test_akm_skin",
+                "price_rub": 100,
+                "locales": [{ "locale": "en", "name": "Test Skin Product", "description": null }]
+            }),
+        )
+        .await;
+    assert!(product_res.status().is_success());
+
+    // 3. Purchase the skin product
+    let order_res = app
+        .post_json(
+            "/api/user/me/shop/orders",
+            &user.access_token,
+            serde_json::json!({
+                "product_key": "test_akm_skin_product"
+            }),
+        )
+        .await;
+    assert!(order_res.status().is_success());
+    let order_body: serde_json::Value = order_res.json().await.expect("order json");
+    let order_id = order_body["id"].as_str().expect("order id");
+
+    // 4. Complete the purchase
+    let complete_res = app
+        .post_json(
+            &format!("/api/user/me/shop/orders/{order_id}/mock/complete"),
+            &user.access_token,
+            serde_json::json!({}),
+        )
+        .await;
+    assert!(complete_res.status().is_success());
+    let complete_body: serde_json::Value = complete_res.json().await.expect("completed order");
+    assert_eq!(complete_body["status"], "fulfilled");
+
+    // 5. Verify the gunskin was automatically selected
+    let selected_gunskin_res = app
+        .get_json("/api/user/me/gunskins/tacz:akm", &user.access_token)
+        .await;
+    assert!(selected_gunskin_res.status().is_success());
+    let collection: serde_json::Value = selected_gunskin_res.json().await.expect("collection json");
+    assert_eq!(collection["selected"]["assetKey"], "test_akm_skin");
+
+    // 6. Verify that a Discord delivery was queued with the correct metadata and message
+    let deliveries = DiscordDelivery::find()
+        .all(&app.db)
+        .await
+        .expect("query deliveries");
+    let delivery = deliveries
+        .iter()
+        .find(|d| d.requested_by_user_id == Some(user_uuid))
+        .expect("found discord delivery");
+    assert!(delivery.message.contains("Этот скин теперь активен!"));
+    let metadata: serde_json::Value = serde_json::from_str(&delivery.metadata).expect("parse metadata");
+    assert_eq!(metadata["autoEquipped"], true);
+}

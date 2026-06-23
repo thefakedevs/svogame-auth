@@ -46,8 +46,8 @@ pub fn squad_kicked(squad_name: &str, leader_username: &str) -> DiscordTemplate 
     }
 }
 
-pub fn shop_purchase_completed(product_name: &str, quantity: i64) -> DiscordTemplate {
-    let description = if quantity > 1 {
+pub fn shop_purchase_completed(product_name: &str, quantity: i64, auto_equipped: bool) -> DiscordTemplate {
+    let mut description = if quantity > 1 {
         format!(
             "Покупка прошла успешно, ура-ура~ ✨\n\
             Ты получил: **{product_name} x{quantity}**."
@@ -58,6 +58,10 @@ pub fn shop_purchase_completed(product_name: &str, quantity: i64) -> DiscordTemp
             Ты получил: **{product_name}**."
         )
     };
+
+    if auto_equipped {
+        description.push_str("\nЭтот скин теперь активен!");
+    }
 
     DiscordTemplate {
         title: "🛍️ Покупка завершена".to_string(),
@@ -95,6 +99,7 @@ pub fn render(template_key: &str, message: &str, metadata: &Value) -> DiscordTem
                 .and_then(Value::as_str)
                 .unwrap_or("неизвестная покупочка"),
             metadata.get("quantity").and_then(Value::as_i64).unwrap_or(1),
+            metadata.get("autoEquipped").and_then(Value::as_bool).unwrap_or(false),
         ),
         _ => admin_custom(message.to_string()),
     }
