@@ -1335,6 +1335,7 @@ async fn yookassa_order_creation_returns_redirect_checkout_url_and_metadata() {
     );
     assert_eq!(create_request["amount"]["value"], "100.00");
     assert_eq!(create_request["capture"], true);
+    assert_eq!(create_request["description"], "1x yk_crate_bundle для ShopBuyerYkCreate");
 }
 
 #[tokio::test]

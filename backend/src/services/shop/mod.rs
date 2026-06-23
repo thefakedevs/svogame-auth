@@ -541,7 +541,10 @@ pub async fn create_order(
     let locale = normalize_optional_locale(input.locale)?;
 
     let tx = db.begin().await?;
-    ensure_user_exists(&tx, user_id).await?;
+    let user = User::find_by_id(user_id)
+        .one(&tx)
+        .await?
+        .ok_or_else(|| not_found("User not found"))?;
     let (product, asset, locales) = load_product_bundle_by_key(&tx, &product_key)
         .await?
         .ok_or_else(|| not_found("Shop product not found"))?;
@@ -578,7 +581,7 @@ pub async fn create_order(
         CreatePaymentCommand {
             order_id,
             amount_rub: total_price_rub,
-            description: localized.name.clone(),
+            description: format!("{}x {} для {}", quantity, localized.name, user.username),
         },
     )
     .await?;
