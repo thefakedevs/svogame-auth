@@ -17,14 +17,14 @@ use crate::entities::{
     ShopPaymentAttemptColumn, ShopPaymentAttemptModel, ShopProduct, ShopProductActiveModel,
     ShopProductColumn, ShopProductLocale, ShopProductLocaleActiveModel, ShopProductLocaleColumn,
     ShopProductLocaleModel, ShopProductModel, ShopReceipt, ShopReceiptColumn, User,
-    UserEntitlement, UserStackableAsset,
+    UserEntitlement, UserStackableAsset, UserSelectedGunskin, UserSelectedGunskinActiveModel,
 };
 use crate::services::discord_notifications::queue_shop_purchase_completed_notification;
 use crate::services::ownership::inventory::{
     self, EntitlementMutation, ProlongExpirableMutation, StackableMutation, grant_entitlement_in_tx,
 };
 use crate::services::ownership::types::{
-    OperationContext, OwnershipActor, OwnershipModel, normalize_metadata, validate_asset_key,
+    AssetKind, OperationContext, OwnershipActor, OwnershipModel, normalize_metadata, validate_asset_key,
 };
 use crate::services::receipts::{self, ShopReceiptView};
 
@@ -541,7 +541,10 @@ pub async fn create_order(
     let locale = normalize_optional_locale(input.locale)?;
 
     let tx = db.begin().await?;
-    ensure_user_exists(&tx, user_id).await?;
+    let user = User::find_by_id(user_id)
+        .one(&tx)
+        .await?
+        .ok_or_else(|| not_found("User not found"))?;
     let (product, asset, locales) = load_product_bundle_by_key(&tx, &product_key)
         .await?
         .ok_or_else(|| not_found("Shop product not found"))?;
@@ -578,7 +581,7 @@ pub async fn create_order(
         CreatePaymentCommand {
             order_id,
             amount_rub: total_price_rub,
-            description: localized.name.clone(),
+            description: format!("{}x {} для {}", quantity, localized.name, user.username),
         },
     )
     .await?;
@@ -1553,6 +1556,38 @@ async fn fulfill_order_in_tx(
         }
     }
 
+    let asset = AssetDefinition::find_by_id(order.asset_definition_id)
+        .one(db)
+        .await?
+        .ok_or_else(|| anyhow!("Asset definition not found"))?;
+
+    let mut auto_equipped = false;
+    if asset.asset_kind == AssetKind::Skin.as_str() {
+        if let Some(ref weapon_key) = asset.weapon_key {
+            let now = chrono::Utc::now();
+            if let Some(existing) = UserSelectedGunskin::find_by_id((order.user_id, weapon_key.clone()))
+                .one(db)
+                .await?
+            {
+                let mut active: UserSelectedGunskinActiveModel = existing.into();
+                active.asset_definition_id = Set(asset.id);
+                active.updated_at = Set(now);
+                active.update(db).await?;
+            } else {
+                UserSelectedGunskinActiveModel {
+                    user_id: Set(order.user_id),
+                    weapon_key: Set(weapon_key.clone()),
+                    asset_definition_id: Set(asset.id),
+                    selected_at: Set(now),
+                    updated_at: Set(now),
+                }
+                .insert(db)
+                .await?;
+            }
+            auto_equipped = true;
+        }
+    }
+
     let mut active: ShopOrderActiveModel = order.clone().into();
     active.status = Set(ORDER_STATUS_FULFILLED.to_string());
     active.fulfilled_at = Set(Some(chrono::Utc::now()));
@@ -1567,6 +1602,7 @@ async fn fulfill_order_in_tx(
         &order.product_key,
         &order.product_name,
         order.quantity,
+        auto_equipped,
     )
     .await?;
     Ok(())

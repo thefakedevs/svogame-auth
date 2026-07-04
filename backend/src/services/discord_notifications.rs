@@ -177,8 +177,9 @@ pub async fn queue_shop_purchase_completed_notification(
     product_key: &str,
     product_name: &str,
     quantity: i64,
+    auto_equipped: bool,
 ) -> Result<()> {
-    let message = discord_templates::shop_purchase_completed(product_name, quantity);
+    let message = discord_templates::shop_purchase_completed(product_name, quantity, auto_equipped);
     insert_delivery(
         db,
         NewDelivery {
@@ -192,7 +193,8 @@ pub async fn queue_shop_purchase_completed_notification(
                 "orderId": order_id,
                 "productKey": product_key,
                 "productName": product_name,
-                "quantity": quantity
+                "quantity": quantity,
+                "autoEquipped": auto_equipped
             }),
         },
     )
