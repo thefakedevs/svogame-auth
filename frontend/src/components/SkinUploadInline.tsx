@@ -1,6 +1,6 @@
 import { Suspense, lazy, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
-import { ApiError, uploadMySkin, type SkinModel } from '../api/skins'
+import { ApiError, uploadMySkin} from '../api/skins'
 import { getAuthToken } from '../shared/session/auth-session'
 import './SkinUploadInline.css'
 
@@ -24,7 +24,6 @@ function skinUploadErrorMessage(error: unknown): string {
 export default function SkinUploadInline({ onUploaded }: { onUploaded?: () => void }) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
-  const [model, setModel] = useState<SkinModel>('default')
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleFileChange = (file: File) => {
@@ -54,7 +53,7 @@ export default function SkinUploadInline({ onUploaded }: { onUploaded?: () => vo
 
     setIsLoading(true)
 
-    const uploadPromise = uploadMySkin(token, file, model)
+    const uploadPromise = uploadMySkin(token, file, 'default')
 
     toast.promise(uploadPromise, {
       loading: 'Загрузка скина...',
@@ -78,7 +77,7 @@ export default function SkinUploadInline({ onUploaded }: { onUploaded?: () => vo
         {previewUrl ? (
           <>
             <Suspense fallback={<div className="upload-placeholder">Загружаем предпросмотр...</div>}>
-              <SkinViewer3D skinUrl={previewUrl} model={model} width={300} height={400} />
+              <SkinViewer3D skinUrl={previewUrl} model={'default'} width={300} height={400} />
             </Suspense>
           </>
         ) : (
