@@ -80,22 +80,6 @@ export default function SkinUploadInline({ onUploaded }: { onUploaded?: () => vo
             <Suspense fallback={<div className="upload-placeholder">Загружаем предпросмотр...</div>}>
               <SkinViewer3D skinUrl={previewUrl} model={model} width={300} height={400} />
             </Suspense>
-            <div className="model-toggle">
-              <button
-                type="button"
-                className={`btn btn-sm model-btn ${model === 'default' ? 'active' : ''}`}
-                onClick={() => setModel('default')}
-              >
-                Обычная
-              </button>
-              <button
-                type="button"
-                className={`btn btn-sm model-btn ${model === 'slim' ? 'active' : ''}`}
-                onClick={() => setModel('slim')}
-              >
-                Тонкая
-              </button>
-            </div>
           </>
         ) : (
           <div className="upload-placeholder" onClick={() => fileInputRef.current?.click()}>
