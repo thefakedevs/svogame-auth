@@ -11,6 +11,7 @@ pub struct AppConfig {
     pub database: DatabaseConfig,
     pub s3: S3Config,
     pub littlemice: LittlemiceConfig,
+    pub metrics: MetricsConfig,
     pub shop: ShopConfig,
     pub receipts: ReceiptsConfig,
     pub pow_complexity: i16,
@@ -26,6 +27,7 @@ pub struct GamerviiCompatConfig {
 
 #[derive(Debug, Clone)]
 pub struct DiscordConfig {
+    pub api_base_url: String,
     pub oauth2_url: String,
     pub redirect_url: String,
     pub client_id: String,
@@ -90,6 +92,17 @@ pub struct LittlemiceConfig {
 }
 
 #[derive(Debug, Clone)]
+pub struct MetricsConfig {
+    pub ingest_secret: Option<String>,
+    pub upload_max_bytes: usize,
+    pub upload_timeout_seconds: u64,
+    pub discord_channel_id: Option<String>,
+    pub discord_retry_interval_seconds: i64,
+    pub discord_max_attempts: i32,
+    pub public_base_url: String,
+}
+
+#[derive(Debug, Clone)]
 pub struct ShopConfig {
     pub payment_provider: ShopPaymentProviderKind,
     pub yookassa: Option<YooKassaConfig>,
@@ -144,6 +157,7 @@ impl AppConfig {
         let database = DatabaseConfig::from_env()?;
         let s3 = S3Config::from_env()?;
         let littlemice = LittlemiceConfig::from_env()?;
+        let metrics = MetricsConfig::from_env()?;
         let shop = ShopConfig::from_env()?;
         let receipts = ReceiptsConfig::from_env()?;
         let pow_complexity = std::env::var("POW_COMPLEXITY")
@@ -160,11 +174,72 @@ impl AppConfig {
             database,
             s3,
             littlemice,
+            metrics,
             shop,
             receipts,
             pow_complexity,
             jwt_secret,
             gamervii_compat,
+        })
+    }
+}
+
+impl MetricsConfig {
+    fn from_env() -> Result<Self> {
+        let ingest_secret = std::env::var("METRICS_INGEST_SECRET")
+            .ok()
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty());
+        let upload_max_bytes = std::env::var("METRICS_UPLOAD_MAX_BYTES")
+            .unwrap_or_else(|_| (16 * 1024 * 1024).to_string())
+            .parse::<usize>()
+            .context("METRICS_UPLOAD_MAX_BYTES must be a valid integer")?;
+        if upload_max_bytes == 0 {
+            anyhow::bail!("METRICS_UPLOAD_MAX_BYTES must be positive");
+        }
+        let upload_timeout_seconds = std::env::var("METRICS_UPLOAD_TIMEOUT_SECONDS")
+            .unwrap_or_else(|_| "60".to_string())
+            .parse::<u64>()
+            .context("METRICS_UPLOAD_TIMEOUT_SECONDS must be a valid integer")?;
+        if upload_timeout_seconds == 0 {
+            anyhow::bail!("METRICS_UPLOAD_TIMEOUT_SECONDS must be positive");
+        }
+        let discord_channel_id = std::env::var("METRICS_DISCORD_CHANNEL_ID")
+            .ok()
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty());
+        let discord_retry_interval_seconds =
+            std::env::var("METRICS_DISCORD_RETRY_INTERVAL_SECONDS")
+                .unwrap_or_else(|_| "60".to_string())
+                .parse::<i64>()
+                .context("METRICS_DISCORD_RETRY_INTERVAL_SECONDS must be a valid integer")?;
+        if discord_retry_interval_seconds <= 0 {
+            anyhow::bail!("METRICS_DISCORD_RETRY_INTERVAL_SECONDS must be positive");
+        }
+        let discord_max_attempts = std::env::var("METRICS_DISCORD_MAX_ATTEMPTS")
+            .unwrap_or_else(|_| "10".to_string())
+            .parse::<i32>()
+            .context("METRICS_DISCORD_MAX_ATTEMPTS must be a valid integer")?;
+        if discord_max_attempts <= 0 {
+            anyhow::bail!("METRICS_DISCORD_MAX_ATTEMPTS must be positive");
+        }
+        let public_base_url = std::env::var("METRICS_PUBLIC_BASE_URL")
+            .unwrap_or_else(|_| "https://svocraft.xyz".to_string())
+            .trim()
+            .trim_end_matches('/')
+            .to_string();
+        if public_base_url.is_empty() {
+            anyhow::bail!("METRICS_PUBLIC_BASE_URL must not be empty");
+        }
+
+        Ok(Self {
+            ingest_secret,
+            upload_max_bytes,
+            upload_timeout_seconds,
+            discord_channel_id,
+            discord_retry_interval_seconds,
+            discord_max_attempts,
+            public_base_url,
         })
     }
 }
@@ -277,6 +352,14 @@ impl GamerviiCompatConfig {
 
 impl DiscordConfig {
     fn from_env() -> Result<Self> {
+        let api_base_url = std::env::var("DISCORD_API_BASE_URL")
+            .unwrap_or_else(|_| "https://discord.com/api/v10".to_string())
+            .trim()
+            .trim_end_matches('/')
+            .to_string();
+        if api_base_url.is_empty() {
+            anyhow::bail!("DISCORD_API_BASE_URL must not be empty");
+        }
         let client_id = std::env::var("DISCORD_CLIENT_ID").context("DISCORD_CLIENT_ID not set")?;
         let redirect_url =
             std::env::var("DISCORD_REDIRECT_URI").context("DISCORD_REDIRECT_URI not set")?;
@@ -310,6 +393,7 @@ impl DiscordConfig {
             .context("DISCORD_HTTP_TIMEOUT_MS must be a valid integer")?;
 
         Ok(DiscordConfig {
+            api_base_url,
             oauth2_url,
             redirect_url,
             client_id,
@@ -419,10 +503,11 @@ impl LittlemiceConfig {
             .unwrap_or_else(|_| (1024 * 1024).to_string())
             .parse::<usize>()
             .context("LITTLEMICE_INFO_MAX_BYTES must be a valid integer")?;
-        let expiry_check_interval_seconds = std::env::var("LITTLEMICE_EXPIRY_CHECK_INTERVAL_SECONDS")
-            .unwrap_or_else(|_| "5".to_string())
-            .parse::<u64>()
-            .context("LITTLEMICE_EXPIRY_CHECK_INTERVAL_SECONDS must be a valid integer")?;
+        let expiry_check_interval_seconds =
+            std::env::var("LITTLEMICE_EXPIRY_CHECK_INTERVAL_SECONDS")
+                .unwrap_or_else(|_| "5".to_string())
+                .parse::<u64>()
+                .context("LITTLEMICE_EXPIRY_CHECK_INTERVAL_SECONDS must be a valid integer")?;
         let cleanup_interval_seconds = std::env::var("LITTLEMICE_CLEANUP_INTERVAL_SECONDS")
             .unwrap_or_else(|_| "3600".to_string())
             .parse::<u64>()
@@ -431,7 +516,9 @@ impl LittlemiceConfig {
             .unwrap_or_else(|_| "30".to_string())
             .parse::<i64>()
             .context("LITTLEMICE_RETENTION_DAYS must be a valid integer")?;
-        if expiry_check_interval_seconds == 0 || cleanup_interval_seconds == 0 || retention_days <= 0
+        if expiry_check_interval_seconds == 0
+            || cleanup_interval_seconds == 0
+            || retention_days <= 0
         {
             anyhow::bail!("Littlemice intervals and retention must be positive");
         }

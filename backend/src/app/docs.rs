@@ -15,6 +15,7 @@ use crate::domains::gunskins::handlers as gunskin_handlers;
 use crate::domains::littlemice::handlers as littlemice_handlers;
 use crate::domains::lootboxes::handlers as lootbox_handlers;
 use crate::domains::meta::handlers as meta_handlers;
+use crate::domains::metrics::handlers as metrics_handlers;
 use crate::domains::ownership::handlers as ownership_handlers;
 use crate::domains::referrals::handlers as referral_handlers;
 use crate::domains::shop::handlers as shop_handlers;
@@ -95,6 +96,14 @@ use utoipa::OpenApi;
         gunskin_handlers::list_admin_weapon_keys,
         meta_handlers::get_restrictions_meta,
         meta_handlers::get_squads_config,
+        metrics_handlers::ingest_timeline,
+        metrics_handlers::get_match,
+        metrics_handlers::get_match_players,
+        metrics_handlers::get_match_player,
+        metrics_handlers::get_player,
+        metrics_handlers::get_player_matches,
+        metrics_handlers::get_player_stats,
+        metrics_handlers::get_leaderboard,
         lootbox_handlers::list_public_lootboxes,
         lootbox_handlers::get_public_lootbox,
         lootbox_handlers::get_my_lootboxes,
@@ -269,6 +278,23 @@ use utoipa::OpenApi;
             meta_handlers::RestrictionLocale,
             meta_handlers::RestrictionLocaleEntry,
             meta_handlers::SquadConfigResponse,
+            metrics_handlers::IngestTimelineResponse,
+            metrics_handlers::MatchResponse,
+            metrics_handlers::MatchPlayerResponse,
+            metrics_handlers::TeamSummaryResponse,
+            metrics_handlers::PlayerProfileResponse,
+            metrics_handlers::NicknameResponse,
+            metrics_handlers::PeriodQuery,
+            metrics_handlers::PlayerMatchesQuery,
+            metrics_handlers::PlayerMatchesResponse,
+            metrics_handlers::MatchListItemResponse,
+            metrics_handlers::PlayerStatsResponse,
+            metrics_handlers::LeaderboardQuery,
+            metrics_handlers::LeaderboardResponse,
+            metrics_handlers::LeaderboardEntryResponse,
+            metrics_handlers::PeriodResponse,
+            metrics_handlers::PaginationResponse,
+            crate::services::metrics::aggregation::PlayerStats,
             lootbox_handlers::OpenLootboxQuery,
             lootbox_handlers::LootboxDefinitionResponse,
             lootbox_handlers::LootboxDropResponse,
@@ -366,6 +392,7 @@ use utoipa::OpenApi;
         (name = "referrals", description = "Referral campaign preview and creator analytics API"),
         (name = "referrals-admin", description = "Administrative referral campaign and registration statistics API"),
         (name = "meta", description = "Public metadata used by clients to drive UI and validation"),
+        (name = "metrics", description = "Game timeline ingestion, match statistics and leaderboards"),
         (name = "shop", description = "Public catalog and self-service purchase flow for shop products"),
         (name = "shop-admin", description = "Administrative shop product configuration API"),
         (name = "skins", description = "Skin upload and retrieval API"),
@@ -380,7 +407,7 @@ use utoipa::OpenApi;
 pub struct ApiDoc;
 
 use utoipa::Modify;
-use utoipa::openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme};
+use utoipa::openapi::security::{ApiKey, ApiKeyValue, HttpAuthScheme, HttpBuilder, SecurityScheme};
 
 struct SecurityAddon;
 
@@ -395,6 +422,13 @@ impl Modify for SecurityAddon {
                     .bearer_format("JWT")
                     .build(),
             ),
+        );
+        components.add_security_scheme(
+            "metrics_ingest_secret",
+            SecurityScheme::ApiKey(ApiKey::Header(ApiKeyValue::with_description(
+                "Authorization",
+                "Raw METRICS_INGEST_SECRET or Bearer <secret>",
+            ))),
         );
     }
 }
