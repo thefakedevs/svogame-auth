@@ -24,7 +24,7 @@ function skinUploadErrorMessage(error: unknown): string {
 export default function SkinUploadInline({ onUploaded }: { onUploaded?: () => void }) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
-  const [model, setModel] = useState<SkinModel>('default')
+  const [model] = useState<SkinModel>('default')
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleFileChange = (file: File) => {

@@ -6,7 +6,7 @@ import type {
 import type { SquadConfigResponse } from '../../api/meta'
 import type { UserResponse } from '../../api/users'
 
-export type ProfileTab = 'overview' | 'squads' | 'referrals' | 'settings'
+export type ProfileTab = 'overview' | 'matches' | 'squads' | 'referrals' | 'settings'
 export type ProfileStatus = 'loading' | 'loaded' | 'error' | 'unauthorized'
 
 export interface ProfileDashboardData {

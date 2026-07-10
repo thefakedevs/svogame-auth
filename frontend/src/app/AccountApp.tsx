@@ -13,6 +13,7 @@ const ContactsPage = lazy(() => import('../pages/_ContactsPage'))
 const DownloadsPage = lazy(() => import('../pages/_DownloadsPage'))
 const HomePage = lazy(() => import('../pages/_HomePage'))
 const LegalPage = lazy(() => import('../pages/LegalPage'))
+const LeaderboardPage = lazy(() => import('../pages/LeaderboardPage'))
 const OwnershipPage = lazy(() => import('../pages/OwnershipPage'))
 const ShopCheckoutReturnPage = lazy(() => import('../pages/ShopCheckoutReturnPage'))
 const ShopPage = lazy(() => import('../pages/ShopPage'))
@@ -104,6 +105,18 @@ function OwnershipShell() {
       <div className="ui-kit-page app-shell">
         <AppHeader pageTitle="Инвентарь" />
         <OwnershipPage />
+      </div>
+    </>
+  )
+}
+
+function LeaderboardShell() {
+  return (
+    <>
+      <div className="ui-kit-vhs" aria-hidden />
+      <div className="ui-kit-page app-shell">
+        <AppHeader pageTitle="Лидерборд" />
+        <LeaderboardPage />
       </div>
     </>
   )
@@ -336,6 +349,9 @@ export default function AccountApp() {
       break
     case paths.profileEdit:
       page = <ProfileShell pageTitle="Настройки профиля" defaultTab="settings" />
+      break
+    case paths.leaderboard:
+      page = <LeaderboardShell />
       break
     case paths.inventory:
       page = <OwnershipShell />

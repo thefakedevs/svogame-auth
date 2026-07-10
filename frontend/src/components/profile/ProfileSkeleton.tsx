@@ -120,11 +120,38 @@ function SettingsSkeleton() {
   )
 }
 
+function MatchesSkeleton() {
+  return (
+    <div className="profile-skeleton-matches">
+      <div className="profile-skeleton-match-summary">
+        {Array.from({ length: 8 }, (_, index) => (
+          <div key={index} className="profile-skeleton-match-stat">
+            <div className="profile-shimmer profile-shimmer-stat-label" />
+            <div className="profile-shimmer profile-shimmer-stat-value" />
+          </div>
+        ))}
+      </div>
+      <div className="card profile-skeleton-panel profile-skeleton-match-history">
+        <div className="profile-skeleton-panel-head">
+          <div>
+            <div className="profile-shimmer profile-shimmer-section" />
+            <div className="profile-shimmer profile-shimmer-summary-line profile-shimmer-summary-line--short" />
+          </div>
+        </div>
+        {Array.from({ length: 5 }, (_, index) => (
+          <div key={index} className="profile-shimmer profile-shimmer-match-row" />
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export default function ProfileSkeleton({ activeTab = 'overview' }: { activeTab?: ProfileTab }) {
   return (
     <>
       {activeTab === 'squads' ? <SquadsSkeleton /> : null}
       {activeTab === 'settings' ? <SettingsSkeleton /> : null}
+      {activeTab === 'matches' ? <MatchesSkeleton /> : null}
       {activeTab === 'overview' ? <OverviewSkeleton /> : null}
     </>
   )

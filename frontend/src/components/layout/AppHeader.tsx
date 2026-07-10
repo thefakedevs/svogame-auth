@@ -183,10 +183,12 @@ export default function AppHeader({ pageTitle }: Props) {
         </a>
         <div className="app-header__menu-section">
           <a href={paths.profile}>Профиль</a>
+          <a href={paths.leaderboard}>Лидерборд</a>
           <a href={paths.shop}>Магазин</a>
           <a href={paths.inventory}>Инвентарь</a>
           <a href={paths.wallet}>Кошелек</a>
           <a href={`${paths.profile}?tab=squads`}>Сквад</a>
+          <a href={`${paths.profile}?tab=matches`}>Мои матчи</a>
           <a href={`${paths.profile}?tab=settings`}>Настройки</a>
           {authUser?.isSuperuser ? <a href={paths.admin}>Админка</a> : null}
         </div>

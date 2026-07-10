@@ -299,6 +299,7 @@ impl TimelineAggregator {
         let mut players = self
             .players
             .into_iter()
+            .filter(|(_, player)| valid_team(player.current_team.as_deref()).is_some())
             .map(|(player_id, mut player)| {
                 player.stats.matches_played = i64::from(completed);
                 if completed
@@ -331,6 +332,9 @@ impl TimelineAggregator {
                 }
             })
             .collect::<Vec<_>>();
+        if players.is_empty() {
+            return Err(AggregationError::NoPlayers);
+        }
         players.sort_by_key(|player| player.player_id);
 
         Ok(MatchAggregate {
@@ -701,7 +705,10 @@ fn close_presence(player: &mut PlayerState, end: i64, warnings: &mut Vec<String>
 }
 
 fn valid_team(team: Option<&str>) -> Option<&str> {
-    team.filter(|team| !team.is_empty() && *team != "Spectators")
+    match team {
+        Some("Attack" | "Defense") => team,
+        _ => None,
+    }
 }
 
 fn fallback_nickname(player_id: Uuid) -> String {

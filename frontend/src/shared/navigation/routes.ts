@@ -13,6 +13,7 @@ export function pageTitleForPath(pathname: string) {
   if (pathname === paths.auth) return 'Авторизация | SvoCraft'
   if (pathname === paths.profileEdit) return 'Настройки профиля | SvoCraft'
   if (pathname === paths.profile) return 'Профиль | SvoCraft'
+  if (pathname === paths.leaderboard) return 'Лидерборд | SvoCraft'
   if (pathname === paths.inventory) return 'Инвентарь | SvoCraft'
   if (pathname === paths.shop) return 'Магазин | SvoCraft'
   if (pathname === paths.shopCheckoutReturn) return 'Проверка оплаты | SvoCraft'

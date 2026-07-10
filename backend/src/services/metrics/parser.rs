@@ -104,6 +104,7 @@ mod tests {
     const A: &str = "00000000-0000-0000-0000-000000000002";
     const B: &str = "00000000-0000-0000-0000-000000000003";
     const C: &str = "00000000-0000-0000-0000-000000000004";
+    const D: &str = "00000000-0000-0000-0000-000000000005";
 
     fn parse(body: &str) -> Result<ParsedTimeline, TimelineStreamError> {
         let game_id = Uuid::parse_str(GAME).expect("valid fixture game UUID");
@@ -339,6 +340,39 @@ mod tests {
                 .warnings
                 .iter()
                 .any(|warning| warning.contains("unknown event type"))
+        );
+    }
+
+    #[test]
+    fn excludes_spectators_and_players_without_a_playing_team() {
+        let body = [
+            start(),
+            join(A, "Attack", "Attack", 1),
+            join(B, "Defense", "Defense", 1),
+            join(C, "Spectator", "Spectators", 1),
+            event(
+                "player_joined",
+                1,
+                &format!(r#""playerId":"{D}","nickname":"NoTeam""#),
+            ),
+            end(2),
+        ]
+        .join("\n");
+        let timeline = parse(&body).expect("valid timeline");
+        assert_eq!(timeline.aggregate.players.len(), 2);
+        assert!(
+            timeline
+                .aggregate
+                .players
+                .iter()
+                .any(|player| player.player_id.to_string() == A)
+        );
+        assert!(
+            timeline
+                .aggregate
+                .players
+                .iter()
+                .any(|player| player.player_id.to_string() == B)
         );
     }
 

@@ -9,6 +9,7 @@ import {
 } from '../../shared/session/referral-campaign-cache'
 import '../../pages/ProfilePage.css'
 import ProfileNewPlayerModal from './ProfileNewPlayerModal'
+import ProfileMatchesTab from './ProfileMatchesTab'
 import ProfileOverviewTab from './ProfileOverviewTab'
 import ProfileReferralsTab from './ProfileReferralsTab'
 import ProfileSettingsTab from './ProfileSettingsTab'
@@ -19,6 +20,7 @@ import type { ProfileTab } from './types'
 import { useProfileDashboard } from './useProfileDashboard'
 
 function normalizeRequestedTab(value: string | null): ProfileTab {
+  if (value === 'matches') return 'matches'
   if (value === 'squads') return 'squads'
   if (value === 'referrals') return 'referrals'
   if (value === 'settings') return 'settings'
@@ -92,6 +94,7 @@ export default function ProfilePage({ defaultTab }: { defaultTab?: ProfileTab })
 
   const tabs = [
     ['overview', 'Обзор'],
+    ['matches', 'Матчи'],
     ['squads', 'Сквад'],
     ...(hasReferralCampaigns ? ([['referrals', 'Рефералки']] as const) : []),
     ['settings', 'Настройки'],
@@ -127,6 +130,8 @@ export default function ProfilePage({ defaultTab }: { defaultTab?: ProfileTab })
                   skinVersion={skinVersion}
                 />
               ) : null}
+
+              {activeTab === 'matches' ? <ProfileMatchesTab playerId={data.user.id} /> : null}
 
               {activeTab === 'squads' ? (
                 <ProfileSquadsTab data={data} authToken={authToken} onChanged={reloadSquads} />

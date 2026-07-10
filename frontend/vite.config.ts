@@ -14,13 +14,19 @@ export default defineConfig(({ mode }) => {
   const backendPort = env.BACKEND_PORT || '3001'
   const publicPort = Number.parseInt(env.DEBUG_PORT || env.VITE_DEV_PORT || '5173', 10)
   const apiTarget = env.VITE_API_TARGET || `http://127.0.0.1:${backendPort}`
+  const skinsTarget = env.VITE_API_TARGET || `https://svocraft.xyz`
+
 
   const apiProxy = {
+    '/api/skins': {
+      target: skinsTarget,
+      changeOrigin: true
+    },
     '/api': {
       target: apiTarget,
       changeOrigin: true,
       ws: true,
-    },
+    }
   }
 
   return {
