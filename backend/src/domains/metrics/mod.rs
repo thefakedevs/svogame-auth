@@ -1,4 +1,5 @@
 use axum::Router;
+use axum::extract::DefaultBodyLimit;
 use axum::routing::{get, post};
 
 pub mod handlers;
@@ -31,4 +32,7 @@ pub fn router() -> Router<crate::app::state::SharedAppState> {
             get(handlers::get_player_stats),
         )
         .route("/api/metrics/leaderboard", get(handlers::get_leaderboard))
+        // Keep this above the 11,000,000-byte application limit so the
+        // handler can enforce METRICS_UPLOAD_MAX_BYTES itself.
+        .layer(DefaultBodyLimit::max(12 * 1024 * 1024))
 }
