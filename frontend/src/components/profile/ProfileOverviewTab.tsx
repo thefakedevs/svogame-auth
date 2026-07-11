@@ -1,5 +1,10 @@
+import { useEffect, useState } from 'react'
+import { ApiError, toDisplayError } from '../../api/http'
+import { getPlayerStats, type PlayerStatsResponse } from '../../api/metrics'
 import { buildSkinUrl } from '../../api/skins'
 import SkinPreview2D from '../SkinPreview2D'
+import ProfileMatchSummary from './ProfileMatchSummary'
+import ProfileMatchSummarySkeleton from './ProfileMatchSummarySkeleton'
 import type { ProfileDashboardData, ProfileTab } from './types'
 
 const dateTimeFormatter = new Intl.DateTimeFormat('ru-RU', {
@@ -33,6 +38,31 @@ export default function ProfileOverviewTab({
   setActiveTab: (tab: ProfileTab) => void
   skinVersion: number
 }) {
+  const [matchStats, setMatchStats] = useState<
+    | { status: 'loading' }
+    | { status: 'ready'; stats: PlayerStatsResponse }
+    | { status: 'empty' }
+    | { status: 'error'; message: string }
+  >({ status: 'loading' })
+
+  useEffect(() => {
+    let cancelled = false
+    setMatchStats({ status: 'loading' })
+    getPlayerStats(data.user.id)
+      .then((stats) => {
+        if (!cancelled) setMatchStats({ status: 'ready', stats })
+      })
+      .catch((error) => {
+        if (cancelled) return
+        if (error instanceof ApiError && error.status === 404) {
+          setMatchStats({ status: 'empty' })
+          return
+        }
+        setMatchStats({ status: 'error', message: toDisplayError(error, 'Не удалось обновить игровую статистику.') })
+      })
+    return () => { cancelled = true }
+  }, [data.user.id])
+
   return (
     <div className="profile-layout">
       <aside className="card profile-identity">
@@ -92,28 +122,18 @@ export default function ProfileOverviewTab({
       <div className="profile-main">
         <section className="card profile-panel">
           <div className="ui-card-header">
-            <h2 className="card-title">Состояние аккаунта</h2>
+            <div>
+              <h2 className="card-title">Игровая статистика</h2>
+              <p className="profile-subtle">Ваши результаты за всё время.</p>
+            </div>
+            <button className="btn btn-sm" type="button" onClick={() => setActiveTab('matches')}>
+              Все матчи
+            </button>
           </div>
-          <div className="profile-stack">
-            <div className="profile-inline-card">
-              <strong>Статус профиля</strong>
-              <span className="profile-subtle">
-                {data.user.isActive
-                  ? 'Аккаунт активен и готов к использованию'
-                  : 'Аккаунт временно недоступен'}
-              </span>
-            </div>
-            <div className="profile-inline-card">
-              <strong>Никнейм</strong>
-              <span className="profile-subtle">{data.user.username}</span>
-            </div>
-            <div className="profile-inline-card">
-              <strong>Скин</strong>
-              <span className="profile-subtle">
-                {skinFailed ? 'Скин не загружен' : 'Скин загружен и отображается'}
-              </span>
-            </div>
-          </div>
+          {matchStats.status === 'loading' ? <ProfileMatchSummarySkeleton /> : null}
+          {matchStats.status === 'ready' ? <ProfileMatchSummary stats={matchStats.stats} /> : null}
+          {matchStats.status === 'empty' ? <div className="profile-empty profile-overview-match-empty"><p>Сыграйте первый матч — здесь появятся ваши результаты.</p></div> : null}
+          {matchStats.status === 'error' ? <div className="profile-empty profile-overview-match-empty"><p>{matchStats.message}</p></div> : null}
         </section>
 
         <section className="card profile-panel">

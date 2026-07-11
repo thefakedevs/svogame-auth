@@ -29,6 +29,7 @@ pub async fn run() -> Result<()> {
     spawn_receipt_worker(state.clone());
     spawn_email_delivery_worker(state.clone());
     spawn_discord_delivery_worker(state.clone());
+    spawn_metrics_discord_delivery_worker(state.clone());
     spawn_littlemice_expiry_worker(state.clone());
     spawn_littlemice_cleanup_worker(state.clone());
 
@@ -217,6 +218,32 @@ fn spawn_discord_delivery_worker(state: SharedAppState) {
                     .await
             {
                 warn!("Discord delivery worker failed: {error}");
+            }
+        }
+    });
+}
+
+fn spawn_metrics_discord_delivery_worker(state: SharedAppState) {
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(std::time::Duration::from_secs(1));
+        loop {
+            interval.tick().await;
+            let (db, discord_config, metrics_config) = {
+                let state_guard = state.read().await;
+                (
+                    state_guard.db.clone(),
+                    state_guard.config.discord.clone(),
+                    state_guard.config.metrics.clone(),
+                )
+            };
+            if let Err(error) = crate::services::metrics::discord::process_next_delivery(
+                &db,
+                &discord_config,
+                &metrics_config,
+            )
+            .await
+            {
+                warn!("Metrics Discord delivery worker failed: {error}");
             }
         }
     });

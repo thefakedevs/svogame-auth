@@ -2,8 +2,9 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use auth::app::config::{
-    AppConfig, DatabaseConfig, DiscordConfig, EmailConfig, EmailProviderKind, ReceiptProviderKind,
-    ReceiptsConfig, S3Config, ShopConfig, ShopPaymentProviderKind, YooKassaConfig,
+    AppConfig, DatabaseConfig, DiscordConfig, EmailConfig, EmailProviderKind, MetricsConfig,
+    ReceiptProviderKind, ReceiptsConfig, S3Config, ShopConfig, ShopPaymentProviderKind,
+    YooKassaConfig,
 };
 use auth::app::router::build_router;
 use auth::app::state::{AppState, SharedAppState};
@@ -95,6 +96,7 @@ impl TestApp {
         let config = AppConfig {
             binding_address: "127.0.0.1:0".to_string(),
             discord: DiscordConfig {
+                api_base_url: "https://discord.test/api/v10".to_string(),
                 oauth2_url: "https://discord.test/oauth".to_string(),
                 redirect_url: "http://localhost:5173/auth/callback".to_string(),
                 client_id: "test-client".to_string(),
@@ -120,6 +122,15 @@ impl TestApp {
                 access_key_id: "test".to_string(),
                 secret_access_key: "test".to_string(),
                 force_path_style: true,
+            },
+            metrics: MetricsConfig {
+                ingest_secret: Some("test-metrics-secret".to_string()),
+                upload_max_bytes: 16 * 1024 * 1024,
+                upload_timeout_seconds: 30,
+                discord_channel_id: None,
+                discord_retry_interval_seconds: 1,
+                discord_max_attempts: 3,
+                public_base_url: address.clone(),
             },
             littlemice: auth::app::config::LittlemiceConfig {
                 public_base_url: address.clone(),
@@ -239,11 +250,7 @@ impl TestApp {
         .await
     }
 
-    pub async fn create_service_token(
-        &self,
-        admin: &IssuedUser,
-        system_name: &str,
-    ) -> String {
+    pub async fn create_service_token(&self, admin: &IssuedUser, system_name: &str) -> String {
         let response = self
             .post_json(
                 "/api/admin/service-tokens",

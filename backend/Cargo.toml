@@ -28,6 +28,7 @@ sha2 = "0.10"
 reqwest = { version = "0.12", features = ["json"] }
 jwt = "0.16"
 hmac = "0.12"
+http-body-util = "0.1"
 uuid = { version = "1.19", features = ["v4"] }
 dotenvy = "0.15"
 regex = "1.12.2"

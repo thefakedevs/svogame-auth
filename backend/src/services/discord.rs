@@ -5,8 +5,7 @@ use reqwest::{
     header::{AUTHORIZATION, CONTENT_TYPE},
 };
 use serde::{Deserialize, Serialize};
-
-const API_ENDPOINT: &str = "https://discord.com/api/v10";
+use serde_json::Value;
 
 #[derive(Deserialize, Debug)]
 pub struct DiscordTokenResponse {
@@ -60,7 +59,11 @@ struct SendMessageRequest<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     content: Option<&'a str>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    embeds: Vec<DiscordEmbed<'a>>,
+    embeds: Vec<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    nonce: Option<&'a str>,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    enforce_nonce: bool,
 }
 
 #[derive(Serialize)]
@@ -120,7 +123,7 @@ pub async fn exchange_code(config: &DiscordConfig, code: &str) -> Result<Discord
     ];
 
     let res = client
-        .post(&format!("{}/oauth2/token", API_ENDPOINT))
+        .post(format!("{}/oauth2/token", config.api_base_url))
         .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
         .basic_auth(&config.client_id, Some(&config.client_secret))
         .form(&params)
@@ -139,7 +142,7 @@ pub async fn get_user_info(
     let client = build_client(config)?;
 
     let res = client
-        .get(&format!("{}/users/@me", API_ENDPOINT))
+        .get(format!("{}/users/@me", config.api_base_url))
         .bearer_auth(access_token)
         .send()
         .await?
@@ -154,9 +157,10 @@ pub async fn create_direct_message_channel(
     bot_token: &str,
     recipient_id: &str,
 ) -> std::result::Result<String, DiscordApiError> {
-    let client = build_client(config).map_err(|error| DiscordApiError::Transport(error.to_string()))?;
+    let client =
+        build_client(config).map_err(|error| DiscordApiError::Transport(error.to_string()))?;
     let response = client
-        .post(format!("{}/users/@me/channels", API_ENDPOINT))
+        .post(format!("{}/users/@me/channels", config.api_base_url))
         .header(AUTHORIZATION, format!("Bot {bot_token}"))
         .json(&CreateDmChannelRequest { recipient_id })
         .send()
@@ -176,13 +180,19 @@ pub async fn send_channel_message(
     channel_id: &str,
     content: &str,
 ) -> std::result::Result<DiscordBotMessageResult, DiscordApiError> {
-    let client = build_client(config).map_err(|error| DiscordApiError::Transport(error.to_string()))?;
+    let client =
+        build_client(config).map_err(|error| DiscordApiError::Transport(error.to_string()))?;
     let response = client
-        .post(format!("{}/channels/{channel_id}/messages", API_ENDPOINT))
+        .post(format!(
+            "{}/channels/{channel_id}/messages",
+            config.api_base_url
+        ))
         .header(AUTHORIZATION, format!("Bot {bot_token}"))
         .json(&SendMessageRequest {
             content: Some(content),
             embeds: Vec::new(),
+            nonce: None,
+            enforce_nonce: false,
         })
         .send()
         .await
@@ -204,14 +214,61 @@ pub async fn send_channel_embed(
     channel_id: &str,
     embed: DiscordEmbed<'_>,
 ) -> std::result::Result<DiscordBotMessageResult, DiscordApiError> {
+    send_channel_embed_with_nonce(config, bot_token, channel_id, embed, None).await
+}
+
+pub async fn send_channel_embed_idempotent(
+    config: &DiscordConfig,
+    bot_token: &str,
+    channel_id: &str,
+    embed: DiscordEmbed<'_>,
+    nonce: &str,
+) -> std::result::Result<DiscordBotMessageResult, DiscordApiError> {
+    send_channel_embed_with_nonce(config, bot_token, channel_id, embed, Some(nonce)).await
+}
+
+pub async fn send_channel_embeds_idempotent(
+    config: &DiscordConfig,
+    bot_token: &str,
+    channel_id: &str,
+    embeds: Vec<Value>,
+    nonce: &str,
+) -> std::result::Result<DiscordBotMessageResult, DiscordApiError> {
+    send_channel_embeds_with_nonce(config, bot_token, channel_id, embeds, Some(nonce)).await
+}
+
+async fn send_channel_embed_with_nonce(
+    config: &DiscordConfig,
+    bot_token: &str,
+    channel_id: &str,
+    embed: DiscordEmbed<'_>,
+    nonce: Option<&str>,
+) -> std::result::Result<DiscordBotMessageResult, DiscordApiError> {
+    let embed = serde_json::to_value(embed)
+        .map_err(|error| DiscordApiError::Transport(error.to_string()))?;
+    send_channel_embeds_with_nonce(config, bot_token, channel_id, vec![embed], nonce).await
+}
+
+async fn send_channel_embeds_with_nonce(
+    config: &DiscordConfig,
+    bot_token: &str,
+    channel_id: &str,
+    embeds: Vec<Value>,
+    nonce: Option<&str>,
+) -> std::result::Result<DiscordBotMessageResult, DiscordApiError> {
     let client =
         build_client(config).map_err(|error| DiscordApiError::Transport(error.to_string()))?;
     let response = client
-        .post(format!("{}/channels/{channel_id}/messages", API_ENDPOINT))
+        .post(format!(
+            "{}/channels/{channel_id}/messages",
+            config.api_base_url
+        ))
         .header(AUTHORIZATION, format!("Bot {bot_token}"))
         .json(&SendMessageRequest {
             content: None,
-            embeds: vec![embed],
+            embeds,
+            nonce,
+            enforce_nonce: nonce.is_some(),
         })
         .send()
         .await
@@ -237,7 +294,7 @@ pub async fn fetch_guild_scheduled_events(
     let response = client
         .get(format!(
             "{}/guilds/{}/scheduled-events?with_user_count=true",
-            API_ENDPOINT, guild_id
+            config.api_base_url, guild_id
         ))
         .header(AUTHORIZATION, format!("Bot {bot_token}"))
         .send()
@@ -251,7 +308,8 @@ pub async fn fetch_guild_scheduled_events(
 }
 
 fn build_client(config: &DiscordConfig) -> Result<Client> {
-    let client = Client::builder().timeout(std::time::Duration::from_millis(config.http_timeout_ms));
+    let client =
+        Client::builder().timeout(std::time::Duration::from_millis(config.http_timeout_ms));
     let client = if let Some(p) = config.discord_proxy.clone() {
         client.proxy(p)
     } else {

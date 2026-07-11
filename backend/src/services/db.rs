@@ -1,12 +1,13 @@
 use crate::app::config::DatabaseConfig;
+use crate::services::metrics_migration::CreateMetricsTables;
 use crate::services::migration::{
     AddAssetDefinitionGunskinColumns, AddAuthRayRegistrationColumns,
-    AddLittlemiceCheckScreenshot2Columns, AddLootboxRewardCompensationColumns, AddShopOrderPaymentLifecycleColumns,
-    AddShopPaymentAttemptProviderIndex, AddUserDeactivationReasonColumn, AddUserSquadIdColumn,
-    AddUserSuperuserColumn, CreateAppKvTable, CreateAssetDefinitionTable, CreateAuditLogTable,
-    CreateAuthRayTable, CreateDefaultSkinTable, CreateDiscordBroadcastTable,
-    CreateDiscordDeliveryTable, CreateEmailDeliveryTable, CreateInventoryOperationTable,
-    CreateLittlemiceCheckTable,
+    AddLittlemiceCheckScreenshot2Columns, AddLootboxRewardCompensationColumns,
+    AddShopOrderPaymentLifecycleColumns, AddShopPaymentAttemptProviderIndex,
+    AddUserDeactivationReasonColumn, AddUserSquadIdColumn, AddUserSuperuserColumn,
+    CreateAppKvTable, CreateAssetDefinitionTable, CreateAuditLogTable, CreateAuthRayTable,
+    CreateDefaultSkinTable, CreateDiscordBroadcastTable, CreateDiscordDeliveryTable,
+    CreateEmailDeliveryTable, CreateInventoryOperationTable, CreateLittlemiceCheckTable,
     CreateLootboxDefinitionTable, CreateLootboxDropDefinitionTable,
     CreateLootboxOpenOperationTable, CreateReferralTables, CreateServiceTokenAuditTable,
     CreateServiceTokenTable, CreateShopOrderTable, CreateShopPaymentAttemptTable,
@@ -76,5 +77,6 @@ pub async fn run_migrations(db: &DatabaseConnection) -> Result<()> {
     AddAssetDefinitionGunskinColumns.up(&schema_manager).await?;
     CreateUserSelectedGunskinTable.up(&schema_manager).await?;
     CreateReferralTables.up(&schema_manager).await?;
+    CreateMetricsTables.up(&schema_manager).await?;
     Ok(())
 }
