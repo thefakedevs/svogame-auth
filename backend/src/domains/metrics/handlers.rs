@@ -14,11 +14,11 @@ use uuid::Uuid;
 
 use crate::app::http::HttpError;
 use crate::app::state::AppStateExtractor;
-use crate::entities::{MetricMatchModel, MetricMatchPlayerModel, MetricPlayerMatchStatModel};
+use crate::entities::{MetricMatchPlayerModel, MetricPlayerMatchStatModel};
 use crate::services::metrics::aggregation::PlayerStats;
 use crate::services::metrics::persistence::{PersistenceError, merge_stats, persist_timeline};
 use crate::services::metrics::read::{
-    LeaderboardMetric, MatchBundle, PlayerSummary, TimeRange, get_match as load_match,
+    LeaderboardMetric, MatchBundle, PlayerMatch, PlayerSummary, TimeRange, get_match as load_match,
     get_player_matches as load_player_matches, get_player_profile, get_player_summary, leaderboard,
 };
 use crate::services::metrics::{ParsedTimeline, TimelineStream, TimelineStreamError};
@@ -133,6 +133,7 @@ pub struct MatchListItemResponse {
     pub ended_at: Option<DateTime<Utc>>,
     pub duration_ms: Option<i64>,
     pub winning_team: Option<String>,
+    pub team_won: Option<bool>,
     pub status: String,
 }
 
@@ -813,7 +814,19 @@ fn player_stats_response(
     }
 }
 
-fn match_list_item(model: MetricMatchModel) -> MatchListItemResponse {
+fn match_list_item(player_match: PlayerMatch) -> MatchListItemResponse {
+    let model = player_match.match_model;
+    let team_won = if model.status == "completed" {
+        match (
+            model.winning_team.as_deref(),
+            player_match.final_team.as_deref(),
+        ) {
+            (Some(winning_team), Some(player_team)) => Some(winning_team == player_team),
+            _ => None,
+        }
+    } else {
+        None
+    };
     MatchListItemResponse {
         game_id: model.game_id,
         map: model.map,
@@ -821,6 +834,7 @@ fn match_list_item(model: MetricMatchModel) -> MatchListItemResponse {
         ended_at: model.ended_at,
         duration_ms: model.duration_ms,
         winning_team: model.winning_team,
+        team_won,
         status: model.status,
     }
 }

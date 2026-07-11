@@ -250,11 +250,7 @@ impl TestApp {
         .await
     }
 
-    pub async fn create_service_token(
-        &self,
-        admin: &IssuedUser,
-        system_name: &str,
-    ) -> String {
+    pub async fn create_service_token(&self, admin: &IssuedUser, system_name: &str) -> String {
         let response = self
             .post_json(
                 "/api/admin/service-tokens",

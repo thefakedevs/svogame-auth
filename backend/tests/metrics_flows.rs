@@ -124,6 +124,8 @@ async fn metrics_pipeline_is_authenticated_transactional_idempotent_and_queryabl
     assert_eq!(matches.status(), StatusCode::OK);
     let matches_body: Value = matches.json().await.expect("matches JSON");
     assert_eq!(matches_body["pagination"]["total"], 1);
+    assert_eq!(matches_body["matches"][0]["winningTeam"], "Attack");
+    assert_eq!(matches_body["matches"][0]["teamWon"], true);
 
     let leaderboard_page_1 = app
         .get_without_auth("/api/metrics/leaderboard?metric=kills&limit=1&offset=0")

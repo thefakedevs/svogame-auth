@@ -95,6 +95,7 @@ export interface MatchListItem {
   endedAt: string | null
   durationMs: number | null
   winningTeam: string | null
+  teamWon?: boolean | null
   status: string
 }
 

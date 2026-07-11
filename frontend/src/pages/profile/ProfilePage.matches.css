@@ -14,34 +14,50 @@
 
 .profile-match-summary {
   display: grid;
-  grid-template-columns: repeat(8, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  padding: 1px;
   border: 1px solid var(--ui-border);
-  background: var(--ui-card);
+  background: var(--ui-border);
 }
 
 .profile-match-summary > div {
   display: grid;
-  gap: 0.25rem;
+  align-content: center;
+  gap: 0.4rem;
   min-width: 0;
-  padding: 1rem;
-  border-right: 1px solid var(--ui-border);
-}
-
-.profile-match-summary > div:last-child {
-  border-right: 0;
+  min-height: 108px;
+  padding: 1rem 1.2rem;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent 72%),
+    var(--ui-card);
 }
 
 .profile-match-summary span {
   color: var(--ui-text-muted);
-  font-size: 0.68rem;
+  font-size: 0.7rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
 .profile-match-summary strong {
   color: var(--ui-text);
-  font-size: 1.2rem;
+  font-size: 1.65rem;
+  line-height: 1;
   font-variant-numeric: tabular-nums;
+}
+
+.profile-match-summary--loading > div {
+  gap: 0.65rem;
+}
+
+.profile-match-summary--loading .profile-shimmer {
+  display: block;
+}
+
+.profile-overview-match-empty {
+  min-height: 112px;
+  padding: 1rem;
 }
 
 .profile-match-history {
@@ -105,9 +121,14 @@
   text-transform: uppercase;
 }
 
-.profile-match-result.is-complete {
+.profile-match-result.is-won {
   border-color: rgba(47, 196, 125, 0.3);
   color: #70dca9;
+}
+
+.profile-match-result.is-lost {
+  border-color: rgba(237, 82, 82, 0.36);
+  color: #ff9696;
 }
 
 .profile-match-open {
@@ -314,37 +335,9 @@
   font: 0.7rem ui-monospace, monospace;
 }
 
-@media (max-width: 1000px) {
-  .profile-match-summary,
-  .profile-match-modal .profile-match-summary {
-    grid-template-columns: repeat(4, 1fr);
-  }
-
-  .profile-match-summary > div:nth-child(4) {
-    border-right: 0;
-  }
-
-  .profile-match-summary > div:nth-child(-n + 4) {
-    border-bottom: 1px solid var(--ui-border);
-  }
-}
-
 @media (max-width: 720px) {
-  .profile-match-summary,
-  .profile-match-modal .profile-match-summary {
+  .profile-match-summary {
     grid-template-columns: repeat(2, 1fr);
-  }
-
-  .profile-match-summary > div {
-    border-bottom: 1px solid var(--ui-border);
-  }
-
-  .profile-match-summary > div:nth-child(even) {
-    border-right: 0;
-  }
-
-  .profile-match-summary > div:nth-last-child(-n + 2) {
-    border-bottom: 0;
   }
 
   .profile-match-row {

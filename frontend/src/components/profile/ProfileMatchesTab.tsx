@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getMatch, getPlayerMatches, getPlayerStats, type MatchResponse, type PlayerMatchesResponse, type PlayerStatsResponse } from '../../api/metrics'
+import { getMatch, getPlayerMatches, type MatchResponse, type PlayerMatchesResponse } from '../../api/metrics'
 import { ApiError, toDisplayError } from '../../api/http'
 import PlayerHead from '../metrics/PlayerHead'
 import AppPortal from '../../shared/ui/portal/AppPortal'
@@ -29,15 +29,6 @@ function MatchLoader({ small = false }: { small?: boolean }) {
   )
 }
 
-function Summary({ stats }: { stats: PlayerStatsResponse }) {
-  const values = [
-    ['Матчи', stats.matchesPlayed], ['Победы', `${stats.winRate}%`], ['Убийства', stats.kills],
-    ['Смерти', stats.deaths], ['Помощь', stats.assists], ['K/D', stats.kd],
-    ['Урон', numberFormatter.format(stats.damageDealt)], ['Хедшоты', stats.headshots],
-  ]
-  return <div className="profile-match-summary">{values.map(([label, value]) => <div key={label}><span>{label}</span><strong>{value}</strong></div>)}</div>
-}
-
 function teamName(player: MatchResponse['players'][number]) {
   return player.finalTeam ?? player.initialTeam ?? 'Без команды'
 }
@@ -63,6 +54,12 @@ function teamOrder(name: string) {
 
 function isWinningTeam(team: string, winningTeam: string | null) {
   return team.toLowerCase() === winningTeam?.toLowerCase()
+}
+
+function matchOutcome(teamWon: boolean | null | undefined) {
+  if (teamWon === true) return { label: 'Победа', className: 'is-won' }
+  if (teamWon === false) return { label: 'Поражение', className: 'is-lost' }
+  return { label: 'Неизвестно', className: 'is-unknown' }
 }
 
 function TeamPlayers({
@@ -141,7 +138,7 @@ function MatchDetails({ match, playerId, onClose }: { match: MatchResponse; play
 
 export default function ProfileMatchesTab({ playerId }: { playerId: string }) {
   const [offset, setOffset] = useState(0)
-  const [data, setData] = useState<{ stats: PlayerStatsResponse; matches: PlayerMatchesResponse } | null>(null)
+  const [data, setData] = useState<PlayerMatchesResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [details, setDetails] = useState<MatchResponse | null>(null)
@@ -150,8 +147,8 @@ export default function ProfileMatchesTab({ playerId }: { playerId: string }) {
   useEffect(() => {
     let cancelled = false
     setLoading(true)
-    Promise.all([getPlayerStats(playerId), getPlayerMatches(playerId, { limit: 10, offset })])
-      .then(([stats, matches]) => { if (!cancelled) { setData({ stats, matches }); setError(null) } })
+    getPlayerMatches(playerId, { limit: 10, offset })
+      .then((matches) => { if (!cancelled) { setData(matches); setError(null) } })
       .catch((reason) => {
         if (cancelled) return
         if (reason instanceof ApiError && reason.status === 404) {
@@ -175,21 +172,25 @@ export default function ProfileMatchesTab({ playerId }: { playerId: string }) {
   if (loading && !data) return <ProfileSkeleton activeTab="matches" />
   if (error && !data) return <div className="ui-alert ui-alert-error">{error}</div>
 
-  const total = data?.matches.pagination.total ?? 0
+  const total = data?.pagination.total ?? 0
   return (
     <div className="profile-matches-tab">
       {error ? <div className="ui-alert ui-alert-error">{error}</div> : null}
-      {data ? <Summary stats={data.stats} /> : null}
       <section className="card profile-panel profile-match-history">
         <div className="ui-card-header"><div><h2 className="card-title">Ваши матчи</h2><p className="profile-subtle">Здесь собраны результаты всех сыгранных матчей.</p></div></div>
-        {data?.matches.matches.length ? <div className="profile-match-list">{data.matches.matches.map((match) => (
-          <button className="profile-match-row" type="button" key={match.gameId} onClick={() => void openMatch(match.gameId)}>
-            <span className={`profile-match-result ${match.winningTeam ? 'is-complete' : ''}`}>{match.winningTeam ? 'Завершён' : 'Без результата'}</span>
-            <span><strong>{match.map}</strong><small>{dateFormatter.format(new Date(match.startedAt))}</small></span>
-            <span><small>Длительность</small><strong>{formatDuration(match.durationMs)}</strong></span>
-            <span><small>Победитель</small><strong>{match.winningTeam ? teamLabel(match.winningTeam) : '—'}</strong></span>
-            <span className="profile-match-open">{detailsLoading === match.gameId ? <><MatchLoader small /> Загрузка…</> : 'Подробнее →'}</span>
-          </button>
+        {data?.matches.length ? <div className="profile-match-list">{data.matches.map((match) => (
+          (() => {
+            const outcome = matchOutcome(match.teamWon)
+            return (
+              <button className="profile-match-row" type="button" key={match.gameId} onClick={() => void openMatch(match.gameId)}>
+                <span className={`profile-match-result ${outcome.className}`}>{outcome.label}</span>
+                <span><strong>{match.map}</strong><small>{dateFormatter.format(new Date(match.startedAt))}</small></span>
+                <span><small>Длительность</small><strong>{formatDuration(match.durationMs)}</strong></span>
+                <span><small>Победитель</small><strong>{match.winningTeam ? teamLabel(match.winningTeam) : '—'}</strong></span>
+                <span className="profile-match-open">{detailsLoading === match.gameId ? <><MatchLoader small /> Загрузка…</> : 'Подробнее →'}</span>
+              </button>
+            )
+          })()
         ))}</div> : <div className="profile-empty"><p>Пока здесь пусто. Сыграйте первый матч — после него здесь появится ваша статистика.</p></div>}
         {total > 10 ? <div className="profile-match-pagination">
           <button className="btn btn-sm" type="button" disabled={offset === 0 || loading} onClick={() => setOffset(Math.max(0, offset - 10))}>Назад</button>

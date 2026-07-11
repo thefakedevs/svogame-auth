@@ -27,6 +27,12 @@ pub struct MatchBundle {
 }
 
 #[derive(Clone, Debug)]
+pub struct PlayerMatch {
+    pub match_model: MetricMatchModel,
+    pub final_team: Option<String>,
+}
+
+#[derive(Clone, Debug)]
 pub struct PlayerProfileBundle {
     pub player: MetricPlayerModel,
     pub nicknames: Vec<MetricPlayerNicknameModel>,
@@ -184,23 +190,32 @@ pub async fn get_player_matches(
     db: &DatabaseConnection,
     player_id: Uuid,
     range: &TimeRange,
-) -> Result<Vec<MetricMatchModel>, DbErr> {
-    let game_ids = MetricMatchPlayer::find()
+) -> Result<Vec<PlayerMatch>, DbErr> {
+    let participation = MetricMatchPlayer::find()
         .filter(MetricMatchPlayerColumn::PlayerId.eq(player_id))
         .all(db)
-        .await?
-        .into_iter()
-        .map(|model| model.game_id)
-        .collect::<Vec<_>>();
+        .await?;
+    let teams_by_game = participation
+        .iter()
+        .map(|model| (model.game_id, model.final_team.clone()))
+        .collect::<HashMap<_, _>>();
+    let game_ids = teams_by_game.keys().copied().collect::<Vec<_>>();
     if game_ids.is_empty() {
         return Ok(Vec::new());
     }
     let mut query = MetricMatch::find().filter(MetricMatchColumn::GameId.is_in(game_ids));
     query = apply_range(query, range);
-    query
+    let matches = query
         .order_by_desc(MetricMatchColumn::StartedAt)
         .all(db)
-        .await
+        .await?;
+    Ok(matches
+        .into_iter()
+        .map(|match_model| PlayerMatch {
+            final_team: teams_by_game.get(&match_model.game_id).cloned().flatten(),
+            match_model,
+        })
+        .collect())
 }
 
 pub async fn get_player_summary(

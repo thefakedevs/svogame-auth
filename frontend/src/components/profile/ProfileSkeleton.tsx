@@ -1,4 +1,5 @@
 import type { ProfileTab } from './types'
+import ProfileMatchSummarySkeleton from './ProfileMatchSummarySkeleton'
 
 function OverviewSkeleton() {
   return (
@@ -21,14 +22,13 @@ function OverviewSkeleton() {
         </div>
       </div>
       <div className="profile-skeleton-main">
-        <div className="card profile-skeleton-panel">
+        <div className="card profile-skeleton-panel profile-skeleton-game-stats">
           <div className="profile-skeleton-panel-head">
             <div className="profile-shimmer profile-shimmer-section" />
             <div className="profile-shimmer profile-shimmer-button profile-shimmer-button--sm" />
           </div>
-          <div className="profile-shimmer profile-shimmer-item" />
-          <div className="profile-shimmer profile-shimmer-item" />
-          <div className="profile-shimmer profile-shimmer-item" />
+          <div className="profile-shimmer profile-shimmer-summary-line profile-shimmer-summary-line--short" />
+          <ProfileMatchSummarySkeleton />
         </div>
         <div className="card profile-skeleton-panel profile-skeleton-panel--summary">
           <div className="profile-skeleton-panel-head">
@@ -123,14 +123,6 @@ function SettingsSkeleton() {
 function MatchesSkeleton() {
   return (
     <div className="profile-skeleton-matches">
-      <div className="profile-skeleton-match-summary">
-        {Array.from({ length: 8 }, (_, index) => (
-          <div key={index} className="profile-skeleton-match-stat">
-            <div className="profile-shimmer profile-shimmer-stat-label" />
-            <div className="profile-shimmer profile-shimmer-stat-value" />
-          </div>
-        ))}
-      </div>
       <div className="card profile-skeleton-panel profile-skeleton-match-history">
         <div className="profile-skeleton-panel-head">
           <div>
