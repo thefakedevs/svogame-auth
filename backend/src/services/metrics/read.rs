@@ -54,6 +54,7 @@ pub struct LeaderboardRow {
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum LeaderboardMetric {
+    MatchesPlayed,
     Kills,
     Deaths,
     Assists,
@@ -70,6 +71,7 @@ pub enum LeaderboardMetric {
 impl LeaderboardMetric {
     pub fn parse(value: &str) -> Option<Self> {
         match value {
+            "matches_played" => Some(Self::MatchesPlayed),
             "kills" => Some(Self::Kills),
             "deaths" => Some(Self::Deaths),
             "assists" => Some(Self::Assists),
@@ -87,6 +89,7 @@ impl LeaderboardMetric {
 
     pub fn as_str(self) -> &'static str {
         match self {
+            Self::MatchesPlayed => "matches_played",
             Self::Kills => "kills",
             Self::Deaths => "deaths",
             Self::Assists => "assists",
@@ -104,6 +107,7 @@ impl LeaderboardMetric {
     fn value(self, summary: &PlayerSummary) -> f64 {
         let stats = &summary.stats;
         match self {
+            Self::MatchesPlayed => stats.matches_played as f64,
             Self::Kills => stats.kills as f64,
             Self::Deaths => stats.deaths as f64,
             Self::Assists => stats.assists as f64,

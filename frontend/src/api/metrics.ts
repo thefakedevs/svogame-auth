@@ -2,6 +2,7 @@ import { request } from './http'
 
 export type MetricsPeriod = 'day' | 'week' | 'month' | 'all'
 export type LeaderboardMetric =
+  | 'matches_played'
   | 'kills'
   | 'deaths'
   | 'assists'

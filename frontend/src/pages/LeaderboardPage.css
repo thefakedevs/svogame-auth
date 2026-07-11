@@ -28,7 +28,8 @@
   text-align: left;
 }
 
-.leaderboard-card {
+.ui-kit-page .leaderboard-card {
+  min-width: 0;
   padding: 0;
   overflow: hidden;
 }
@@ -81,6 +82,7 @@
 
 .leaderboard-table-wrap {
   position: relative;
+  min-width: 0;
   min-height: 220px;
   overflow-x: hidden;
 }
@@ -131,6 +133,11 @@
 
 .leaderboard-table th.is-selected-metric {
   color: var(--ui-primary);
+}
+
+.leaderboard-table td.is-selected-metric {
+  color: var(--ui-primary) !important;
+  font-weight: 800;
 }
 
 .leaderboard-table tbody tr:hover {
@@ -212,6 +219,44 @@
   font-size: 0.8rem;
 }
 
+@media (max-width: 1080px) {
+  .leaderboard-table-wrap {
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+  }
+
+  .leaderboard-table {
+    min-width: 940px;
+  }
+
+  .leaderboard-table th:nth-child(1) {
+    width: 64px;
+  }
+
+  .leaderboard-table th:nth-child(2) {
+    width: 230px;
+  }
+
+  .leaderboard-table th:nth-child(6) {
+    width: 90px;
+  }
+
+  .leaderboard-table th,
+  .leaderboard-table td {
+    padding: 0.8rem 0.75rem;
+  }
+
+  .leaderboard-player {
+    gap: 0.55rem;
+  }
+
+  .leaderboard-player .player-head {
+    width: 34px;
+    height: 34px;
+    flex-basis: 34px;
+  }
+}
+
 @media (max-width: 720px) {
   .leaderboard-header {
     align-items: flex-start;
@@ -221,6 +266,7 @@
   .leaderboard-controls {
     align-items: stretch;
     flex-direction: column;
+    padding: 1rem;
   }
 
   .leaderboard-controls .ui-field {
@@ -231,11 +277,4 @@
     flex: 1;
   }
 
-  .leaderboard-table-wrap {
-    overflow-x: auto;
-  }
-
-  .leaderboard-table {
-    min-width: 700px;
-  }
 }

@@ -16,8 +16,8 @@ export default function PlayerHead({ playerId, nickname, className = '' }: {
   const src = buildSkinUrl(playerId)
   return (
     <span className={`player-head ${className}`} role="img" aria-label={`Голова игрока ${nickname}`}>
-      <img className="player-head__layer player-head__layer--base" src={src} alt="" onError={() => setFailed(true)} />
-      <img className="player-head__layer player-head__layer--hat" src={src} alt="" />
+      <img className="player-head__layer player-head__layer--base" src={src} alt="" draggable={false} onError={() => setFailed(true)} />
+      <img className="player-head__layer player-head__layer--hat" src={src} alt="" draggable={false} />
     </span>
   )
 }

@@ -93,6 +93,8 @@ curl --location 'http://127.0.0.1:3001/api/metrics/timeline/6ad2866c-208b-4a90-9
 - `GET /api/metrics/players/{player_id}/stats`
 - `GET /api/metrics/leaderboard`
 
+Доступные leaderboard metrics: `matches_played`, `kills`, `deaths`, `assists`, `vehicle_destructions`, `kd`, `kda`, `damage_dealt`, `damage_per_minute`, `win_rate`, `headshots`, `time_in_game`.
+
 
 Player match/stats и leaderboard принимают RFC3339 `from`/`to`. Удобные rolling periods: `day` = последние 24 часа, `week` = 7 дней, `month` = 30 дней, `all`. Explicit range нельзя комбинировать с period, кроме `all`; обе границы включительны. Период всегда определяется по времени начала матча.
 
