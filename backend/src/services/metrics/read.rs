@@ -8,7 +8,7 @@ use crate::entities::{
     MetricMatch, MetricMatchColumn, MetricMatchModel, MetricMatchPlayer, MetricMatchPlayerColumn,
     MetricMatchPlayerModel, MetricPlayer, MetricPlayerColumn, MetricPlayerMatchStat,
     MetricPlayerMatchStatColumn, MetricPlayerMatchStatModel, MetricPlayerModel,
-    MetricPlayerNickname, MetricPlayerNicknameColumn, MetricPlayerNicknameModel,
+    MetricPlayerNickname, MetricPlayerNicknameColumn, MetricPlayerNicknameModel, User, UserColumn,
 };
 
 use super::aggregation::PlayerStats;
@@ -294,13 +294,21 @@ pub async fn leaderboard(
         .into_iter()
         .map(|player| (player.player_id, player.last_nickname))
         .collect::<HashMap<_, _>>();
+    let backend_nicknames = User::find()
+        .filter(UserColumn::Id.is_in(player_ids.iter().copied()))
+        .all(db)
+        .await?
+        .into_iter()
+        .map(|user| (user.id, user.username))
+        .collect::<HashMap<_, _>>();
     let mut rows = summaries
         .into_iter()
         .map(|(player_id, summary)| LeaderboardRow {
             player_id,
-            nickname: nicknames
+            nickname: backend_nicknames
                 .get(&player_id)
                 .cloned()
+                .or_else(|| nicknames.get(&player_id).cloned())
                 .unwrap_or_else(|| player_id.to_string()),
             metric_value: metric.value(&summary),
             summary,

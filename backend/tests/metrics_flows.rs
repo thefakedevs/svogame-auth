@@ -5,6 +5,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use auth::entities::{
     MetricDiscordOutbox, MetricDiscordOutboxActiveModel, MetricIngestion, MetricIngestionColumn,
+    UserActiveModel,
 };
 use auth::services::metrics::discord::process_next_delivery;
 use axum::extract::State;
@@ -127,6 +128,24 @@ async fn metrics_pipeline_is_authenticated_transactional_idempotent_and_queryabl
     assert_eq!(matches_body["matches"][0]["winningTeam"], "Attack");
     assert_eq!(matches_body["matches"][0]["teamWon"], true);
 
+    UserActiveModel {
+        id: Set(Uuid::parse_str(A).expect("valid player UUID")),
+        discord_id: Set("leaderboard-current-name".to_string()),
+        username: Set("CurrentAlpha".to_string()),
+        avatar_url: Set(None),
+        email: Set(None),
+        auth_epoch: Set(0),
+        is_active: Set(true),
+        is_superuser: Set(false),
+        squad_id: Set(None),
+        deactivation_reason: Set(None),
+        last_login_at: Set(Utc::now()),
+        created_at: Set(Utc::now()),
+    }
+    .insert(&app.db)
+    .await
+    .expect("insert authoritative backend nickname");
+
     let leaderboard_page_1 = app
         .get_without_auth("/api/metrics/leaderboard?metric=kills&limit=1&offset=0")
         .await;
@@ -134,6 +153,7 @@ async fn metrics_pipeline_is_authenticated_transactional_idempotent_and_queryabl
     let page_1: Value = leaderboard_page_1.json().await.expect("leaderboard page 1");
     assert_eq!(page_1["entries"][0]["rank"], 1);
     assert_eq!(page_1["entries"][0]["playerId"], A);
+    assert_eq!(page_1["entries"][0]["nickname"], "CurrentAlpha");
     assert_eq!(page_1["pagination"]["total"], 3);
     let leaderboard_page_2 = app
         .get_without_auth("/api/metrics/leaderboard?metric=kills&limit=1&offset=1")
