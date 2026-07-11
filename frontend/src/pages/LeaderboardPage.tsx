@@ -5,6 +5,7 @@ import PlayerHead from '../components/metrics/PlayerHead'
 import './LeaderboardPage.css'
 
 const metricOptions: Array<[LeaderboardMetric, string]> = [
+  ['matches_played', 'Матчи'],
   ['kills', 'Убийства'],
   ['deaths', 'Смерти'],
   ['damage_dealt', 'Урон'],
@@ -53,6 +54,9 @@ export default function LeaderboardPage() {
   }
   const entries = state.data?.entries ?? []
   const total = state.data?.pagination.total ?? 0
+  const metricColumnClass = (column: LeaderboardMetric) => (
+    metric === column ? 'is-selected-metric' : 'is-secondary-metric'
+  )
 
   return (
     <main className="leaderboard-page page">
@@ -61,7 +65,6 @@ export default function LeaderboardPage() {
           <h1 className="card-title">Таблица лидеров</h1>
           <p className="card-text">Результаты матчей сообщества.</p>
         </div>
-        <span className="ui-badge ui-badge-neutral">{numberFormatter.format(total)} участников</span>
       </section>
 
       <section className="card leaderboard-card">
@@ -88,11 +91,11 @@ export default function LeaderboardPage() {
           <table className="leaderboard-table">
             <thead>
               <tr>
-                <th>Место</th><th>Участник</th><th>Матчи</th>
-                <th className={metric === 'kills' ? 'is-selected-metric' : ''}>Убийства</th>
-                <th className={metric === 'deaths' ? 'is-selected-metric' : ''}>Смерти</th>
-                <th className={metric === 'damage_dealt' ? 'is-selected-metric' : ''}>Урон</th>
-                <th className={metric === 'kd' ? 'is-selected-metric' : ''}>K/D</th>
+                <th>Место</th><th>Участник</th><th className={metricColumnClass('matches_played')}>Матчи</th>
+                <th className={metricColumnClass('kills')}>Убийства</th>
+                <th className={metricColumnClass('deaths')}>Смерти</th>
+                <th className={metricColumnClass('damage_dealt')}>Урон</th>
+                <th className={metricColumnClass('kd')}>K/D</th>
               </tr>
             </thead>
             <tbody>
@@ -105,11 +108,11 @@ export default function LeaderboardPage() {
                       <span><strong>{entry.nickname}</strong><small>{entry.playerId}</small></span>
                     </div>
                   </td>
-                  <td>{numberFormatter.format(entry.matchesPlayed)}</td>
-                  <td className={metric === 'kills' ? 'leaderboard-primary-value' : ''}>{entry.kills}</td>
-                  <td className={metric === 'deaths' ? 'leaderboard-primary-value' : ''}>{entry.deaths}</td>
-                  <td className={metric === 'damage_dealt' ? 'leaderboard-primary-value' : ''}>{numberFormatter.format(entry.damageDealt)}</td>
-                  <td className={metric === 'kd' ? 'leaderboard-primary-value' : ''}>{numberFormatter.format(entry.kd)}</td>
+                  <td className={metricColumnClass('matches_played')}>{numberFormatter.format(entry.matchesPlayed)}</td>
+                  <td className={metricColumnClass('kills')}>{entry.kills}</td>
+                  <td className={metricColumnClass('deaths')}>{entry.deaths}</td>
+                  <td className={metricColumnClass('damage_dealt')}>{numberFormatter.format(entry.damageDealt)}</td>
+                  <td className={metricColumnClass('kd')}>{numberFormatter.format(entry.kd)}</td>
                 </tr>
               ))}
             </tbody>

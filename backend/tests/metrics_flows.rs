@@ -162,6 +162,18 @@ async fn metrics_pipeline_is_authenticated_transactional_idempotent_and_queryabl
     assert_eq!(page_2["entries"][0]["rank"], 2);
     assert_eq!(page_2["entries"][0]["playerId"], C);
 
+    let matches_played_leaderboard = app
+        .get_without_auth("/api/metrics/leaderboard?metric=matches_played&limit=10")
+        .await;
+    assert_eq!(matches_played_leaderboard.status(), StatusCode::OK);
+    let matches_played: Value = matches_played_leaderboard
+        .json()
+        .await
+        .expect("matches played leaderboard JSON");
+    assert_eq!(matches_played["metric"], "matches_played");
+    assert_eq!(matches_played["entries"][0]["metricValue"], 1.0);
+    assert_eq!(matches_played["entries"][0]["matchesPlayed"], 1);
+
     let outbox =
         MetricDiscordOutbox::find_by_id(Uuid::parse_str(GAME).expect("valid fixture game UUID"))
             .one(&app.db)
