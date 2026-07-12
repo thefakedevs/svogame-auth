@@ -227,6 +227,7 @@ pub async fn list_users(
         if let Ok(uuid) = Uuid::parse_str(q) {
             condition = condition.add(UserColumn::Id.eq(uuid));
         }
+        condition = condition.add(UserColumn::DiscordId.eq(q));
         user_query = user_query.filter(condition);
     }
 

@@ -22,6 +22,7 @@ import AppPortal from '../../shared/ui/portal/AppPortal'
 import LoadingState from '../LoadingState'
 import SkinViewer3D from '../SkinViewer3D'
 import AdminLink from './AdminLink'
+import AdminUserMatchesModal from './AdminUserMatchesModal'
 import AdminUserOwnershipPanel from './AdminUserOwnershipPanel'
 
 function formatDateTime(value?: string | null) {
@@ -62,6 +63,7 @@ export default function AdminUserProfile({
   const [isUpdatingRestrictions, setIsUpdatingRestrictions] = useState(false)
   const [isResettingAuthEpoch, setIsResettingAuthEpoch] = useState(false)
   const [isResetAuthEpochModalOpen, setIsResetAuthEpochModalOpen] = useState(false)
+  const [isMatchesModalOpen, setIsMatchesModalOpen] = useState(false)
   const [restrictionReason, setRestrictionReason] = useState('')
   const [userRestrictions, setUserRestrictions] = useState<AdminUserRestrictionResponse[]>([])
   const [restrictionMeta, setRestrictionMeta] = useState<RestrictionMetaResponse[]>([])
@@ -275,6 +277,9 @@ export default function AdminUserProfile({
                 >
                   Открытые кейсы
                 </AdminLink>
+                <button className="btn btn-sm" type="button" onClick={() => setIsMatchesModalOpen(true)}>
+                  Матчи
+                </button>
               </div>
             </div>
 
@@ -439,6 +444,7 @@ export default function AdminUserProfile({
           </div>
         </AppPortal>
       ) : null}
+      {user && isMatchesModalOpen ? <AdminUserMatchesModal userId={user.id} username={user.username} onClose={() => setIsMatchesModalOpen(false)} /> : null}
     </div>
   )
 }

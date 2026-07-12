@@ -693,7 +693,7 @@ function AdminHome({
           <div className="admin-filter-bar">
             <label className="admin-shop-field">
               <span>Поиск</span>
-              <input className="ui-input" value={usersQuery} onChange={(event) => onUsersQueryChange(event.target.value)} placeholder="Ник, email или UUID" />
+              <input className="ui-input" value={usersQuery} onChange={(event) => onUsersQueryChange(event.target.value)} placeholder="Ник, email, UUID или Discord ID" />
             </label>
           </div>
           <div className="admin-list">

@@ -1124,7 +1124,7 @@ async fn admin_can_grant_and_revoke_restrictions_and_user_sees_them() {
 
 #[tokio::test]
 #[serial]
-async fn admin_can_search_users_by_username_and_uuid() {
+async fn admin_can_search_users_by_username_uuid_and_discord_id() {
     let app = TestApp::spawn().await;
     let admin = app.issue_user_token("SearchAdmin", true, &[]).await;
     let searched_user = app.issue_user_token("UniqueSearchTarget", false, &[]).await;
@@ -1166,6 +1166,37 @@ async fn admin_can_search_users_by_username_and_uuid() {
 
     assert_eq!(uuid_search_body["total"], 1);
     assert_eq!(uuid_search_body["items"][0]["id"], searched_user.user_id);
+
+    let discord_user_response = app
+        .post_without_auth(
+            "/api/test/issue-token",
+            serde_json::json!({
+                "username": "DiscordSearchTarget",
+                "discordId": "123456789012345678",
+            }),
+        )
+        .await;
+    assert!(discord_user_response.status().is_success());
+    let discord_user_body: serde_json::Value = discord_user_response
+        .json()
+        .await
+        .expect("discord user json");
+
+    let discord_search = app
+        .get_json(
+            "/api/admin/users?q=123456789012345678&page=1&perPage=10",
+            &admin.access_token,
+        )
+        .await;
+    assert!(discord_search.status().is_success());
+    let discord_search_body: serde_json::Value =
+        discord_search.json().await.expect("discord search json");
+
+    assert_eq!(discord_search_body["total"], 1);
+    assert_eq!(
+        discord_search_body["items"][0]["id"],
+        discord_user_body["userId"]
+    );
 }
 
 #[tokio::test]
