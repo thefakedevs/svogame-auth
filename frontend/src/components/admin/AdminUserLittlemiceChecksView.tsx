@@ -420,7 +420,6 @@ function ClientInfoHumanView({ text }: { text: string }) {
                     <td>{asText(item.r)}</td>
                     <td>{asText(item.loaded)}</td>
                     <td><code>{asText(item.h)}</code></td>
-                    <td><code>{asText(item.hw)}</code></td>
                   </tr>
                 ))}
               </tbody>

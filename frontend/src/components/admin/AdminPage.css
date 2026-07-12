@@ -1464,6 +1464,9 @@
   text-align: left;
   vertical-align: top;
   font-size: 0.82rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .admin-littlemice-data-table th {
