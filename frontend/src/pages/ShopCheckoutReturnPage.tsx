@@ -9,11 +9,11 @@ import {
 } from '../api/shop'
 import ErrorState from '../components/ErrorState'
 import LoadingState from '../components/LoadingState'
+import PaymentImageConfetti from '../components/PaymentImageConfetti'
 import { currentAppPath, redirectToAuth } from '../routes/auth'
 import { paths } from '../routes/paths'
 import { useQueryParams } from '../shared/navigation/query'
 import { getAuthToken } from '../shared/session/auth-session'
-import Pride from 'react-canvas-confetti/dist/presets/pride'
 import './OwnershipPage.css'
 import './ShopPage.css'
 
@@ -425,21 +425,7 @@ export default function ShopCheckoutReturnPage() {
           <ReceiptPanel state={receiptState} />
           <CallbackActions />
         </section>
-        {isTabVisible && (
-          <>
-            <Pride
-              style={{ position: 'fixed', pointerEvents: 'none', width: '100%', height: '100%', top: 0, left: 0, zIndex: -1 }}
-              autorun={{ speed: 1 }}
-              decorateOptions={(defaultOptions) => ({
-                ...defaultOptions,
-                particleCount: 50,
-                spread: 90,
-                zIndex: -1,
-                colors: ['#26ccff', '#a25afd', '#ff5e7e', '#88ff5a', '#fcff42', '#ffa62d', '#ff36ff']
-              })}
-            />
-          </>
-        )}
+        {isTabVisible && <PaymentImageConfetti />}
       </main>
     )
   }
