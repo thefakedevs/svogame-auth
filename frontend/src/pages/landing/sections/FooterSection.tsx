@@ -1,3 +1,5 @@
+import { paths } from '../../../routes/paths'
+
 export default function FooterSection() {
   const year = new Date().getFullYear()
 
@@ -8,13 +10,13 @@ export default function FooterSection() {
           <h2>Основное</h2>
           <ul>
             <li>
-              <a href="/profile" data-cta="footer-profile">Профиль</a>
+              <a href={paths.profile} data-cta="footer-profile">Профиль</a>
             </li>
             <li>
-              <a href="/downloads" data-cta="footer-downloads">Скачать лаунчер</a>
+              <a href={paths.downloads} data-cta="footer-downloads">Скачать лаунчер</a>
             </li>
             <li>
-              <a href="/wiki" data-cta="footer-wiki">Вики проекта</a>
+              <a href={paths.wiki} data-cta="footer-wiki">Вики проекта</a>
             </li>
           </ul>
         </div>
@@ -23,16 +25,16 @@ export default function FooterSection() {
           <h2>Документы</h2>
           <ul>
             <li>
-              <a href="/legal/public_offer" data-cta="footer-privacy">Публичная оферта</a>
+              <a href={paths.legalPublicOffer} data-cta="footer-privacy">Публичная оферта</a>
             </li>
             <li>
-              <a href="/legal/user_agreement" data-cta="footer-terms">Пользовательское соглашение</a>
+              <a href={paths.legalUserAgreement} data-cta="footer-terms">Пользовательское соглашение</a>
             </li>
             <li>
-              <a href="/legal/privacy_policy" data-cta="footer-privacy">Политика конфиденциальности</a>
+              <a href={paths.legalPrivacyPolicy} data-cta="footer-privacy">Политика конфиденциальности</a>
             </li>
             <li>
-              <a href="/legal/refund_policy" data-cta="footer-privacy">Политика возвратов</a>
+              <a href={paths.legalRefundPolicy} data-cta="footer-privacy">Политика возвратов</a>
             </li>
           </ul>
         </div>
@@ -41,7 +43,7 @@ export default function FooterSection() {
           <h2>Связь</h2>
           <ul>
             <li>
-              <a href="/contacts" data-cta="footer-contacts">Контакты</a>
+              <a href={paths.contacts} data-cta="footer-contacts">Контакты</a>
             </li>
             <li>
               <a href="https://discord.gg/UQQK4ykxMa" data-cta="footer-discord">Discord</a>

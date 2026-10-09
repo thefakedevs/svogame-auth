@@ -1,4 +1,5 @@
 import seed from '../../public/static-preview/data.json'
+import { withBasePath } from '../shared/navigation/basePath'
 
 export const STATIC_PREVIEW = true
 
@@ -68,7 +69,7 @@ function assetList(url: URL) {
   const page = Math.max(1, Number(params.get('page') ?? 1))
   const perPage = Math.max(1, Number(params.get('perPage') ?? 100))
   const start = (page - 1) * perPage
-  return { items: items.slice(start, start + perPage), total: items.length, page, perPage, totalPages: Math.ceil(items.length / perPage) }
+  return { items: items.slice(start, start + perPage).map((asset) => ({ ...asset, imageUrl: asset.imageUrl ? withBasePath(asset.imageUrl) : asset.imageUrl })), total: items.length, page, perPage, totalPages: Math.ceil(items.length / perPage) }
 }
 
 function metricRows(metric: string) {
@@ -98,7 +99,7 @@ function shopOrder(body: Record<string, unknown>) {
     quantity, unitPriceRub: product.priceRub, totalPriceRub: product.priceRub * quantity,
     grantedAmount: product.stackableAmount, grantedDurationSeconds: product.durationSeconds, maxOwnedAmount: product.maxOwnedAmount,
     paymentProvider: 'mock', status: 'paid', failureProblem: null, paymentExpiresAt: null, paidAt: stamp, fulfilledAt: stamp,
-    payment: { id: `${id}-payment`, provider: 'mock', providerPaymentId: id, checkoutToken: null, checkoutUrl: `/shop/checkout/return?orderId=${id}`, status: 'succeeded', createdAt: stamp, updatedAt: stamp },
+    payment: { id: `${id}-payment`, provider: 'mock', providerPaymentId: id, checkoutToken: null, checkoutUrl: `${withBasePath('/shop/checkout/return')}?orderId=${id}`, status: 'succeeded', createdAt: stamp, updatedAt: stamp },
     receipt: null, metadata: {}, createdAt: stamp, updatedAt: stamp,
   }
   shopOrders[id] = order
@@ -209,7 +210,7 @@ export async function mockStaticApi(input: string, init: RequestInit = {}): Prom
     return { ...match, eventsProcessed: 0, playerCount: 0, teams: [], players: [] }
   }
   if (path === '/api/skins/me' && method === 'POST') return { status: 'success', uuid: previewUserId, model: 'default', message: 'Скин сохранён в режиме предпросмотра.' }
-  if (path === '/api/auth/prepare') return { oauthUrl: '/profile', pow: { challenge: 'preview', difficulty: 0 } }
+  if (path === '/api/auth/prepare') return { oauthUrl: withBasePath('/profile'), pow: { challenge: 'preview', difficulty: 0 } }
   if (path.startsWith('/api/admin/')) return []
   console.info(`[static preview] No fixture for ${method} ${path}`)
   return []

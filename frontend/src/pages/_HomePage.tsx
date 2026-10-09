@@ -10,6 +10,8 @@ import {
 } from '../api/inventory'
 import { listDiscordGuildEvents, type DiscordGuildEventResponse } from '../api/discord'
 import { listPublicShopProducts, type ShopProductResponse } from '../api/shop'
+import { paths } from '../routes/paths'
+import { withBasePath } from '../shared/navigation/basePath'
 import FooterSection from './landing/sections/FooterSection'
 import './HomePage.css'
 import './OwnershipPage.css'
@@ -526,7 +528,7 @@ useEffect(() => {
       <section className="landing-hero" aria-labelledby="landing-hero-title">
         <img
           className="landing-hero__image"
-          src="/landing/hero.jpg"
+          src={withBasePath('/landing/hero.jpg')}
           alt=""
           fetchPriority="high"
           aria-hidden="true"
@@ -541,7 +543,7 @@ useEffect(() => {
           <div className="landing-hero__actions">
             <a
               className="btn primary btn-lg"
-              href="/auth"
+              href={paths.auth}
               data-analytics-event="start_play"
               data-cta="hero-start-play"
             >
@@ -549,7 +551,7 @@ useEffect(() => {
             </a>
             <a
               className="btn btn-secondary-accent btn-lg"
-              href="/downloads"
+              href={paths.downloads}
               data-analytics-event="download_launcher"
               data-cta="hero-download-launcher"
               aria-label="Скачать лаунчер SvoCraft"
@@ -583,7 +585,7 @@ useEffect(() => {
             <div className="ui-card-footer">
               <a
                 className="btn btn-sm btn-secondary-accent"
-                href="/auth"
+                href={paths.auth}
                 data-analytics-event="start_play"
                 data-cta="mode-capture-flag-start"
               >
@@ -603,7 +605,7 @@ useEffect(() => {
             <div className="ui-card-footer">
               <a
                 className="btn btn-sm btn-secondary-accent"
-                href="/auth"
+                href={paths.auth}
                 data-analytics-event="start_play"
                 data-cta="mode-duels-start"
               >
@@ -643,7 +645,7 @@ useEffect(() => {
           <div className="landing-start__actions">
             <a
               className="btn primary btn-lg"
-              href="/downloads"
+              href={paths.downloads}
               data-analytics-event="download_launcher"
               data-cta="start-download-launcher"
             >
@@ -664,7 +666,7 @@ useEffect(() => {
         <PhotoProvider loop photoClosable maskOpacity={0.92}>
           <div className="landing-gallery-grid">
             <PhotoView
-              src="/landing/2026-04-12_20.33.02.png"
+              src={withBasePath('/landing/2026-04-12_20.33.02.png')}
               width={1280}
               height={720}
               overlay={(
@@ -682,7 +684,7 @@ useEffect(() => {
                 aria-label="Открыть изображение: Арена захвата флага"
               >
                 <img
-                  src="/landing/2026-04-12_20.33.02.png"
+                  src={withBasePath('/landing/2026-04-12_20.33.02.png')}
                   width={1280}
                   height={720}
                   loading="lazy"
@@ -696,7 +698,7 @@ useEffect(() => {
             </PhotoView>
 
             <PhotoView
-              src="/landing/2026-04-12_22.13.53.png"
+              src={withBasePath('/landing/2026-04-12_22.13.53.png')}
               width={1280}
               height={720}
               overlay={(
@@ -714,7 +716,7 @@ useEffect(() => {
                 aria-label="Открыть изображение: Дуэльная линия"
               >
                 <img
-                  src="/landing/2026-04-12_22.13.53.png"
+                  src={withBasePath('/landing/2026-04-12_22.13.53.png')}
                   width={1280}
                   height={720}
                   loading="lazy"
@@ -728,7 +730,7 @@ useEffect(() => {
             </PhotoView>
 
             <PhotoView
-              src="/landing/2026-04-12_21.50.19.png"
+              src={withBasePath('/landing/2026-04-12_21.50.19.png')}
               width={1280}
               height={720}
               overlay={(
@@ -746,7 +748,7 @@ useEffect(() => {
                 aria-label="Открыть изображение: Командный спавн"
               >
                 <img
-                  src="/landing/2026-04-12_21.50.19.png"
+                  src={withBasePath('/landing/2026-04-12_21.50.19.png')}
                   width={1280}
                   height={720}
                   loading="lazy"
@@ -760,7 +762,7 @@ useEffect(() => {
             </PhotoView>
 
             <PhotoView
-              src="/landing/launcher.png"
+              src={withBasePath('/landing/launcher.png')}
               width={1280}
               height={720}
               overlay={(
@@ -778,7 +780,7 @@ useEffect(() => {
                 aria-label="Открыть изображение: Лаунчер"
               >
                 <img
-                  src="/landing/launcher.png"
+                  src={withBasePath('/landing/launcher.png')}
                   width={1280}
                   height={720}
                   loading="lazy"
@@ -842,7 +844,7 @@ useEffect(() => {
         <div className="landing-ticker__actions">
           <a
             className="btn btn-secondary-accent"
-            href="/shop"
+            href={paths.shop}
             data-analytics-event="shop_view_all"
             data-cta="shop-ticker-view-all"
           >
@@ -979,7 +981,7 @@ useEffect(() => {
         <div className="landing-final-cta__actions">
           <a
             className="btn primary btn-lg"
-            href="/auth"
+            href={paths.auth}
             data-analytics-event="start_play"
             data-cta="final-start-play"
           >
@@ -987,7 +989,7 @@ useEffect(() => {
           </a>
           <a
             className="btn btn-lg"
-            href="/downloads"
+            href={paths.downloads}
             data-analytics-event="download_launcher"
             data-cta="final-download-launcher"
           >

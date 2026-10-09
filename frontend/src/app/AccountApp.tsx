@@ -253,17 +253,19 @@ function adminRouteForPath(
     return { type: 'home' }
   }
 
-  const userMatch = pathname.match(/^\/admin\/users\/([^/]+)$/)
+  const adminSubpath = pathname.startsWith(`${paths.admin}/`) ? pathname.slice(paths.admin.length) : ''
+
+  const userMatch = adminSubpath.match(/^\/users\/([^/]+)$/)
   if (userMatch) {
     return { type: 'user', userId: decodeURIComponent(userMatch[1]) }
   }
 
-  const userLootboxHistoryMatch = pathname.match(/^\/admin\/users\/([^/]+)\/lootboxes\/open-history$/)
+  const userLootboxHistoryMatch = adminSubpath.match(/^\/users\/([^/]+)\/lootboxes\/open-history$/)
   if (userLootboxHistoryMatch) {
     return { type: 'userLootboxHistory', userId: decodeURIComponent(userLootboxHistoryMatch[1]) }
   }
 
-  const userLittlemiceCheckMatch = pathname.match(/^\/admin\/users\/([^/]+)\/littlemice\/([^/]+)$/)
+  const userLittlemiceCheckMatch = adminSubpath.match(/^\/users\/([^/]+)\/littlemice\/([^/]+)$/)
   if (userLittlemiceCheckMatch) {
     return {
       type: 'userLittlemice',
@@ -272,32 +274,32 @@ function adminRouteForPath(
     }
   }
 
-  const userLittlemiceMatch = pathname.match(/^\/admin\/users\/([^/]+)\/littlemice$/)
+  const userLittlemiceMatch = adminSubpath.match(/^\/users\/([^/]+)\/littlemice$/)
   if (userLittlemiceMatch) {
     return { type: 'userLittlemice', userId: decodeURIComponent(userLittlemiceMatch[1]) }
   }
 
-  const squadMatch = pathname.match(/^\/admin\/squads\/([^/]+)$/)
+  const squadMatch = adminSubpath.match(/^\/squads\/([^/]+)$/)
   if (squadMatch) {
     return { type: 'squad', squadId: decodeURIComponent(squadMatch[1]) }
   }
 
-  const tokenAuditMatch = pathname.match(/^\/admin\/tokens\/([^/]+)\/audit$/)
+  const tokenAuditMatch = adminSubpath.match(/^\/tokens\/([^/]+)\/audit$/)
   if (tokenAuditMatch) {
     return { type: 'tokenAudit', tokenId: decodeURIComponent(tokenAuditMatch[1]) }
   }
 
-  const assetMatch = pathname.match(/^\/admin\/assets\/([^/]+)$/)
+  const assetMatch = adminSubpath.match(/^\/assets\/([^/]+)$/)
   if (assetMatch) {
     return { type: 'asset', assetId: decodeURIComponent(assetMatch[1]) }
   }
 
-  const shopProductMatch = pathname.match(/^\/admin\/shop\/products\/([^/]+)$/)
+  const shopProductMatch = adminSubpath.match(/^\/shop\/products\/([^/]+)$/)
   if (shopProductMatch) {
     return { type: 'shopProduct', productId: decodeURIComponent(shopProductMatch[1]) }
   }
 
-  const lootboxMatch = pathname.match(/^\/admin\/lootboxes\/([^/]+)$/)
+  const lootboxMatch = adminSubpath.match(/^\/lootboxes\/([^/]+)$/)
   if (lootboxMatch) {
     return { type: 'lootbox', lootboxId: decodeURIComponent(lootboxMatch[1]) }
   }

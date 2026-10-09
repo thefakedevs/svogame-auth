@@ -103,13 +103,14 @@ function appendVersion(url: string, version: number) {
 }
 
 function parseRoute(pathname: string): AdminRoute {
-  const userMatch = pathname.match(/^\/admin\/users\/([^/]+)$/)
+  const adminPath = pathname.startsWith(`${paths.admin}/`) ? pathname.slice(paths.admin.length) : ''
+  const userMatch = adminPath.match(/^\/users\/([^/]+)$/)
   if (userMatch) return { type: 'user', userId: decodeURIComponent(userMatch[1]) }
 
-  const userLootboxHistoryMatch = pathname.match(/^\/admin\/users\/([^/]+)\/lootboxes\/open-history$/)
+  const userLootboxHistoryMatch = adminPath.match(/^\/users\/([^/]+)\/lootboxes\/open-history$/)
   if (userLootboxHistoryMatch) return { type: 'userLootboxHistory', userId: decodeURIComponent(userLootboxHistoryMatch[1]) }
 
-  const userLittlemiceCheckMatch = pathname.match(/^\/admin\/users\/([^/]+)\/littlemice\/([^/]+)$/)
+  const userLittlemiceCheckMatch = adminPath.match(/^\/users\/([^/]+)\/littlemice\/([^/]+)$/)
   if (userLittlemiceCheckMatch) {
     return {
       type: 'userLittlemice',
@@ -118,22 +119,22 @@ function parseRoute(pathname: string): AdminRoute {
     }
   }
 
-  const userLittlemiceMatch = pathname.match(/^\/admin\/users\/([^/]+)\/littlemice$/)
+  const userLittlemiceMatch = adminPath.match(/^\/users\/([^/]+)\/littlemice$/)
   if (userLittlemiceMatch) return { type: 'userLittlemice', userId: decodeURIComponent(userLittlemiceMatch[1]) }
 
-  const squadMatch = pathname.match(/^\/admin\/squads\/([^/]+)$/)
+  const squadMatch = adminPath.match(/^\/squads\/([^/]+)$/)
   if (squadMatch) return { type: 'squad', squadId: decodeURIComponent(squadMatch[1]) }
 
-  const auditMatch = pathname.match(/^\/admin\/tokens\/([^/]+)\/audit$/)
+  const auditMatch = adminPath.match(/^\/tokens\/([^/]+)\/audit$/)
   if (auditMatch) return { type: 'tokenAudit', tokenId: decodeURIComponent(auditMatch[1]) }
 
-  const assetMatch = pathname.match(/^\/admin\/assets\/([^/]+)$/)
+  const assetMatch = adminPath.match(/^\/assets\/([^/]+)$/)
   if (assetMatch) return { type: 'asset', assetId: decodeURIComponent(assetMatch[1]) }
 
-  const shopProductMatch = pathname.match(/^\/admin\/shop\/products\/([^/]+)$/)
+  const shopProductMatch = adminPath.match(/^\/shop\/products\/([^/]+)$/)
   if (shopProductMatch) return { type: 'shopProduct', productId: decodeURIComponent(shopProductMatch[1]) }
 
-  const lootboxMatch = pathname.match(/^\/admin\/lootboxes\/([^/]+)$/)
+  const lootboxMatch = adminPath.match(/^\/lootboxes\/([^/]+)$/)
   if (lootboxMatch) return { type: 'lootbox', lootboxId: decodeURIComponent(lootboxMatch[1]) }
 
   if (pathname === adminLittlemicePath()) return { type: 'littlemice' }

@@ -1,14 +1,18 @@
 import { paths } from '../../routes/paths'
 
 export function normalizePathname(pathname: string) {
-  if (!pathname || pathname === paths.home) {
+  const normalized = pathname.endsWith('/') ? pathname.slice(0, -1) : pathname
+  const normalizedHome = paths.home.endsWith('/') ? paths.home.slice(0, -1) : paths.home
+
+  if (!pathname || normalized === normalizedHome) {
     return paths.home
   }
 
-  return pathname.endsWith('/') ? pathname.slice(0, -1) : pathname
+  return normalized
 }
 
 export function pageTitleForPath(pathname: string) {
+  const adminSubpath = pathname.startsWith(paths.admin) ? pathname.slice(paths.admin.length) : ''
   if (pathname === paths.home) return 'SvoCraft'
   if (pathname === paths.auth) return 'Авторизация | SvoCraft'
   if (pathname === paths.profileEdit) return 'Настройки профиля | SvoCraft'
@@ -21,13 +25,13 @@ export function pageTitleForPath(pathname: string) {
   if (pathname === paths.downloads) return 'Скачать лаунчер | SvoCraft'
   if (pathname === paths.contacts) return 'Контакты | SvoCraft'
   if (pathname === paths.admin) return 'Админ-панель | SvoCraft'
-  if (pathname.match(/^\/admin\/users\/[^/]+\/lootboxes\/open-history$/)) {
+  if (adminSubpath.match(/^\/users\/[^/]+\/lootboxes\/open-history$/)) {
     return 'Открытые кейсы игрока | Админка | SvoCraft'
   }
-  if (pathname.match(/^\/admin\/users\/[^/]+\/littlemice\/[^/]+$/)) {
+  if (adminSubpath.match(/^\/users\/[^/]+\/littlemice\/[^/]+$/)) {
     return 'Проверка littlemice | Админка | SvoCraft'
   }
-  if (pathname.match(/^\/admin\/users\/[^/]+\/littlemice$/)) {
+  if (adminSubpath.match(/^\/users\/[^/]+\/littlemice$/)) {
     return 'Проверки littlemice | Админка | SvoCraft'
   }
   if (pathname.startsWith(`${paths.admin}/users/`)) return 'Профиль игрока | Админка | SvoCraft'
