@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { toDisplayError } from '../../api/http'
+import { STATIC_PREVIEW } from '../../api/staticPreview'
 import { getMyDefaultWalletBalance, type WalletBalanceResponse } from '../../api/inventory'
 import { buildAuthUrl } from '../../routes/auth'
 import { paths } from '../../routes/paths'
@@ -87,7 +88,7 @@ export default function AppHeader({ pageTitle }: Props) {
 
   const sessionWarning = useMemo(() => {
     const token = getAuthToken()
-    if (!authHydrated || !token) return null
+    if (STATIC_PREVIEW || !authHydrated || !token) return null
 
     return validateTokenFormat(token)
       ? null

@@ -1,4 +1,5 @@
 import { ApiError, authHeaders, request } from './http'
+import { STATIC_PREVIEW } from './staticPreview'
 
 export type OwnershipModel = 'stackable' | 'entitlement' | 'expirable'
 export type AssetKind = 'currency' | 'subscription' | 'lootbox' | 'item' | 'skin' | 'cosmetic' | 'ticket' | 'token' | string
@@ -189,10 +190,12 @@ function appendImageVersion(url: string, version?: string | null) {
 }
 
 export function buildPublicAssetImageUrl(assetId: string, version?: string | null) {
+  if (STATIC_PREVIEW) return `/static-preview/assets/${encodeURIComponent(assetId)}.png`
   return appendImageVersion(`/api/assets/${encodeURIComponent(assetId)}/image`, version)
 }
 
 export function buildAdminAssetImageUrl(assetId: string, version?: string | null) {
+  if (STATIC_PREVIEW) return `/static-preview/assets/${encodeURIComponent(assetId)}.png`
   return appendImageVersion(`/api/admin/assets/${encodeURIComponent(assetId)}/image`, version)
 }
 

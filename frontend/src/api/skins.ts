@@ -1,4 +1,5 @@
 import { ApiError, authHeaders, request } from './http'
+import { STATIC_PREVIEW } from './staticPreview'
 
 export type SkinModel = 'default' | 'slim'
 
@@ -10,6 +11,7 @@ export interface UploadSkinResponse {
 }
 
 export function buildSkinUrl(userId: string, version?: number): string {
+  if (STATIC_PREVIEW) return '/static-preview/default-skin.png'
   const url = `/api/skins/${userId}`
   return version ? `${url}?v=${version}` : url
 }

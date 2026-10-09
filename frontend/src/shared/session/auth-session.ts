@@ -1,4 +1,5 @@
 import type { UserProfile } from '../../api/auth'
+import { STATIC_PREVIEW } from '../../api/staticPreview'
 import { useAuthStore } from '../../store/authStore'
 import { loadStoredPowData, saveStoredPowData } from './pow-storage'
 import type { PowData } from './token'
@@ -7,6 +8,14 @@ export function bootstrapAuthSession() {
   const powData = loadStoredPowData()
   if (powData) {
     useAuthStore.setState({ powData })
+  }
+
+  if (STATIC_PREVIEW) {
+    useAuthStore.setState({
+      token: 'static-preview-session',
+      user: { id: '00000000-0000-4000-8000-000000000071', username: 'Игрок', avatarUrl: '', isSuperuser: false },
+      hydrated: true,
+    })
   }
 }
 

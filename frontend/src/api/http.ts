@@ -1,3 +1,5 @@
+import { mockStaticApi, STATIC_PREVIEW } from './staticPreview'
+
 export type ApiErrorKind = 'http' | 'network' | 'parse'
 
 export class ApiError extends Error {
@@ -97,6 +99,10 @@ function extractErrorMessage(body: unknown): string | null {
 export async function request<T>(input: string, options: RequestOptions = {}): Promise<T> {
   const { parseAs = 'json', headers, ...init } = options
 
+  if (STATIC_PREVIEW) {
+    return await mockStaticApi(input, { ...init, headers }) as T
+  }
+
   let response: Response
   try {
     response = await fetch(input, {
@@ -135,6 +141,8 @@ export async function request<T>(input: string, options: RequestOptions = {}): P
 }
 
 export async function requestBlob(input: string, options: RequestInit = {}): Promise<Blob> {
+  if (STATIC_PREVIEW) return new Blob()
+
   let response: Response
   try {
     response = await fetch(input, options)
